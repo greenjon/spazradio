@@ -205,7 +205,7 @@ class RadioService : MediaSessionService() {
                             // Not using FFT for now
                         }
                     },
-                    Visualizer.getMaxCaptureRate() / 2,
+                    Visualizer.getMaxCaptureRate(),
                     true,
                     false
                 )

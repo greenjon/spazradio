@@ -2,8 +2,13 @@ package com.greenjon.spazradiotest
 
 import android.Manifest
 import android.content.ComponentName
-import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,21 +35,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,9 +59,9 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
-import com.greenjon.spazradiotest.ui.theme.SpazradiotestTheme
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import com.greenjon.spazradiotest.ui.theme.SpazradiotestTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -146,7 +150,9 @@ fun RadioApp(
                 
                 // Header: Play/Pause - Listeners - VIS
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -187,7 +193,9 @@ fun RadioApp(
 
                 // Track Title Section (Moved below buttons)
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -239,7 +247,9 @@ fun RadioApp(
                             modifier = Modifier.align(Alignment.Center)
                         )
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+                        LazyColumn(modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)) {
                             item {
                                 Text(
                                     text = "Schedule",
@@ -261,7 +271,9 @@ fun RadioApp(
 
 @Composable
 fun ScheduleItemRow(item: ScheduleItem) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(modifier = Modifier
+        .fillMaxWidth()
+        .padding(vertical = 4.dp)) {
         Text(
             text = "${item.datePart} • ${item.startTime} - ${item.endTime}",
             style = MaterialTheme.typography.labelMedium,
@@ -276,30 +288,177 @@ fun ScheduleItemRow(item: ScheduleItem) {
 }
 
 @Composable
-fun Oscilloscope(waveform: ByteArray?) {
+fun Oscilloscope(
+    waveform: ByteArray?,
+    modifier: Modifier = Modifier
+        .fillMaxWidth()
+        .height(300.dp)
+) {
+    // 1. Setup the Frame Clock
+    val frameClock = remember { mutableStateOf(0L) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            // This is the function that was missing
+            withFrameNanos { time ->
+                frameClock.value = time
+            }
+        }
+    }
+
     if (waveform == null) return
 
-    Canvas(modifier = Modifier.fillMaxWidth().height(300.dp)) {
-        val width = size.width
-        val height = size.height
-        val centerY = height / 2
+    val bitmapRef = remember { mutableStateOf<Bitmap?>(null) }
+    // Note the explicit type here to avoid confusion
+    val canvasRef = remember { mutableStateOf<AndroidCanvas?>(null) }
+    val smoothedGain = remember { mutableStateOf(1f) }
 
-        val path = Path()
-        path.moveTo(0f, centerY)
 
-        val step = width / waveform.size
-        for (i in waveform.indices) {
-            val v = (waveform[i].toInt() and 0xFF) - 128
-            
-            val y = centerY + (v * (height / 2) / 128)
-            val x = i * step
-            path.lineTo(x, y)
+    // Reuse Paint objects
+    val fadePaint = remember {
+        Paint().apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+            color = android.graphics.Color.argb(35, 0, 0, 0)
+        }
+    }
+
+    val linePaint = remember {
+        Paint().apply {
+            color = NeonGreen.toArgb()
+            style = Paint.Style.STROKE
+            strokeWidth = 5f
+            isAntiAlias = true
+            setShadowLayer(10f, 0f, 0f, NeonGreen.toArgb())
+        }
+    }
+
+    val path = remember { Path() }
+
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val tick = frameClock.value // Triggers redraw
+
+        val width = size.width.toInt()
+        val height = size.height.toInt()
+
+        if (bitmapRef.value == null || bitmapRef.value!!.width != width || bitmapRef.value!!.height != height) {
+            val newBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            bitmapRef.value = newBitmap
+            canvasRef.value = AndroidCanvas(newBitmap)
         }
 
-        drawPath(
-            path = path,
-            color = NeonGreen,
-            style = Stroke(width = 2.dp.toPx())
-        )
+        val bmp = bitmapRef.value!!
+        val cvs = canvasRef.value!!
+
+        cvs.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fadePaint)
+
+        // -----------------------------
+// 1) RMS + Peak Analysis
+// -----------------------------
+        var maxAmplitude = 0
+        var sumSquares = 0f
+
+        for (b in waveform) {
+            val v = (b.toInt() and 0xFF) - 128
+            val absV = kotlin.math.abs(v)
+            if (absV > maxAmplitude) maxAmplitude = absV
+            sumSquares += v * v
+        }
+
+        val rms = if (waveform.isNotEmpty()) {
+            kotlin.math.sqrt(sumSquares / waveform.size)
+        } else {
+            0f
+        }
+// -----------------------------
+// 2) Dynamic Trail Decay
+// -----------------------------
+        val dynamicAlpha = when {
+            maxAmplitude < 10 -> 18   // long persistence in silence
+            maxAmplitude < 30 -> 28
+            maxAmplitude < 60 -> 40
+            else -> 55   // fast decay when loud
+        }
+
+        fadePaint.color = android.graphics.Color.argb(dynamicAlpha, 0, 0, 0)
+
+// -----------------------------
+// 3) RMS Auto-Gain (Soft Compressed + Smoothed)
+// -----------------------------
+        val minGain = 0.5f // Lowered floor
+        val maxGain = 1.8f // Lowered ceiling slightly
+
+        val normalizedRms = (rms / 64f).coerceIn(0.08f, 1.2f)
+        val targetGain = (1f / normalizedRms).coerceIn(minGain, maxGain)
+
+        smoothedGain.value += (targetGain - smoothedGain.value) * 0.12f
+        val autoGain = smoothedGain.value
+
+// -----------------------------
+// 4) Geometry Setup
+// -----------------------------
+        val centerY = height / 2f
+        val centerX = height / 2f
+
+        // This is the "ideal" height if the wave wasn't huge.
+        // We multiply by autoGain to boost quiet parts.
+        val baseScale = (height * 0.45f) * autoGain
+
+        path.reset()
+        path.moveTo(0f, centerY)
+
+// -----------------------------
+// 5) Bézier Tension Control
+// -----------------------------
+        val tension = 0.55f   // 🎛 Adjust freely: 0.3 = liquid, 0.8 = sharp
+
+// -----------------------------
+// 6) Draw Logic — Lissajous Mode (Mono → Fake Stereo)
+// -----------------------------
+        if (maxAmplitude > 2 && waveform.size > 8) {
+
+            val count = waveform.size
+            val phaseOffset = count / 4   // 90° shift
+            val radius = baseScale        // reuse your auto-gain scale
+
+            path.reset()
+
+            // --- First point ---
+            val v0 = waveform[0].toInt() and 0xFF
+            val v0n = (v0 / 128f) - 1f
+            val v0p = waveform[phaseOffset % count].toInt() and 0xFF
+            val v0pn = (v0p / 128f) - 1f
+
+            val x0 = centerX + v0n * radius
+            val y0 = centerY + v0pn * radius
+            path.moveTo(x0, y0)
+
+            // --- Vector Trace ---
+            for (i in 1 until count - phaseOffset) {
+
+                val a = waveform[i].toInt() and 0xFF
+                val b = waveform[(i + phaseOffset) % count].toInt() and 0xFF
+
+                val an = (a / 128f) - 1f
+                val bn = (b / 128f) - 1f
+
+                val rawX = centerX + an * radius
+                val rawY = centerY + bn * radius
+
+                // Soft limiter still applies
+                val limit = height / 2f - 12f
+
+                val lx = centerX + limit * kotlin.math.tanh((rawX - centerX) / limit)
+                val ly = centerY + limit * kotlin.math.tanh((rawY - centerY) / limit)
+
+                path.lineTo(lx.toFloat(), ly.toFloat())
+            }
+
+        } else {
+            // Silence fallback
+            path.reset()
+            path.addCircle(centerX, centerY, 10f, Path.Direction.CW)
+        }
+        cvs.drawPath(path, linePaint)
+        drawImage(image = bmp.asImageBitmap())
     }
 }
