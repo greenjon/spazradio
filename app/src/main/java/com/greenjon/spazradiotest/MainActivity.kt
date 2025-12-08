@@ -17,10 +17,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,12 +34,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -103,7 +113,14 @@ fun RadioApp(
     val context = LocalContext.current
     var mediaController by remember { mutableStateOf<MediaController?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
-    var isVisEnabled by remember { mutableStateOf(false) }
+    
+    // Replaced isVisEnabled with showSettings
+    var showSettings by remember { mutableStateOf(false) }
+
+    // Settings State
+    val lissajousMode = remember { mutableStateOf(true) }
+    val tension = remember { mutableStateOf(0.55f) }
+    val gainRange = remember { mutableStateOf(0.5f..1.8f) }
 
     var trackTitle by remember { mutableStateOf("Connecting...") }
     var trackListeners by remember { mutableStateOf("") }
@@ -141,14 +158,14 @@ fun RadioApp(
                 .fillMaxSize()
                 .background(
                     brush = Brush.verticalGradient(
-                        colors = listOf(Magenta, DeepBlue)
+                        colors = listOf(DeepBlue, Magenta, DeepBlue)
                     )
                 )
                 .padding(innerPadding)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 
-                // Header: Play/Pause - Listeners - VIS
+                // Header: Play/Pause - Listeners - Settings
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -178,14 +195,14 @@ fun RadioApp(
                         color = NeonGreen
                     )
 
-                    // Top Right VIS Button
+                    // Top Right Settings Button (Replaces VIS)
                     Button(
-                        onClick = { isVisEnabled = !isVisEnabled },
+                        onClick = { showSettings = !showSettings }, // Toggle settings
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                         modifier = Modifier.border(1.dp, NeonGreen, RoundedCornerShape(4.dp))
                     ) {
                         Text(
-                            text = if (isVisEnabled) "VIS: ON" else "VIS: OFF",
+                            text = "Settings",
                             color = NeonGreen
                         )
                     }
@@ -207,25 +224,25 @@ fun RadioApp(
                     )
                 }
 
-                // Visualizer (Conditional)
-                if (isVisEnabled) {
-                    val waveform by RadioService.waveformFlow.collectAsState()
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp)
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Oscilloscope(waveform = waveform)
-                    }
+                // Visualizer (Always visible now in main view)
+                val waveform by RadioService.waveformFlow.collectAsState()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Oscilloscope(
+                        waveform = waveform,
+                        lissajousMode = lissajousMode.value,
+                        tension = tension.value,
+                        minGain = gainRange.value.start,
+                        maxGain = gainRange.value.endInclusive
+                    )
                 }
 
-                // Schedule Section (Bottom)
-                val schedule by scheduleViewModel.schedule.collectAsState()
-                val loading by scheduleViewModel.loading.collectAsState()
-                val error by scheduleViewModel.error.collectAsState()
-
+                // Lower Half: Settings or Schedule
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -235,36 +252,162 @@ fun RadioApp(
                         .border(3.dp, NeonGreen, RoundedCornerShape(16.dp))
                         .clip(RoundedCornerShape(16.dp))
                 ) {
-                    if (loading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center),
-                            color = NeonGreen
-                        )
-                    } else if (error != null) {
-                        Text(
-                            text = "Error: $error",
-                            color = MaterialTheme.colorScheme.error, // Keeping error color red/standard for visibility or could be NeonGreen too
-                            modifier = Modifier.align(Alignment.Center)
+                    if (showSettings) {
+                        SettingsScreen(
+                            onBack = { showSettings = false },
+                            lissajousMode = lissajousMode,
+                            tension = tension,
+                            gainRange = gainRange
                         )
                     } else {
-                        LazyColumn(modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp)) {
-                            item {
-                                Text(
-                                    text = "Schedule",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    modifier = Modifier.padding(bottom = 8.dp),
-                                    color = NeonGreen
-                                )
-                            }
-                            items(schedule) { item ->
-                                ScheduleItemRow(item)
+                        // Schedule Section (Bottom)
+                        val schedule by scheduleViewModel.schedule.collectAsState()
+                        val loading by scheduleViewModel.loading.collectAsState()
+                        val error by scheduleViewModel.error.collectAsState()
+
+                        if (loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.align(Alignment.Center),
+                                color = NeonGreen
+                            )
+                        } else if (error != null) {
+                            Text(
+                                text = "Error: $error",
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        } else {
+                            LazyColumn(modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp)) {
+                                item {
+                                    Text(
+                                        text = "Schedule",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        modifier = Modifier.padding(bottom = 8.dp),
+                                        color = NeonGreen
+                                    )
+                                }
+                                items(schedule) { item ->
+                                    ScheduleItemRow(item)
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SettingsScreen(
+    onBack: () -> Unit,
+    lissajousMode: MutableState<Boolean>,
+    tension: MutableState<Float>,
+    gainRange: MutableState<ClosedFloatingPointRange<Float>>
+) {
+    // Use a column but ensure it fits in the container
+    // We also add a scrim to catch clicks so they don't pass through to what was below, 
+    // though here we are replacing the content so it's fine.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { /* Absorb clicks */ },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top // Align top to start listing settings
+    ) {
+        Text(
+            text = "Settings",
+            style = MaterialTheme.typography.headlineMedium,
+            color = NeonGreen,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        
+        // Scrollable content if settings grow
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            // Lissajous Mode Control
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Lissajous Mode",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = NeonGreen
+                )
+                Checkbox(
+                    checked = lissajousMode.value,
+                    onCheckedChange = { lissajousMode.value = it },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = NeonGreen,
+                        uncheckedColor = NeonGreen,
+                        checkmarkColor = DeepBlue
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Bézier Tension Control
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Text(
+                    text = "Bézier Tension: ${String.format("%.2f", tension.value)}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = NeonGreen
+                )
+                Slider(
+                    value = tension.value,
+                    onValueChange = { tension.value = it },
+                    valueRange = 0f..1f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = NeonGreen,
+                        activeTrackColor = NeonGreen,
+                        inactiveTrackColor = DeepBlue.copy(alpha = 0.5f)
+                    )
+                )
+            }
+
+            // Auto-gain Range Control
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Text(
+                    text = "Auto-gain Range: ${String.format("%.1f", gainRange.value.start)} - ${String.format("%.1f", gainRange.value.endInclusive)}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = NeonGreen
+                )
+                RangeSlider(
+                    value = gainRange.value,
+                    onValueChange = { gainRange.value = it },
+                    valueRange = 0f..3f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = NeonGreen,
+                        activeTrackColor = NeonGreen,
+                        inactiveTrackColor = DeepBlue.copy(alpha = 0.5f)
+                    )
+                )
+            }
+        }
+
+        Button(
+            onClick = onBack,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+            modifier = Modifier
+                .border(1.dp, NeonGreen, RoundedCornerShape(4.dp))
+                .padding(top = 8.dp)
+        ) {
+            Text("Close", color = NeonGreen)
         }
     }
 }
@@ -290,16 +433,18 @@ fun ScheduleItemRow(item: ScheduleItem) {
 @Composable
 fun Oscilloscope(
     waveform: ByteArray?,
+    lissajousMode: Boolean,
+    tension: Float,
+    minGain: Float,
+    maxGain: Float,
     modifier: Modifier = Modifier
         .fillMaxWidth()
         .height(300.dp)
 ) {
-    // 1. Setup the Frame Clock
     val frameClock = remember { mutableStateOf(0L) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            // This is the function that was missing
             withFrameNanos { time ->
                 frameClock.value = time
             }
@@ -309,12 +454,9 @@ fun Oscilloscope(
     if (waveform == null) return
 
     val bitmapRef = remember { mutableStateOf<Bitmap?>(null) }
-    // Note the explicit type here to avoid confusion
     val canvasRef = remember { mutableStateOf<AndroidCanvas?>(null) }
     val smoothedGain = remember { mutableStateOf(1f) }
 
-
-    // Reuse Paint objects
     val fadePaint = remember {
         Paint().apply {
             xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
@@ -335,7 +477,8 @@ fun Oscilloscope(
     val path = remember { Path() }
 
     androidx.compose.foundation.Canvas(modifier = modifier) {
-        val tick = frameClock.value // Triggers redraw
+        // Trigger redraw on frame
+        val tick = frameClock.value 
 
         val width = size.width.toInt()
         val height = size.height.toInt()
@@ -351,9 +494,7 @@ fun Oscilloscope(
 
         cvs.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fadePaint)
 
-        // -----------------------------
-// 1) RMS + Peak Analysis
-// -----------------------------
+        // 1) RMS + Peak Analysis
         var maxAmplitude = 0
         var sumSquares = 0f
 
@@ -369,94 +510,105 @@ fun Oscilloscope(
         } else {
             0f
         }
-// -----------------------------
-// 2) Dynamic Trail Decay
-// -----------------------------
+
+        // 2) Dynamic Trail Decay
         val dynamicAlpha = when {
-            maxAmplitude < 10 -> 18   // long persistence in silence
+            maxAmplitude < 10 -> 18
             maxAmplitude < 30 -> 28
             maxAmplitude < 60 -> 40
-            else -> 55   // fast decay when loud
+            else -> 55
         }
 
         fadePaint.color = android.graphics.Color.argb(dynamicAlpha, 0, 0, 0)
 
-// -----------------------------
-// 3) RMS Auto-Gain (Soft Compressed + Smoothed)
-// -----------------------------
-        val minGain = 0.5f // Lowered floor
-        val maxGain = 1.8f // Lowered ceiling slightly
-
+        // 3) RMS Auto-Gain
         val normalizedRms = (rms / 64f).coerceIn(0.08f, 1.2f)
         val targetGain = (1f / normalizedRms).coerceIn(minGain, maxGain)
 
         smoothedGain.value += (targetGain - smoothedGain.value) * 0.12f
         val autoGain = smoothedGain.value
 
-// -----------------------------
-// 4) Geometry Setup
-// -----------------------------
+        // 4) Geometry Setup
         val centerY = height / 2f
-        val centerX = height / 2f
+        val centerX = width / 2f
+        val xScale = width * 0.42f
+        val yScale = height * 0.42f
 
-        // This is the "ideal" height if the wave wasn't huge.
-        // We multiply by autoGain to boost quiet parts.
+        val phaseOffset = Math.PI.toFloat() / 2f  // Fake stereo
         val baseScale = (height * 0.45f) * autoGain
 
         path.reset()
         path.moveTo(0f, centerY)
 
-// -----------------------------
-// 5) Bézier Tension Control
-// -----------------------------
-        val tension = 0.55f   // 🎛 Adjust freely: 0.3 = liquid, 0.8 = sharp
-
-// -----------------------------
-// 6) Draw Logic — Lissajous Mode (Mono → Fake Stereo)
-// -----------------------------
-        if (maxAmplitude > 2 && waveform.size > 8) {
-
-            val count = waveform.size
-            val phaseOffset = count / 4   // 90° shift
-            val radius = baseScale        // reuse your auto-gain scale
-
+        // 6) Draw Logic — Lissajous Mode
+        if (lissajousMode) {
             path.reset()
 
-            // --- First point ---
-            val v0 = waveform[0].toInt() and 0xFF
-            val v0n = (v0 / 128f) - 1f
-            val v0p = waveform[phaseOffset % count].toInt() and 0xFF
-            val v0pn = (v0p / 128f) - 1f
+            if (maxAmplitude > 2 && waveform.size > 8) {
 
-            val x0 = centerX + v0n * radius
-            val y0 = centerY + v0pn * radius
-            path.moveTo(x0, y0)
+                var firstPoint = true
+                val count = waveform.size
+                val phaseShift = waveform.size / 4   // ✅ 90° shift in samples
 
-            // --- Vector Trace ---
-            for (i in 1 until count - phaseOffset) {
+                for (i in 0 until count) {
+                    val a = ((waveform[i].toInt() and 0xFF) - 128) / 128f
+                    val bIndex = (i + phaseShift) % count
+                    val b = ((waveform[bIndex].toInt() and 0xFF) - 128) / 128f
 
-                val a = waveform[i].toInt() and 0xFF
-                val b = waveform[(i + phaseOffset) % count].toInt() and 0xFF
+                    val x = centerX + a * xScale
+                    val y = centerY + b * yScale
 
-                val an = (a / 128f) - 1f
-                val bn = (b / 128f) - 1f
+                    if (firstPoint) {
+                        path.moveTo(x, y)
+                        firstPoint = false
+                    } else {
+                        path.lineTo(x, y)
+                    }
+                }
 
-                val rawX = centerX + an * radius
-                val rawY = centerY + bn * radius
+                path.close()
 
-                // Soft limiter still applies
-                val limit = height / 2f - 12f
-
-                val lx = centerX + limit * kotlin.math.tanh((rawX - centerX) / limit)
-                val ly = centerY + limit * kotlin.math.tanh((rawY - centerY) / limit)
-
-                path.lineTo(lx.toFloat(), ly.toFloat())
+            } else {
+                path.addCircle(centerX, centerY, 10f, Path.Direction.CW)
             }
 
         } else {
-            // Silence fallback
-            path.reset()
-            path.addCircle(centerX, centerY, 10f, Path.Direction.CW)
+            // ✅ Classic Time-Based Oscilloscope (Your Existing Mode)
+            if (maxAmplitude > 2) {
+                val step = width.toFloat() / (waveform.size - 1)
+
+                for (i in 1 until waveform.size) {
+                    val prevIndex = i - 1
+
+                    val prevV = waveform[prevIndex].toInt() and 0xFF
+                    val prevNormalized = (prevV / 128f) - 1f
+                    val prevX = prevIndex * step
+
+                    val rawPrevY = prevNormalized * baseScale
+                    val limitThreshold = height / 2f - 10f
+                    val limitedPrevY = limitThreshold * kotlin.math.tanh(rawPrevY / limitThreshold)
+                    val prevY = centerY + limitedPrevY
+
+                    val v = waveform[i].toInt() and 0xFF
+                    val normalized = (v / 128f) - 1f
+                    val x = i * step
+
+                    val rawY = normalized * baseScale
+                    val limitedY = limitThreshold * kotlin.math.tanh(rawY / limitThreshold)
+                    val y = centerY + limitedY
+
+                    val dx = x - prevX
+                    val controlOffset = dx * tension
+
+                    path.cubicTo(
+                        prevX + controlOffset, prevY,
+                        x - controlOffset, y,
+                        x, y
+                    )
+                }
+            } else {
+                path.lineTo(width.toFloat(), centerY)
+            }
         }
         cvs.drawPath(path, linePaint)
         drawImage(image = bmp.asImageBitmap())
