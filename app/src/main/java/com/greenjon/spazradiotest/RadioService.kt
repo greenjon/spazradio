@@ -79,6 +79,8 @@ class RadioService : MediaSessionService() {
             .setLoadControl(loadControl)
             .build()
         
+        player?.playWhenReady = true // Autostart playback when ready
+
         // Ensure we have a valid intent for the session activity
         val sessionActivityPendingIntent =
             PendingIntent.getActivity(
