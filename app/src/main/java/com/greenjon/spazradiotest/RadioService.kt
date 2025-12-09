@@ -56,7 +56,7 @@ class RadioService : MediaSessionService() {
             .readTimeout(30, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
-            .hostnameVerifier { _, _ -> true } // Trust all hostnames for debugging
+         //   .hostnameVerifier { _, _ -> true } // Trust all hostnames for debugging
             .build()
 
         val okHttpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
