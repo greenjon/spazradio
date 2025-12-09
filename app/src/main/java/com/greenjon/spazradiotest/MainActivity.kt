@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
@@ -14,7 +13,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,8 +30,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,9 +43,12 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -67,21 +66,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
-import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.greenjon.spazradiotest.ui.theme.SpazradiotestTheme
+import java.util.Locale
+import android.graphics.Canvas as AndroidCanvas
 
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
-        ) { isGranted: Boolean ->
+        ) { _: Boolean ->
             // Handle permission result if needed
         }
 
@@ -114,14 +115,14 @@ fun RadioApp(
     scheduleViewModel: ScheduleViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    var mediaController by remember { mutableStateOf<MediaController?>(null) }
+    var mediaController by remember { mutableStateOf<androidx.media3.session.MediaController?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     
     var showSettings by remember { mutableStateOf(false) }
 
     // Settings State
     val lissajousMode = remember { mutableStateOf(true) }
-    val tension = remember { mutableStateOf(0.55f) }
+    val tension = remember { mutableFloatStateOf(0.55f) }
     val gainRange = remember { mutableStateOf(0.5f..1.8f) }
 
     var trackTitle by remember { mutableStateOf("Connecting...") }
@@ -129,8 +130,8 @@ fun RadioApp(
 
     LaunchedEffect(Unit) {
         val sessionToken = SessionToken(context, ComponentName(context, RadioService::class.java))
-        val controllerFuture: ListenableFuture<MediaController> =
-            MediaController.Builder(context, sessionToken).buildAsync()
+        val controllerFuture: ListenableFuture<androidx.media3.session.MediaController> =
+            androidx.media3.session.MediaController.Builder(context, sessionToken).buildAsync()
         
         controllerFuture.addListener({
             try {
@@ -227,21 +228,17 @@ fun RadioApp(
 
                 // Visualizer (Always visible now in main view)
                 val waveform by RadioService.waveformFlow.collectAsState()
-                Box(
+                Oscilloscope(
+                    waveform = waveform,
+                    lissajousMode = lissajousMode.value,
+                    tension = tension.floatValue,
+                    minGain = gainRange.value.start,
+                    maxGain = gainRange.value.endInclusive,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp)
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Oscilloscope(
-                        waveform = waveform,
-                        lissajousMode = lissajousMode.value,
-                        tension = tension.value,
-                        minGain = gainRange.value.start,
-                        maxGain = gainRange.value.endInclusive
-                    )
-                }
+                        .padding(16.dp)
+                )
 
                 // Lower Half: Settings or Schedule
                 Box(
@@ -305,7 +302,7 @@ fun RadioApp(
 fun SettingsScreen(
     onBack: () -> Unit,
     lissajousMode: MutableState<Boolean>,
-    tension: MutableState<Float>,
+    tension: MutableFloatState,
     gainRange: MutableState<ClosedFloatingPointRange<Float>>
 ) {
     // Use a column but ensure it fits in the container
@@ -363,15 +360,17 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Bézier Tension Control
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            Column(modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)) {
                 Text(
-                    text = "Bézier Tension: ${String.format("%.2f", tension.value)}",
+                    text = "Bézier Tension: ${String.format(Locale.US, "%.2f", tension.floatValue)}",
                     style = MaterialTheme.typography.bodyLarge,
                     color = NeonGreen
                 )
                 Slider(
-                    value = tension.value,
-                    onValueChange = { tension.value = it },
+                    value = tension.floatValue,
+                    onValueChange = { tension.floatValue = it },
                     valueRange = 0f..1f,
                     colors = SliderDefaults.colors(
                         thumbColor = NeonGreen,
@@ -382,9 +381,11 @@ fun SettingsScreen(
             }
 
             // Auto-gain Range Control
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            Column(modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)) {
                 Text(
-                    text = "Auto-gain Range: ${String.format("%.1f", gainRange.value.start)} - ${String.format("%.1f", gainRange.value.endInclusive)}",
+                    text = "Auto-gain Range: ${String.format(Locale.US, "%.1f", gainRange.value.start)} - ${String.format(Locale.US, "%.1f", gainRange.value.endInclusive)}",
                     style = MaterialTheme.typography.bodyLarge,
                     color = NeonGreen
                 )
@@ -438,15 +439,13 @@ fun Oscilloscope(
     minGain: Float,
     maxGain: Float,
     modifier: Modifier = Modifier
-        .fillMaxWidth()
-        .height(300.dp)
 ) {
-    val frameClock = remember { mutableStateOf(0L) }
+    val frameClock = remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(Unit) {
         while (true) {
             withFrameNanos { time ->
-                frameClock.value = time
+                frameClock.longValue = time
             }
         }
     }
@@ -455,7 +454,7 @@ fun Oscilloscope(
 
     val bitmapRef = remember { mutableStateOf<Bitmap?>(null) }
     val canvasRef = remember { mutableStateOf<AndroidCanvas?>(null) }
-    val smoothedGain = remember { mutableStateOf(1f) }
+    val smoothedGain = remember { mutableFloatStateOf(1f) }
 
     val fadePaint = remember {
         Paint().apply {
@@ -477,14 +476,14 @@ fun Oscilloscope(
     val path = remember { Path() }
 
     androidx.compose.foundation.Canvas(modifier = modifier) {
-        // Trigger redraw on frame
-        val tick = frameClock.value 
+        frameClock.longValue // Trigger redraw on frame by reading the state
 
         val width = size.width.toInt()
         val height = size.height.toInt()
 
         if (bitmapRef.value == null || bitmapRef.value!!.width != width || bitmapRef.value!!.height != height) {
-            val newBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val newBitmap =
+                createBitmap(width, height, Bitmap.Config.ARGB_8888)
             bitmapRef.value = newBitmap
             canvasRef.value = AndroidCanvas(newBitmap)
         }
@@ -525,8 +524,8 @@ fun Oscilloscope(
         val normalizedRms = (rms / 64f).coerceIn(0.08f, 1.2f)
         val targetGain = (1f / normalizedRms).coerceIn(minGain, maxGain)
 
-        smoothedGain.value += (targetGain - smoothedGain.value) * 0.12f
-        val autoGain = smoothedGain.value
+        smoothedGain.floatValue += (targetGain - smoothedGain.floatValue) * 0.12f
+        val autoGain = smoothedGain.floatValue
 
         // 4) Geometry Setup
         val centerY = height / 2f
