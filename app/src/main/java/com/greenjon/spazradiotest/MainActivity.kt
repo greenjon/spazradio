@@ -66,10 +66,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.createBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
@@ -89,7 +89,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        
+
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.RECORD_AUDIO
@@ -115,9 +115,9 @@ fun RadioApp(
     scheduleViewModel: ScheduleViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    var mediaController by remember { mutableStateOf<androidx.media3.session.MediaController?>(null) }
+    var mediaController by remember { mutableStateOf<MediaController?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
-    
+
     var showSettings by remember { mutableStateOf(false) }
 
     // Settings State
@@ -130,9 +130,9 @@ fun RadioApp(
 
     LaunchedEffect(Unit) {
         val sessionToken = SessionToken(context, ComponentName(context, RadioService::class.java))
-        val controllerFuture: ListenableFuture<androidx.media3.session.MediaController> =
-            androidx.media3.session.MediaController.Builder(context, sessionToken).buildAsync()
-        
+        val controllerFuture: ListenableFuture<MediaController> =
+            MediaController.Builder(context, sessionToken).buildAsync()
+
         controllerFuture.addListener({
             try {
                 mediaController = controllerFuture.get()
@@ -140,6 +140,7 @@ fun RadioApp(
                     override fun onIsPlayingChanged(playing: Boolean) {
                         isPlaying = playing
                     }
+
                     override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
                         trackTitle = mediaMetadata.title?.toString() ?: "Radio Spaz"
                         trackListeners = mediaMetadata.artist?.toString() ?: ""
@@ -148,7 +149,7 @@ fun RadioApp(
                 isPlaying = mediaController?.isPlaying == true
                 trackTitle = mediaController?.mediaMetadata?.title?.toString() ?: "Radio Spaz"
                 trackListeners = mediaController?.mediaMetadata?.artist?.toString() ?: ""
-                
+
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -167,7 +168,7 @@ fun RadioApp(
                 .padding(innerPadding)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                
+
                 // Header: Play/Pause - Listeners - Settings
                 Row(
                     modifier = Modifier
@@ -230,6 +231,7 @@ fun RadioApp(
                 val waveform by RadioService.waveformFlow.collectAsState()
                 Oscilloscope(
                     waveform = waveform,
+                    isPlaying = isPlaying,
                     lissajousMode = lissajousMode.value,
                     tension = tension.floatValue,
                     minGain = gainRange.value.start,
@@ -275,9 +277,11 @@ fun RadioApp(
                                 modifier = Modifier.align(Alignment.Center)
                             )
                         } else {
-                            LazyColumn(modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp)) {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(8.dp)
+                            ) {
                                 item {
                                     Text(
                                         text = "Schedule",
@@ -306,8 +310,6 @@ fun SettingsScreen(
     gainRange: MutableState<ClosedFloatingPointRange<Float>>
 ) {
     // Use a column but ensure it fits in the container
-    // We also add a scrim to catch clicks so they don't pass through to what was below, 
-    // though here we are replacing the content so it's fine.
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -326,7 +328,7 @@ fun SettingsScreen(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 16.dp)
         )
-        
+
         // Scrollable content if settings grow
         Column(
             modifier = Modifier
@@ -360,9 +362,7 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Bézier Tension Control
-            Column(modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 Text(
                     text = "Bézier Tension: ${String.format(Locale.US, "%.2f", tension.floatValue)}",
                     style = MaterialTheme.typography.bodyLarge,
@@ -381,11 +381,15 @@ fun SettingsScreen(
             }
 
             // Auto-gain Range Control
-            Column(modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 Text(
-                    text = "Auto-gain Range: ${String.format(Locale.US, "%.1f", gainRange.value.start)} - ${String.format(Locale.US, "%.1f", gainRange.value.endInclusive)}",
+                    text = "Auto-gain Range: ${String.format(Locale.US, "%.1f", gainRange.value.start)} - ${
+                        String.format(
+                            Locale.US,
+                            "%.1f",
+                            gainRange.value.endInclusive
+                        )
+                    }",
                     style = MaterialTheme.typography.bodyLarge,
                     color = NeonGreen
                 )
@@ -403,7 +407,7 @@ fun SettingsScreen(
         }
 
         IconButton(onClick = onBack) {
-             Icon(
+            Icon(
                 painter = painterResource(id = R.drawable.ic_close),
                 contentDescription = "Close Settings",
                 tint = NeonGreen,
@@ -415,9 +419,11 @@ fun SettingsScreen(
 
 @Composable
 fun ScheduleItemRow(item: ScheduleItem) {
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .padding(vertical = 4.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
         Text(
             text = "${item.datePart} • ${item.startTime} - ${item.endTime}",
             style = MaterialTheme.typography.labelMedium,
@@ -434,6 +440,7 @@ fun ScheduleItemRow(item: ScheduleItem) {
 @Composable
 fun Oscilloscope(
     waveform: ByteArray?,
+    isPlaying: Boolean,
     lissajousMode: Boolean,
     tension: Float,
     minGain: Float,
@@ -449,8 +456,6 @@ fun Oscilloscope(
             }
         }
     }
-
-    if (waveform == null) return
 
     val bitmapRef = remember { mutableStateOf<Bitmap?>(null) }
     val canvasRef = remember { mutableStateOf<AndroidCanvas?>(null) }
@@ -482,8 +487,7 @@ fun Oscilloscope(
         val height = size.height.toInt()
 
         if (bitmapRef.value == null || bitmapRef.value!!.width != width || bitmapRef.value!!.height != height) {
-            val newBitmap =
-                createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val newBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             bitmapRef.value = newBitmap
             canvasRef.value = AndroidCanvas(newBitmap)
         }
@@ -493,122 +497,126 @@ fun Oscilloscope(
 
         cvs.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fadePaint)
 
-        // 1) RMS + Peak Analysis
-        var maxAmplitude = 0
-        var sumSquares = 0f
+        if (isPlaying && waveform != null) {
+            // 1) RMS + Peak Analysis
+            var maxAmplitude = 0
+            var sumSquares = 0f
 
-        for (b in waveform) {
-            val v = (b.toInt() and 0xFF) - 128
-            val absV = kotlin.math.abs(v)
-            if (absV > maxAmplitude) maxAmplitude = absV
-            sumSquares += v * v
-        }
+            for (b in waveform) {
+                val v = (b.toInt() and 0xFF) - 128
+                val absV = kotlin.math.abs(v)
+                if (absV > maxAmplitude) maxAmplitude = absV
+                sumSquares += v * v
+            }
 
-        val rms = if (waveform.isNotEmpty()) {
-            kotlin.math.sqrt(sumSquares / waveform.size)
-        } else {
-            0f
-        }
+            val rms = if (waveform.isNotEmpty()) {
+                kotlin.math.sqrt(sumSquares / waveform.size)
+            } else {
+                0f
+            }
 
-        // 2) Dynamic Trail Decay
-        val dynamicAlpha = when {
-            maxAmplitude < 10 -> 18
-            maxAmplitude < 30 -> 28
-            maxAmplitude < 60 -> 40
-            else -> 55
-        }
+            // 2) Dynamic Trail Decay
+            val dynamicAlpha = when {
+                maxAmplitude < 10 -> 18
+                maxAmplitude < 30 -> 28
+                maxAmplitude < 60 -> 40
+                else -> 55
+            }
 
-        fadePaint.color = android.graphics.Color.argb(dynamicAlpha, 0, 0, 0)
+            fadePaint.color = android.graphics.Color.argb(dynamicAlpha, 0, 0, 0)
 
-        // 3) RMS Auto-Gain
-        val normalizedRms = (rms / 64f).coerceIn(0.08f, 1.2f)
-        val targetGain = (1f / normalizedRms).coerceIn(minGain, maxGain)
+            // 3) RMS Auto-Gain
+            val normalizedRms = (rms / 64f).coerceIn(0.08f, 1.2f)
+            val targetGain = (1f / normalizedRms).coerceIn(minGain, maxGain)
 
-        smoothedGain.floatValue += (targetGain - smoothedGain.floatValue) * 0.12f
-        val autoGain = smoothedGain.floatValue
+            smoothedGain.floatValue += (targetGain - smoothedGain.floatValue) * 0.12f
+            val autoGain = smoothedGain.floatValue
 
-        // 4) Geometry Setup
-        val centerY = height / 2f
-        val centerX = width / 2f
-        val xScale = width * 0.42f
-        val yScale = height * 0.42f
+            // 4) Geometry Setup
+            val centerY = height / 2f
+            val centerX = width / 2f
+            val xScale = width * 0.42f
+            val yScale = height * 0.42f
 
-        val baseScale = (height * 0.45f) * autoGain
+            val baseScale = (height * 0.45f) * autoGain
 
-        path.reset()
-        path.moveTo(0f, centerY)
-
-        // 6) Draw Logic — Lissajous Mode
-        if (lissajousMode) {
             path.reset()
+            path.moveTo(0f, centerY)
 
-            if (maxAmplitude > 2 && waveform.size > 8) {
+            // 6) Draw Logic — Lissajous Mode
+            if (lissajousMode) {
+                path.reset()
 
-                var firstPoint = true
-                val count = waveform.size
-                val phaseShift = waveform.size / 4   // ✅ 90° shift in samples
+                if (maxAmplitude > 2 && waveform.size > 8) {
 
-                for (i in 0 until count) {
-                    val a = ((waveform[i].toInt() and 0xFF) - 128) / 128f
-                    val bIndex = (i + phaseShift) % count
-                    val b = ((waveform[bIndex].toInt() and 0xFF) - 128) / 128f
+                    var firstPoint = true
+                    val count = waveform.size
+                    val phaseShift = waveform.size / 4   // ✅ 90° shift in samples
 
-                    val x = centerX + a * xScale
-                    val y = centerY + b * yScale
+                    for (i in 0 until count) {
+                        val a = ((waveform[i].toInt() and 0xFF) - 128) / 128f
+                        val bIndex = (i + phaseShift) % count
+                        val b = ((waveform[bIndex].toInt() and 0xFF) - 128) / 128f
 
-                    if (firstPoint) {
-                        path.moveTo(x, y)
-                        firstPoint = false
-                    } else {
-                        path.lineTo(x, y)
+                        val x = centerX + a * xScale
+                        val y = centerY + b * yScale
+
+                        if (firstPoint) {
+                            path.moveTo(x, y)
+                            firstPoint = false
+                        } else {
+                            path.lineTo(x, y)
+                        }
                     }
+
+                    path.close()
+
+                } else {
+                    path.addCircle(centerX, centerY, 10f, Path.Direction.CW)
                 }
 
-                path.close()
-
             } else {
-                path.addCircle(centerX, centerY, 10f, Path.Direction.CW)
-            }
+                // ✅ Classic Time-Based Oscilloscope (Your Existing Mode)
+                if (maxAmplitude > 2) {
+                    val step = width.toFloat() / (waveform.size - 1)
 
-        } else {
-            // ✅ Classic Time-Based Oscilloscope (Your Existing Mode)
-            if (maxAmplitude > 2) {
-                val step = width.toFloat() / (waveform.size - 1)
+                    for (i in 1 until waveform.size) {
+                        val prevIndex = i - 1
 
-                for (i in 1 until waveform.size) {
-                    val prevIndex = i - 1
+                        val prevV = waveform[prevIndex].toInt() and 0xFF
+                        val prevNormalized = (prevV / 128f) - 1f
+                        val prevX = prevIndex * step
 
-                    val prevV = waveform[prevIndex].toInt() and 0xFF
-                    val prevNormalized = (prevV / 128f) - 1f
-                    val prevX = prevIndex * step
+                        val rawPrevY = prevNormalized * baseScale
+                        val limitThreshold = height / 2f - 10f
+                        val limitedPrevY =
+                            limitThreshold * kotlin.math.tanh(rawPrevY / limitThreshold)
+                        val prevY = centerY + limitedPrevY
 
-                    val rawPrevY = prevNormalized * baseScale
-                    val limitThreshold = height / 2f - 10f
-                    val limitedPrevY = limitThreshold * kotlin.math.tanh(rawPrevY / limitThreshold)
-                    val prevY = centerY + limitedPrevY
+                        val v = waveform[i].toInt() and 0xFF
+                        val normalized = (v / 128f) - 1f
+                        val x = i * step
 
-                    val v = waveform[i].toInt() and 0xFF
-                    val normalized = (v / 128f) - 1f
-                    val x = i * step
+                        val rawY = normalized * baseScale
+                        val limitedY =
+                            limitThreshold * kotlin.math.tanh(rawY / limitThreshold)
+                        val y = centerY + limitedY
 
-                    val rawY = normalized * baseScale
-                    val limitedY = limitThreshold * kotlin.math.tanh(rawY / limitThreshold)
-                    val y = centerY + limitedY
+                        val dx = x - prevX
+                        val controlOffset = dx * tension
 
-                    val dx = x - prevX
-                    val controlOffset = dx * tension
-
-                    path.cubicTo(
-                        prevX + controlOffset, prevY,
-                        x - controlOffset, y,
-                        x, y
-                    )
+                        path.cubicTo(
+                            prevX + controlOffset, prevY,
+                            x - controlOffset, y,
+                            x, y
+                        )
+                    }
+                } else {
+                    path.lineTo(width.toFloat(), centerY)
                 }
-            } else {
-                path.lineTo(width.toFloat(), centerY)
             }
+            cvs.drawPath(path, linePaint)
         }
-        cvs.drawPath(path, linePaint)
         drawImage(image = bmp.asImageBitmap())
     }
 }
