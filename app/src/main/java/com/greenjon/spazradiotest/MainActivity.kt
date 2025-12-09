@@ -344,7 +344,7 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Lissajous Mode",
+                    text = "Visuals",
                     style = MaterialTheme.typography.bodyLarge,
                     color = NeonGreen
                 )
@@ -362,7 +362,9 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Bézier Tension Control
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            Column(modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)) {
                 Text(
                     text = "Bézier Tension: ${String.format(Locale.US, "%.2f", tension.floatValue)}",
                     style = MaterialTheme.typography.bodyLarge,
@@ -381,7 +383,9 @@ fun SettingsScreen(
             }
 
             // Auto-gain Range Control
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            Column(modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)) {
                 Text(
                     text = "Auto-gain Range: ${String.format(Locale.US, "%.1f", gainRange.value.start)} - ${
                         String.format(
@@ -543,15 +547,14 @@ fun Oscilloscope(
             path.reset()
             path.moveTo(0f, centerY)
 
-            // 6) Draw Logic — Lissajous Mode
             if (lissajousMode) {
                 path.reset()
 
                 if (maxAmplitude > 2 && waveform.size > 8) {
-
+                    // ... (Keep existing Lissajous logic here) ...
                     var firstPoint = true
                     val count = waveform.size
-                    val phaseShift = waveform.size / 4   // ✅ 90° shift in samples
+                    val phaseShift = waveform.size / 4
 
                     for (i in 0 until count) {
                         val a = ((waveform[i].toInt() and 0xFF) - 128) / 128f
@@ -568,54 +571,14 @@ fun Oscilloscope(
                             path.lineTo(x, y)
                         }
                     }
-
                     path.close()
-
                 } else {
                     path.addCircle(centerX, centerY, 10f, Path.Direction.CW)
                 }
 
-            } else {
-                // ✅ Classic Time-Based Oscilloscope (Your Existing Mode)
-                if (maxAmplitude > 2) {
-                    val step = width.toFloat() / (waveform.size - 1)
-
-                    for (i in 1 until waveform.size) {
-                        val prevIndex = i - 1
-
-                        val prevV = waveform[prevIndex].toInt() and 0xFF
-                        val prevNormalized = (prevV / 128f) - 1f
-                        val prevX = prevIndex * step
-
-                        val rawPrevY = prevNormalized * baseScale
-                        val limitThreshold = height / 2f - 10f
-                        val limitedPrevY =
-                            limitThreshold * kotlin.math.tanh(rawPrevY / limitThreshold)
-                        val prevY = centerY + limitedPrevY
-
-                        val v = waveform[i].toInt() and 0xFF
-                        val normalized = (v / 128f) - 1f
-                        val x = i * step
-
-                        val rawY = normalized * baseScale
-                        val limitedY =
-                            limitThreshold * kotlin.math.tanh(rawY / limitThreshold)
-                        val y = centerY + limitedY
-
-                        val dx = x - prevX
-                        val controlOffset = dx * tension
-
-                        path.cubicTo(
-                            prevX + controlOffset, prevY,
-                            x - controlOffset, y,
-                            x, y
-                        )
-                    }
-                } else {
-                    path.lineTo(width.toFloat(), centerY)
-                }
+                // Only draw the path if we are in Lissajous mode
+                cvs.drawPath(path, linePaint)
             }
-            cvs.drawPath(path, linePaint)
         }
         drawImage(image = bmp.asImageBitmap())
     }
