@@ -160,7 +160,7 @@ fun RadioApp(
                 .fillMaxSize()
                 .background(
                     brush = Brush.verticalGradient(
-                        colors = listOf(DeepBlue, Magenta)
+                        colors = listOf(DeepBlue, Magenta, DeepBlue)
                     )
                 )
                 .padding(innerPadding)
