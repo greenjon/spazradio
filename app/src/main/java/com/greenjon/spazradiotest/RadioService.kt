@@ -124,8 +124,21 @@ class RadioService : MediaSessionService() {
             while (isActive) {
                 try {
                     fetchAndUpdateMetadata()
-                } catch (e: Exception) {
-                    Log.e("RadioService", "Metadata polling error", e)
+                } catch (e: Exception) {    Log.e("RadioService", "Error parsing metadata", e)
+                    val errorMetadata = MediaMetadata.Builder()
+                        .setTitle("Radio Spaz")
+                        .setArtist("Error loading metadata")
+                        .build()
+
+                    // Update the UI with the error message
+                    withContext(Dispatchers.Main) {
+                        player?.let { exoPlayer ->
+                            // ... your existing logic to replace the media item's metadata
+                            val currentItem = exoPlayer.getMediaItemAt(0)
+                            val newItem = currentItem.buildUpon().setMediaMetadata(errorMetadata).build()
+                            exoPlayer.replaceMediaItem(0, newItem)
+                        }
+                    }
                 }
                 delay(10000) // Poll every 10 seconds
             }
