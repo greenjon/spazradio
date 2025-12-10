@@ -36,12 +36,49 @@ jobs:
           COUNT=$(git rev-list --count HEAD)
           echo "VERSION_TAG=v1.0.$COUNT" >> $GITHUB_ENV
 
+      - name: Generate Commit Log (Full Messages)
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 --always "$(git rev-list --tags --max-count=1)^" 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found. Using full history."
+            RANGE=""
+          else
+            echo "Previous tag: $PREV_TAG"
+            RANGE="$PREV_TAG..HEAD"
+          fi
+
+          LOG=$(git log $RANGE --pretty=format:"%h%n%s%n%b%n---")
+
+          LOG="${LOG//'%'/'%25'}"
+          LOG="${LOG//$'\n'/'%0A'}"
+          LOG="${LOG//$'\r'/'%0D'}"
+
+          echo "commit_log=$LOG" >> $GITHUB_OUTPUT
+
+      - name: Rename APK
+        id: rename_apk
+        run: |
+          VERSION="${{ env.VERSION_TAG }}"
+          ORIGINAL="app/build/outputs/apk/debug/app-debug.apk"
+          RENAMED="SPAZ.Radio-${VERSION}-debug.apk"
+          cp "$ORIGINAL" "$RENAMED"
+          echo "apk_name=$RENAMED" >> $GITHUB_OUTPUT
+
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION_TAG }}
           name: Release ${{ env.VERSION_TAG }}
-          generate_release_notes: true    # <<< THE IMPORTANT LINE
-          files: app/build/outputs/apk/debug/app-debug.apk
+          body: |
+            ## Commits in this build
+
+            ${{ steps.changelog.outputs.commit_log }}
+
+            ## Full Diff
+            https://github.com/${{ github.repository }}/compare/${{ env.VERSION_TAG }}^...${{ env.VERSION_TAG }}
+
+          files: ${{ steps.rename_apk.outputs.apk_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
