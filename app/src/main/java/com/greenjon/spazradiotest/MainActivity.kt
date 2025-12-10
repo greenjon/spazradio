@@ -119,6 +119,7 @@ fun RadioApp(
     var isPlaying by remember { mutableStateOf(false) }
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    val showSchedule = rememberSaveable { mutableStateOf(true) }
 
     // Settings State
     val lissajousMode = rememberSaveable { mutableStateOf(true) }
@@ -203,16 +204,19 @@ fun RadioApp(
                     }
 
                     // Right Column (InfoBox)
-                    InfoBox(
-                        showSettings = showSettings,
-                        onCloseSettings = { showSettings = false },
-                        lissajousMode = lissajousMode,
-                        scheduleViewModel = scheduleViewModel,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .padding(16.dp)
-                    )
+                    if (showSettings || showSchedule.value) {
+                        InfoBox(
+                            showSettings = showSettings,
+                            onCloseSettings = { showSettings = false },
+                            lissajousMode = lissajousMode,
+                            showSchedule = showSchedule,
+                            scheduleViewModel = scheduleViewModel,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(16.dp)
+                        )
+                    }
                 }
             } else {
                 // Portrait (Original)
@@ -240,16 +244,19 @@ fun RadioApp(
                         )
                     }
 
-                    InfoBox(
-                        showSettings = showSettings,
-                        onCloseSettings = { showSettings = false },
-                        lissajousMode = lissajousMode,
-                        scheduleViewModel = scheduleViewModel,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    )
+                    if (showSettings || showSchedule.value) {
+                        InfoBox(
+                            showSettings = showSettings,
+                            onCloseSettings = { showSettings = false },
+                            lissajousMode = lissajousMode,
+                            showSchedule = showSchedule,
+                            scheduleViewModel = scheduleViewModel,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        )
+                    }
                 }
             }
         }
@@ -322,6 +329,7 @@ fun InfoBox(
     showSettings: Boolean,
     onCloseSettings: () -> Unit,
     lissajousMode: MutableState<Boolean>,
+    showSchedule: MutableState<Boolean>,
     scheduleViewModel: ScheduleViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -335,6 +343,7 @@ fun InfoBox(
             SettingsScreen(
                 onBack = onCloseSettings,
                 lissajousMode = lissajousMode,
+                showSchedule = showSchedule
                 //        tension = tension,
                 //gainRange = gainRange
             )
@@ -382,6 +391,7 @@ fun InfoBox(
 fun SettingsScreen(
     onBack: () -> Unit,
     lissajousMode: MutableState<Boolean>,
+    showSchedule: MutableState<Boolean>
 //    tension: MutableFloatState,
     //gainRange: MutableState<ClosedFloatingPointRange<Float>>
 ) {
@@ -427,6 +437,32 @@ fun SettingsScreen(
                 Checkbox(
                     checked = lissajousMode.value,
                     onCheckedChange = { lissajousMode.value = it },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = NeonGreen,
+                        uncheckedColor = NeonGreen,
+                        checkmarkColor = DeepBlue
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Show Schedule Control
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Show Schedule",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = NeonGreen
+                )
+                Checkbox(
+                    checked = showSchedule.value,
+                    onCheckedChange = { showSchedule.value = it },
                     colors = CheckboxDefaults.colors(
                         checkedColor = NeonGreen,
                         uncheckedColor = NeonGreen,
