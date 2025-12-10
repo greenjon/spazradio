@@ -77,6 +77,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.greenjon.spazradiotest.ui.theme.SpazradiotestTheme
 import android.graphics.Canvas as AndroidCanvas
+import androidx.core.content.edit
 
 class MainActivity : ComponentActivity() {
 
@@ -127,11 +128,11 @@ fun RadioApp(
     val lissajousMode = remember { mutableStateOf(prefs.getBoolean("visuals_enabled", true)) }
 
     LaunchedEffect(showSchedule.value) {
-        prefs.edit().putBoolean("show_schedule", showSchedule.value).apply()
+        prefs.edit { putBoolean("show_schedule", showSchedule.value) }
     }
 
     LaunchedEffect(lissajousMode.value) {
-        prefs.edit().putBoolean("visuals_enabled", lissajousMode.value).apply()
+        prefs.edit { putBoolean("visuals_enabled", lissajousMode.value) }
     }
     
     var trackTitle by remember { mutableStateOf("Connecting...") }
@@ -154,12 +155,12 @@ fun RadioApp(
                     }
 
                     override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
-                        trackTitle = mediaMetadata.title?.toString() ?: "Radio Spaz"
+                        trackTitle = mediaMetadata.title?.toString() ?: "SPAZ.Radio"
                         trackListeners = mediaMetadata.artist?.toString() ?: ""
                     }
                 })
                 isPlaying = mediaController?.isPlaying == true
-                trackTitle = mediaController?.mediaMetadata?.title?.toString() ?: "Radio Spaz"
+                trackTitle = mediaController?.mediaMetadata?.title?.toString() ?: "SPAZ.Radio"
                 trackListeners = mediaController?.mediaMetadata?.artist?.toString() ?: ""
 
             } catch (e: Exception) {
@@ -290,7 +291,7 @@ fun PlayerHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -306,9 +307,9 @@ fun PlayerHeader(
 
         // Center: Listeners count
         Text(
-            text = trackListeners, // Contains "N listening"
-            style = MaterialTheme.typography.labelMedium,
-            color = NeonGreen
+            text = "SPAZ.Radio   -   $trackListeners", // Contains "N listening"
+            style = MaterialTheme.typography.titleLarge,
+            color = Color(0xFFFFFF00)
         )
 
         // Top Right Settings Button
@@ -328,12 +329,12 @@ fun TrackTitle(trackTitle: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = trackTitle,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             color = NeonGreen
@@ -390,7 +391,7 @@ fun InfoBox(
                             text = "Schedule",
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.padding(bottom = 8.dp),
-                            color = NeonGreen
+                            color = Color(0xFFFFFF00)
                         )
                     }
                     items(schedule) { item ->
@@ -423,8 +424,9 @@ fun SettingsScreen(
         Text(
             text = "Settings",
             style = MaterialTheme.typography.headlineMedium,
-            color = NeonGreen,
-            fontWeight = FontWeight.Bold,
+            color = Color(0xFFFFFF00),
+            textAlign = TextAlign.Left,
+            //       fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
