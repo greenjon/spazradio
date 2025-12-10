@@ -228,15 +228,17 @@ fun RadioApp(
 
                     TrackTitle(trackTitle = trackTitle)
 
-                    Oscilloscope(
-                        waveform = waveform,
-                        isPlaying = isPlaying,
-                        lissajousMode = lissajousMode.value,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp)
-                            .padding(16.dp)
-                    )
+                    if (lissajousMode.value) {
+                        Oscilloscope(
+                            waveform = waveform,
+                            isPlaying = isPlaying,
+                            lissajousMode = lissajousMode.value,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                                .padding(16.dp)
+                        )
+                    }
 
                     InfoBox(
                         showSettings = showSettings,
