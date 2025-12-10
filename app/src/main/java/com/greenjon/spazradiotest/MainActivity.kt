@@ -3,6 +3,7 @@ package com.greenjon.spazradiotest
 import android.Manifest
 import android.content.ComponentName
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Path
@@ -22,11 +23,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,6 +59,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -124,6 +128,9 @@ fun RadioApp(
     var trackTitle by remember { mutableStateOf("Connecting...") }
     var trackListeners by remember { mutableStateOf("") }
 
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     LaunchedEffect(Unit) {
         val sessionToken = SessionToken(context, ComponentName(context, RadioService::class.java))
         val controllerFuture: ListenableFuture<MediaController> =
@@ -163,134 +170,205 @@ fun RadioApp(
                 )
                 .padding(innerPadding)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            val waveform by RadioService.waveformFlow.collectAsState()
+            
+            if (isLandscape) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    // Left Column (Controls + Visualizer)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        PlayerHeader(
+                            isPlaying = isPlaying,
+                            onPlayPause = {
+                                if (isPlaying) mediaController?.pause() else mediaController?.play()
+                            },
+                            trackListeners = trackListeners,
+                            onToggleSettings = { showSettings = !showSettings }
+                        )
 
-                // Header: Play/Pause - Listeners - Settings
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Top Left Play/Pause Button
-                    IconButton(onClick = {
-                        if (isPlaying) {
-                            mediaController?.pause()
-                        } else {
-                            mediaController?.play()
-                        }
-                    }) {
-                        Icon(
-                            painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
-                            contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = NeonGreen,
-                            modifier = Modifier.size(48.dp)
+                        TrackTitle(trackTitle = trackTitle)
+
+                        Oscilloscope(
+                            waveform = waveform,
+                            isPlaying = isPlaying,
+                            lissajousMode = lissajousMode.value,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(16.dp)
                         )
                     }
 
-                    // Center: Listeners count
-                    Text(
-                        text = trackListeners, // Contains "N listening"
-                        style = MaterialTheme.typography.labelMedium,
-                        color = NeonGreen
-                    )
-
-                    // Top Right Settings Button (Replaces VIS)
-                    IconButton(onClick = { showSettings = !showSettings }) { // Toggle settings
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_settings),
-                            contentDescription = "Settings",
-                            tint = NeonGreen,
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-                }
-
-                // Track Title Section (Moved below buttons)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = trackTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        color = NeonGreen
+                    // Right Column (InfoBox)
+                    InfoBox(
+                        showSettings = showSettings,
+                        onCloseSettings = { showSettings = false },
+                        lissajousMode = lissajousMode,
+                        scheduleViewModel = scheduleViewModel,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(16.dp)
                     )
                 }
+            } else {
+                // Portrait (Original)
+                Column(modifier = Modifier.fillMaxSize()) {
+                    PlayerHeader(
+                        isPlaying = isPlaying,
+                        onPlayPause = {
+                            if (isPlaying) mediaController?.pause() else mediaController?.play()
+                        },
+                        trackListeners = trackListeners,
+                        onToggleSettings = { showSettings = !showSettings }
+                    )
 
-                // Visualizer (Always visible now in main view)
-                val waveform by RadioService.waveformFlow.collectAsState()
-                Oscilloscope(
-                    waveform = waveform,
-                    isPlaying = isPlaying,
-                    lissajousMode = lissajousMode.value,
-            //        tension = tension.floatValue,
-//                    minGain = gainRange.value.start,
-//                    maxGain = gainRange.value.endInclusive,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                        .padding(16.dp)
+                    TrackTitle(trackTitle = trackTitle)
+
+                    Oscilloscope(
+                        waveform = waveform,
+                        isPlaying = isPlaying,
+                        lissajousMode = lissajousMode.value,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                            .padding(16.dp)
+                    )
+
+                    InfoBox(
+                        showSettings = showSettings,
+                        onCloseSettings = { showSettings = false },
+                        lissajousMode = lissajousMode,
+                        scheduleViewModel = scheduleViewModel,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PlayerHeader(
+    isPlaying: Boolean,
+    onPlayPause: () -> Unit,
+    trackListeners: String,
+    onToggleSettings: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Top Left Play/Pause Button
+        IconButton(onClick = onPlayPause) {
+            Icon(
+                painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
+                contentDescription = if (isPlaying) "Pause" else "Play",
+                tint = NeonGreen,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+
+        // Center: Listeners count
+        Text(
+            text = trackListeners, // Contains "N listening"
+            style = MaterialTheme.typography.labelMedium,
+            color = NeonGreen
+        )
+
+        // Top Right Settings Button
+        IconButton(onClick = onToggleSettings) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_settings),
+                contentDescription = "Settings",
+                tint = NeonGreen,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun TrackTitle(trackTitle: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = trackTitle,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = NeonGreen
+        )
+    }
+}
+
+@Composable
+fun InfoBox(
+    showSettings: Boolean,
+    onCloseSettings: () -> Unit,
+    lissajousMode: MutableState<Boolean>,
+    scheduleViewModel: ScheduleViewModel,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(Color(0x80000000), RoundedCornerShape(16.dp)) // 50% transparent black
+            .border(3.dp, NeonGreen, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+    ) {
+        if (showSettings) {
+            SettingsScreen(
+                onBack = onCloseSettings,
+                lissajousMode = lissajousMode,
+                //        tension = tension,
+                //gainRange = gainRange
+            )
+        } else {
+            // Schedule Section (Bottom)
+            val schedule by scheduleViewModel.schedule.collectAsState()
+            val loading by scheduleViewModel.loading.collectAsState()
+            val error by scheduleViewModel.error.collectAsState()
+
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = NeonGreen
                 )
-
-                // Lower Half: Settings or Schedule
-                Box(
+            } else if (error != null) {
+                Text(
+                    text = "Error: $error",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            } else {
+                LazyColumn(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .background(Color(0x80000000), RoundedCornerShape(16.dp)) // 50% transparent black
-                        .border(3.dp, NeonGreen, RoundedCornerShape(16.dp))
-                        .clip(RoundedCornerShape(16.dp))
+                        .fillMaxSize()
+                        .padding(8.dp)
                 ) {
-                    if (showSettings) {
-                        SettingsScreen(
-                            onBack = { showSettings = false },
-                            lissajousMode = lissajousMode,
-                    //        tension = tension,
-                            //gainRange = gainRange
+                    item {
+                        Text(
+                            text = "Schedule",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            color = NeonGreen
                         )
-                    } else {
-                        // Schedule Section (Bottom)
-                        val schedule by scheduleViewModel.schedule.collectAsState()
-                        val loading by scheduleViewModel.loading.collectAsState()
-                        val error by scheduleViewModel.error.collectAsState()
-
-                        if (loading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.align(Alignment.Center),
-                                color = NeonGreen
-                            )
-                        } else if (error != null) {
-                            Text(
-                                text = "Error: $error",
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(8.dp)
-                            ) {
-                                item {
-                                    Text(
-                                        text = "Schedule",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        modifier = Modifier.padding(bottom = 8.dp),
-                                        color = NeonGreen
-                                    )
-                                }
-                                items(schedule) { item ->
-                                    ScheduleItemRow(item)
-                                }
-                            }
-                        }
+                    }
+                    items(schedule) { item ->
+                        ScheduleItemRow(item)
                     }
                 }
             }
