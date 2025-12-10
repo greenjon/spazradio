@@ -3,19 +3,19 @@ name: Build and Release APK
 on:
   push:
     branches:
-      - main  # Or 'master', depending on your default branch name
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Needed to upload the release
+      contents: write  # Required to create a release
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Important: Fetches all history so we can count commits for versioning
+          fetch-depth: 0  # Required for commit counting and release notes
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -28,23 +28,20 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        # We build Debug because it doesn't require setting up Keystores/Secrets yet.
-        # It allows you to test immediately.
         run: ./gradlew assembleDebug
 
       - name: Get Version Number
         id: get_version
         run: |
-          # Calculate the number of commits again to name the release tag
           COUNT=$(git rev-list --count HEAD)
           echo "VERSION_TAG=v1.0.$COUNT" >> $GITHUB_ENV
 
       - name: Create Release and Upload APK
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION_TAG }}
           name: Release ${{ env.VERSION_TAG }}
-          body: "Automatic build from commit."
+          generate_release_notes: true    # <<< THE IMPORTANT LINE
           files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
