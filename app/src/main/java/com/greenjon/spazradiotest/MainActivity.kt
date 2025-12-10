@@ -2,6 +2,7 @@ package com.greenjon.spazradiotest
 
 import android.Manifest
 import android.content.ComponentName
+import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -115,14 +116,24 @@ fun RadioApp(
     scheduleViewModel: ScheduleViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE) }
+
     var mediaController by remember { mutableStateOf<MediaController?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
-    val showSchedule = rememberSaveable { mutableStateOf(true) }
+    
+    val showSchedule = remember { mutableStateOf(prefs.getBoolean("show_schedule", true)) }
+    val lissajousMode = remember { mutableStateOf(prefs.getBoolean("visuals_enabled", true)) }
 
-    // Settings State
-    val lissajousMode = rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(showSchedule.value) {
+        prefs.edit().putBoolean("show_schedule", showSchedule.value).apply()
+    }
+
+    LaunchedEffect(lissajousMode.value) {
+        prefs.edit().putBoolean("visuals_enabled", lissajousMode.value).apply()
+    }
+    
  //   val tension = remember { mutableFloatStateOf(0.55f) }
 //    val gainRange = remember { mutableStateOf(0.5f..1.8f) }
 
