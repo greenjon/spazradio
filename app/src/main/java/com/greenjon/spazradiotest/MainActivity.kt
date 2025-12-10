@@ -36,14 +36,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,8 +70,8 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.greenjon.spazradiotest.ui.theme.SpazradiotestTheme
-import java.util.Locale
 import android.graphics.Canvas as AndroidCanvas
+import androidx.core.graphics.createBitmap
 
 class MainActivity : ComponentActivity() {
 
@@ -123,7 +119,7 @@ fun RadioApp(
     // Settings State
     val lissajousMode = remember { mutableStateOf(true) }
  //   val tension = remember { mutableFloatStateOf(0.55f) }
-    val gainRange = remember { mutableStateOf(0.5f..1.8f) }
+//    val gainRange = remember { mutableStateOf(0.5f..1.8f) }
 
     var trackTitle by remember { mutableStateOf("Connecting...") }
     var trackListeners by remember { mutableStateOf("") }
@@ -257,7 +253,7 @@ fun RadioApp(
                             onBack = { showSettings = false },
                             lissajousMode = lissajousMode,
                     //        tension = tension,
-                            gainRange = gainRange
+                            //gainRange = gainRange
                         )
                     } else {
                         // Schedule Section (Bottom)
@@ -307,7 +303,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     lissajousMode: MutableState<Boolean>,
 //    tension: MutableFloatState,
-    gainRange: MutableState<ClosedFloatingPointRange<Float>>
+    //gainRange: MutableState<ClosedFloatingPointRange<Float>>
 ) {
     // Use a column but ensure it fits in the container
     Column(
@@ -491,7 +487,7 @@ fun Oscilloscope(
         val height = size.height.toInt()
 
         if (bitmapRef.value == null || bitmapRef.value!!.width != width || bitmapRef.value!!.height != height) {
-            val newBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val newBitmap = createBitmap(width, height)
             bitmapRef.value = newBitmap
             canvasRef.value = AndroidCanvas(newBitmap)
         }
@@ -525,10 +521,10 @@ fun Oscilloscope(
             val attack = 0.25f     // reacts fast to loud parts
             val release = 0.05f    // falls back slowly on quiet parts
 
-            if (rms > loudnessEnv)
-                loudnessEnv += (rms - loudnessEnv) * attack
+            loudnessEnv += if (rms > loudnessEnv)
+                (rms - loudnessEnv) * attack
             else
-                loudnessEnv += (rms - loudnessEnv) * release
+                (rms - loudnessEnv) * release
 
             // -------------------------------------------
             // 3) Convert loudness into explosion scale
