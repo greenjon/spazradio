@@ -243,19 +243,28 @@ fun RadioApp(
 
                     TrackTitle(trackTitle = trackTitle)
 
+                    val showInfoBox = showSettings || showSchedule.value
+
                     if (lissajousMode.value) {
                         Oscilloscope(
                             waveform = waveform,
                             isPlaying = isPlaying,
                             lissajousMode = lissajousMode.value,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
-                                .padding(16.dp)
+                            modifier = if (showInfoBox) {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                                    .padding(16.dp)
+                            } else {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(16.dp)
+                            }
                         )
                     }
 
-                    if (showSettings || showSchedule.value) {
+                    if (showInfoBox) {
                         InfoBox(
                             showSettings = showSettings,
                             onCloseSettings = { showSettings = false },
