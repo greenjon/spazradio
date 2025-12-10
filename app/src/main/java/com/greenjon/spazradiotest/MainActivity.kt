@@ -122,7 +122,7 @@ fun RadioApp(
 
     // Settings State
     val lissajousMode = remember { mutableStateOf(true) }
-    val tension = remember { mutableFloatStateOf(0.55f) }
+ //   val tension = remember { mutableFloatStateOf(0.55f) }
     val gainRange = remember { mutableStateOf(0.5f..1.8f) }
 
     var trackTitle by remember { mutableStateOf("Connecting...") }
@@ -233,9 +233,9 @@ fun RadioApp(
                     waveform = waveform,
                     isPlaying = isPlaying,
                     lissajousMode = lissajousMode.value,
-                    tension = tension.floatValue,
-                    minGain = gainRange.value.start,
-                    maxGain = gainRange.value.endInclusive,
+            //        tension = tension.floatValue,
+//                    minGain = gainRange.value.start,
+//                    maxGain = gainRange.value.endInclusive,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp)
@@ -256,7 +256,7 @@ fun RadioApp(
                         SettingsScreen(
                             onBack = { showSettings = false },
                             lissajousMode = lissajousMode,
-                            tension = tension,
+                    //        tension = tension,
                             gainRange = gainRange
                         )
                     } else {
@@ -306,7 +306,7 @@ fun RadioApp(
 fun SettingsScreen(
     onBack: () -> Unit,
     lissajousMode: MutableState<Boolean>,
-    tension: MutableFloatState,
+//    tension: MutableFloatState,
     gainRange: MutableState<ClosedFloatingPointRange<Float>>
 ) {
     // Use a column but ensure it fits in the container
@@ -362,52 +362,52 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Bézier Tension Control
-            Column(modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)) {
-                Text(
-                    text = "Bézier Tension: ${String.format(Locale.US, "%.2f", tension.floatValue)}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = NeonGreen
-                )
-                Slider(
-                    value = tension.floatValue,
-                    onValueChange = { tension.floatValue = it },
-                    valueRange = 0f..1f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = NeonGreen,
-                        activeTrackColor = NeonGreen,
-                        inactiveTrackColor = DeepBlue.copy(alpha = 0.5f)
-                    )
-                )
-            }
+//            Column(modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(bottom = 16.dp)) {
+//                Text(
+//                    text = "Bézier Tension: ${String.format(Locale.US, "%.2f", tension.floatValue)}",
+//                    style = MaterialTheme.typography.bodyLarge,
+//                    color = NeonGreen
+//                )
+//                Slider(
+//                    value = tension.floatValue,
+//                    onValueChange = { tension.floatValue = it },
+//                    valueRange = 0f..1f,
+//                    colors = SliderDefaults.colors(
+//                        thumbColor = NeonGreen,
+//                        activeTrackColor = NeonGreen,
+//                        inactiveTrackColor = DeepBlue.copy(alpha = 0.5f)
+//                    )
+//                )
+//            }
 
             // Auto-gain Range Control
-            Column(modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)) {
-                Text(
-                    text = "Auto-gain Range: ${String.format(Locale.US, "%.1f", gainRange.value.start)} - ${
-                        String.format(
-                            Locale.US,
-                            "%.1f",
-                            gainRange.value.endInclusive
-                        )
-                    }",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = NeonGreen
-                )
-                RangeSlider(
-                    value = gainRange.value,
-                    onValueChange = { gainRange.value = it },
-                    valueRange = 0f..3f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = NeonGreen,
-                        activeTrackColor = NeonGreen,
-                        inactiveTrackColor = DeepBlue.copy(alpha = 0.5f)
-                    )
-                )
-            }
+//            Column(modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(bottom = 16.dp)) {
+//                Text(
+//                    text = "Auto-gain Range: ${String.format(Locale.US, "%.1f", gainRange.value.start)} - ${
+//                        String.format(
+//                            Locale.US,
+//                            "%.1f",
+//                            gainRange.value.endInclusive
+//                        )
+//                    }",
+//                    style = MaterialTheme.typography.bodyLarge,
+//                    color = NeonGreen
+//                )
+//                RangeSlider(
+//                    value = gainRange.value,
+//                    onValueChange = { gainRange.value = it },
+//                    valueRange = 0f..3f,
+//                    colors = SliderDefaults.colors(
+//                        thumbColor = NeonGreen,
+//                        activeTrackColor = NeonGreen,
+//                        inactiveTrackColor = DeepBlue.copy(alpha = 0.5f)
+//                    )
+//                )
+//            }
         }
 
         IconButton(onClick = onBack) {
@@ -446,9 +446,9 @@ fun Oscilloscope(
     waveform: ByteArray?,
     isPlaying: Boolean,
     lissajousMode: Boolean,
-    tension: Float,
-    minGain: Float,
-    maxGain: Float,
+ //   tension: Float,
+//    minGain: Float,
+//    maxGain: Float,
     modifier: Modifier = Modifier
 ) {
     val frameClock = remember { mutableLongStateOf(0L) }
@@ -463,7 +463,7 @@ fun Oscilloscope(
 
     val bitmapRef = remember { mutableStateOf<Bitmap?>(null) }
     val canvasRef = remember { mutableStateOf<AndroidCanvas?>(null) }
-    val smoothedGain = remember { mutableFloatStateOf(1f) }
+    var loudnessEnv by remember { mutableFloatStateOf(0f) }
 
     val fadePaint = remember {
         Paint().apply {
@@ -502,9 +502,11 @@ fun Oscilloscope(
         cvs.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fadePaint)
 
         if (isPlaying && waveform != null) {
-            // 1) RMS + Peak Analysis
-            var maxAmplitude = 0
+            // -------------------------------------------
+            // 1) Compute RMS of this audio frame
+            // -------------------------------------------
             var sumSquares = 0f
+            var maxAmplitude = 0
 
             for (b in waveform) {
                 val v = (b.toInt() and 0xFF) - 128
@@ -513,13 +515,30 @@ fun Oscilloscope(
                 sumSquares += v * v
             }
 
-            val rms = if (waveform.isNotEmpty()) {
+            val rms = if (waveform.isNotEmpty())
                 kotlin.math.sqrt(sumSquares / waveform.size)
-            } else {
-                0f
-            }
+            else 0f
 
-            // 2) Dynamic Trail Decay
+            // -------------------------------------------
+            // 2) Smooth loudness envelope (volume follower)
+            // -------------------------------------------
+            val attack = 0.25f     // reacts fast to loud parts
+            val release = 0.05f    // falls back slowly on quiet parts
+
+            if (rms > loudnessEnv)
+                loudnessEnv += (rms - loudnessEnv) * attack
+            else
+                loudnessEnv += (rms - loudnessEnv) * release
+
+            // -------------------------------------------
+            // 3) Convert loudness into explosion scale
+            // -------------------------------------------
+            // loudnessEnv is 0–128 range, normalize it
+            // tweak divisor (32f) to control overall sensitivity
+            val explosionScale = ((loudnessEnv / 64f))
+                .coerceIn(0.3f, 4.5f)   // min size vs max explosion
+
+            // 4) Dynamic Trail Decay
             val dynamicAlpha = when {
                 maxAmplitude < 10 -> 18
                 maxAmplitude < 30 -> 28
@@ -529,20 +548,11 @@ fun Oscilloscope(
 
             fadePaint.color = android.graphics.Color.argb(dynamicAlpha, 0, 0, 0)
 
-            // 3) RMS Auto-Gain
-            val normalizedRms = (rms / 64f).coerceIn(0.08f, 1.2f)
-            val targetGain = (1f / normalizedRms).coerceIn(minGain, maxGain)
-
-            smoothedGain.floatValue += (targetGain - smoothedGain.floatValue) * 0.12f
-            val autoGain = smoothedGain.floatValue
-
-            // 4) Geometry Setup
+            // 5) Geometry Setup
             val centerY = height / 2f
             val centerX = width / 2f
             val xScale = width * 0.42f
             val yScale = height * 0.42f
-
-            val baseScale = (height * 0.45f) * autoGain
 
             path.reset()
             path.moveTo(0f, centerY)
@@ -551,7 +561,6 @@ fun Oscilloscope(
                 path.reset()
 
                 if (maxAmplitude > 2 && waveform.size > 8) {
-                    // ... (Keep existing Lissajous logic here) ...
                     var firstPoint = true
                     val count = waveform.size
                     val phaseShift = waveform.size / 4
@@ -561,8 +570,8 @@ fun Oscilloscope(
                         val bIndex = (i + phaseShift) % count
                         val b = ((waveform[bIndex].toInt() and 0xFF) - 128) / 128f
 
-                        val x = centerX + a * xScale
-                        val y = centerY + b * yScale
+                        val x = centerX + a * xScale * explosionScale
+                        val y = centerY + b * yScale * explosionScale
 
                         if (firstPoint) {
                             path.moveTo(x, y)
