@@ -97,14 +97,10 @@ class ScheduleViewModel : ViewModel() {
         val monthDayPattern = DateFormat.getBestDateTimePattern(Locale.getDefault(), "MMdd")
         val monthDayFormat = SimpleDateFormat(monthDayPattern, Locale.getDefault())
         
-        val timeFormat = SimpleDateFormat("h:mm", Locale.getDefault())
+        val timeFormat = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT, Locale.getDefault())
         
-        // Custom AM/PM logic to match 'a' or 'p'
-        val startMeridiem = if (SimpleDateFormat("a", Locale.getDefault()).format(start).lowercase().contains("p")) "p" else "a"
-        val endMeridiem = if (SimpleDateFormat("a", Locale.getDefault()).format(end).lowercase().contains("p")) "p" else "a"
-
-        val startTime = "${timeFormat.format(start)}$startMeridiem"
-        val endTime = "${timeFormat.format(end)}$endMeridiem"
+        val startTime = timeFormat.format(start)
+        val endTime = timeFormat.format(end)
 
         // HTML decoding (simple version for this use case)
         val cleanName = android.text.Html.fromHtml(show.name, android.text.Html.FROM_HTML_MODE_LEGACY).toString()
