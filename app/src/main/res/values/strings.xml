@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">SPAZ Radio</string>
+    <string name="listening_template">%d listening</string>
+    <string name="schedule_title">Schedule</string>
+    <string name="settings_title">Settings</string>
+    <string name="show_schedule">Show Schedule</string>
+    <string name="show_visuals">Show Visuals</string>
 </resources>

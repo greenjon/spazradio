@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -323,7 +324,7 @@ fun PlayerHeader(
         IconButton(onClick = onToggleSettings) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_settings),
-                contentDescription = "Settings",
+                contentDescription = stringResource(R.string.settings_title),
                 tint = NeonGreen,
                 modifier = Modifier.size(48.dp)
             )
@@ -395,7 +396,7 @@ fun InfoBox(
                 ) {
                     item {
                         Text(
-                            text = "Schedule",
+                            text = stringResource(R.string.schedule_title),
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.padding(bottom = 8.dp),
                             color = Color(0xFFFFFF00)
@@ -429,7 +430,7 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.Top // Align top to start listing settings
     ) {
         Text(
-            text = "Settings",
+            text = stringResource(R.string.settings_title),
             style = MaterialTheme.typography.headlineMedium,
             color = Color(0xFFFFFF00),
             textAlign = TextAlign.Left,
@@ -452,7 +453,7 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Show Visuals",
+                    text = stringResource(R.string.show_visuals),
                     style = MaterialTheme.typography.bodyLarge,
                     color = NeonGreen
                 )
@@ -478,7 +479,7 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Show Schedule",
+                    text = stringResource(R.string.show_schedule),
                     style = MaterialTheme.typography.bodyLarge,
                     color = NeonGreen
                 )

@@ -180,7 +180,7 @@ class RadioService : MediaSessionService() {
 
             val newMetadata = MediaMetadata.Builder()
                 .setTitle(playing)
-                .setArtist("$listeners listening")
+                .setArtist(getString(R.string.listening_template, listeners))
                 .build()
 
             withContext(Dispatchers.Main) {

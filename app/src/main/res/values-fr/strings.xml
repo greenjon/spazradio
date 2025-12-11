@@ -1,0 +1,7 @@
+<resources>
+    <string name="listening_template">%d à l\'écoute</string>
+    <string name="schedule_title">Programme</string>
+    <string name="settings_title">Paramètres</string>
+    <string name="show_schedule">Afficher le programme</string>
+    <string name="show_visuals">Afficher les visuels</string>
+</resources>
