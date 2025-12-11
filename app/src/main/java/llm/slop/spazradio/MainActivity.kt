@@ -452,7 +452,7 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Visuals",
+                    text = "Show Visuals",
                     style = MaterialTheme.typography.bodyLarge,
                     color = NeonGreen
                 )
