@@ -15,7 +15,7 @@ android {
     defaultConfig {
         applicationId = "llm.slop.spazradio" // Verify this is your ID
         minSdk = 24 // Or whatever you have
-        targetSdk = 34 // Or whatever you have
+        targetSdk = 35 // Or whatever you have
 
         // --- AUTOMATIC VERSIONING LOGIC ---
         val gitCommitCount = try {
