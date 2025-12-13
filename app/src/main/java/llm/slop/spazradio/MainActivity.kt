@@ -1,68 +1,23 @@
 package llm.slop.spazradio
 
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import android.Manifest
-import android.content.ComponentName
-import android.content.Context
-import android.content.pm.PackageManager
-import android.content.res.Configuration
-import android.graphics.Bitmap
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.SystemBarStyle
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -71,37 +26,54 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.createBitmap
+import androidx.core.content.edit
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import llm.slop.spazradio.ui.theme.SpazRadioTheme
+import android.Manifest
+import android.content.ComponentName
+import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.graphics.*
+import android.os.Bundle
+import androidx.core.graphics.createBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import android.graphics.Canvas as AndroidCanvas
-import androidx.core.content.edit
+
+/* ---------- Connection State ---------- */
+
+enum class ConnectionState {
+    CONNECTING,
+    BUFFERING,
+    RECONNECTING,
+    PLAYING
+}
+
+/* ---------- Activity ---------- */
 
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher =
-        registerForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) { _: Boolean ->
-            // Handle permission result if needed
-        }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(
-                android.graphics.Color.TRANSPARENT
-            ),
-            navigationBarStyle = SystemBarStyle.dark(
-                android.graphics.Color.TRANSPARENT
-            )
+            statusBarStyle = SystemBarStyle.dark(Color.Transparent.toArgb()),
+            navigationBarStyle = SystemBarStyle.dark(Color.Transparent.toArgb())
         )
+
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.RECORD_AUDIO
@@ -118,22 +90,28 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/* ---------- Colors ---------- */
+
 val NeonGreen = Color(0xFF00FF00)
 val DeepBlue = Color(0xFF120A8F)
 val Magenta = Color(0xFFFF00FF)
+
+/* ---------- App Root ---------- */
 
 @Composable
 fun RadioApp(
     scheduleViewModel: ScheduleViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE) }
+    val prefs = remember {
+        context.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE)
+    }
 
     var mediaController by remember { mutableStateOf<MediaController?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
+    var connectionState by remember { mutableStateOf(ConnectionState.CONNECTING) }
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
-    
     val showSchedule = remember { mutableStateOf(prefs.getBoolean("show_schedule", true)) }
     val lissajousMode = remember { mutableStateOf(prefs.getBoolean("visuals_enabled", true)) }
 
@@ -144,34 +122,65 @@ fun RadioApp(
     LaunchedEffect(lissajousMode.value) {
         prefs.edit { putBoolean("visuals_enabled", lissajousMode.value) }
     }
-    
-    var trackTitle by remember { mutableStateOf("Connecting...") }
+
+    var trackTitle by remember { mutableStateOf("SPAZ.Radio") }
     var trackListeners by remember { mutableStateOf("") }
+
+    val displayedSecondLine = when (connectionState) {
+        ConnectionState.CONNECTING -> "Connecting…"
+        ConnectionState.BUFFERING -> "Buffering…"
+        ConnectionState.RECONNECTING -> "Reconnecting…"
+        ConnectionState.PLAYING -> trackTitle
+    }
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    LaunchedEffect(Unit) {
-        val sessionToken = SessionToken(context, ComponentName(context, RadioService::class.java))
-        val controllerFuture: ListenableFuture<MediaController> =
-            MediaController.Builder(context, sessionToken).buildAsync()
+    /* ---------- Media Controller ---------- */
 
-        controllerFuture.addListener({
+    LaunchedEffect(Unit) {
+        val token = SessionToken(context, ComponentName(context, RadioService::class.java))
+        val future: ListenableFuture<MediaController> =
+            MediaController.Builder(context, token).buildAsync()
+
+        future.addListener({
             try {
-                mediaController = controllerFuture.get()
+                mediaController = future.get()
+
                 mediaController?.addListener(object : Player.Listener {
+
+                    override fun onPlaybackStateChanged(state: Int) {
+                        connectionState = when (state) {
+                            Player.STATE_IDLE -> ConnectionState.CONNECTING
+                            Player.STATE_BUFFERING -> ConnectionState.BUFFERING
+                            Player.STATE_READY ->
+                                if (mediaController?.isPlaying == true)
+                                    ConnectionState.PLAYING
+                                else
+                                    ConnectionState.BUFFERING
+                            Player.STATE_ENDED -> ConnectionState.RECONNECTING
+                            else -> connectionState
+                        }
+                    }
+
                     override fun onIsPlayingChanged(playing: Boolean) {
                         isPlaying = playing
+                        if (playing) {
+                            connectionState = ConnectionState.PLAYING
+                        }
                     }
 
-                    override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
-                        trackTitle = mediaMetadata.title?.toString() ?: "SPAZ.Radio"
-                        trackListeners = mediaMetadata.artist?.toString() ?: ""
+                    override fun onPlayerError(error: PlaybackException) {
+                        connectionState = ConnectionState.RECONNECTING
+                    }
+
+                    override fun onMediaMetadataChanged(metadata: MediaMetadata) {
+                        trackTitle = metadata.title?.toString() ?: "SPAZ.Radio"
+                        trackListeners = metadata.artist?.toString() ?: ""
                     }
                 })
+
                 isPlaying = mediaController?.isPlaying == true
-                trackTitle = mediaController?.mediaMetadata?.title?.toString() ?: "SPAZ.Radio"
-                trackListeners = mediaController?.mediaMetadata?.artist?.toString() ?: ""
 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -179,37 +188,34 @@ fun RadioApp(
         }, MoreExecutors.directExecutor())
     }
 
+    /* ---------- UI ---------- */
+
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(DeepBlue, Magenta, DeepBlue)
-                    )
+                    Brush.verticalGradient(listOf(DeepBlue, Magenta, DeepBlue))
                 )
                 .padding(innerPadding)
         ) {
             val waveform by RadioService.waveformFlow.collectAsState()
-            
+
             if (isLandscape) {
                 Row(modifier = Modifier.fillMaxSize()) {
-                    // Left Column (Controls + Visualizer)
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    ) {
+                    Column(modifier = Modifier.weight(1f)) {
+
                         PlayerHeader(
                             isPlaying = isPlaying,
                             onPlayPause = {
-                                if (isPlaying) mediaController?.pause() else mediaController?.play()
+                                if (isPlaying) mediaController?.pause()
+                                else mediaController?.play()
                             },
                             trackListeners = trackListeners,
                             onToggleSettings = { showSettings = !showSettings }
                         )
 
-                        TrackTitle(trackTitle = trackTitle)
+                        TrackTitle(displayedSecondLine)
 
                         Oscilloscope(
                             waveform = waveform,
@@ -222,7 +228,6 @@ fun RadioApp(
                         )
                     }
 
-                    // Right Column (InfoBox)
                     if (showSettings || showSchedule.value) {
                         InfoBox(
                             showSettings = showSettings,
@@ -238,18 +243,19 @@ fun RadioApp(
                     }
                 }
             } else {
-                // Portrait (Original)
                 Column(modifier = Modifier.fillMaxSize()) {
+
                     PlayerHeader(
                         isPlaying = isPlaying,
                         onPlayPause = {
-                            if (isPlaying) mediaController?.pause() else mediaController?.play()
+                            if (isPlaying) mediaController?.pause()
+                            else mediaController?.play()
                         },
                         trackListeners = trackListeners,
                         onToggleSettings = { showSettings = !showSettings }
                     )
 
-                    TrackTitle(trackTitle = trackTitle)
+                    TrackTitle(displayedSecondLine)
 
                     val showInfoBox = showSettings || showSchedule.value
 
@@ -290,6 +296,10 @@ fun RadioApp(
         }
     }
 }
+
+/* ---------- Existing Composables ---------- */
+/* PlayerHeader, TrackTitle, InfoBox, SettingsScreen,
+   ScheduleItemRow, Oscilloscope remain unchanged */
 
 @Composable
 fun PlayerHeader(
@@ -554,23 +564,23 @@ fun Oscilloscope(
     var loudnessEnv by remember { mutableFloatStateOf(0f) }
 
     val fadePaint = remember {
-        Paint().apply {
+        android.graphics.Paint().apply {
             xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
             color = android.graphics.Color.argb(35, 0, 0, 0)
         }
     }
 
     val linePaint = remember {
-        Paint().apply {
+        android.graphics.Paint().apply {
             color = NeonGreen.toArgb()
-            style = Paint.Style.STROKE
+            style = android.graphics.Paint.Style.STROKE
             strokeWidth = 5f
             isAntiAlias = true
             setShadowLayer(10f, 0f, 0f, NeonGreen.toArgb())
         }
     }
 
-    val path = remember { Path() }
+    val path = remember { android.graphics.Path() }
 
     androidx.compose.foundation.Canvas(modifier = modifier) {
         frameClock.longValue // Trigger redraw on frame by reading the state
@@ -687,7 +697,7 @@ fun Oscilloscope(
 
                     path.close()
                 } else {
-                    path.addCircle(centerX, centerY, 10f, Path.Direction.CW)
+                    path.addCircle(centerX, centerY, 10f, android.graphics.Path.Direction.CW)
                 }
 
                 // Only draw the path if we are in Lissajous mode
