@@ -35,6 +35,7 @@ data class RawShow(
 
 
 class ScheduleViewModel : ViewModel() {
+
     private val _schedule = MutableStateFlow<List<ScheduleItem>>(emptyList())
     val schedule: StateFlow<List<ScheduleItem>> = _schedule
 
@@ -44,15 +45,13 @@ class ScheduleViewModel : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    // Configure OkHttpClient with timeouts to be more robust
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
-        .hostnameVerifier { _, _ -> true }
         .build()
-        
+
     private val gson = Gson()
 
     init {
@@ -62,31 +61,47 @@ class ScheduleViewModel : ViewModel() {
     fun loadSchedule() {
         viewModelScope.launch(Dispatchers.IO) {
             _loading.value = true
-            try {
-                val request = Request.Builder()
-                    .url("https://radio.spaz.org/djdash/droid")
-                    .build()
+            _error.value = null
 
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) throw IOException("Unexpected code $response")
+            var attempt = 0
+            val maxAttempts = 2
 
-                    val responseData = response.body?.string()
-                    val type = object : TypeToken<List<RawShow>>() {}.type
-                    val rawShows: List<RawShow> = gson.fromJson(responseData, type)
+            while (attempt < maxAttempts) {
+                try {
+                    val request = Request.Builder()
+                        .url("https://radio.spaz.org/djdash/droid")
+                        .build()
 
-                    val now = System.currentTimeMillis()
-                    val formatted = rawShows
-                        .filter { it.end_timestamp > now } // Filter out past shows
-                        .map { formatShowItem(it) }
-                    
-                    _schedule.value = formatted
-                    _loading.value = false
+                    client.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) {
+                            throw IOException("Unexpected code $response")
+                        }
+
+                        val responseData = response.body?.string()
+                        val type = object : TypeToken<List<RawShow>>() {}.type
+                        val rawShows: List<RawShow> = gson.fromJson(responseData, type)
+
+                        val now = System.currentTimeMillis()
+                        _schedule.value = rawShows
+                            .filter { it.end_timestamp > now }
+                            .map { formatShowItem(it) }
+                    }
+
+                    // Success → exit retry loop
+                    break
+
+                } catch (e: IOException) {
+                    attempt++
+                    if (attempt >= maxAttempts) {
+                        Log.e("ScheduleViewModel", "Error fetching schedule", e)
+                        _error.value = "Schedule unavailable"
+                    } else {
+                        kotlinx.coroutines.delay(1_000)
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e("ScheduleViewModel", "Error fetching schedule", e)
-                _error.value = e.message
-                _loading.value = false
             }
+
+            _loading.value = false
         }
     }
 
@@ -95,22 +110,24 @@ class ScheduleViewModel : ViewModel() {
         val end = Date(show.end_timestamp)
 
         val weekdayFormat = SimpleDateFormat("EEE", Locale.getDefault())
-        // Use getBestDateTimePattern to respect user's locale for month/day order and separator
-        val monthDayPattern = DateFormat.getBestDateTimePattern(Locale.getDefault(), "MMdd")
+        val monthDayPattern =
+            DateFormat.getBestDateTimePattern(Locale.getDefault(), "MMdd")
         val monthDayFormat = SimpleDateFormat(monthDayPattern, Locale.getDefault())
-        
-        val timeFormat = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT, Locale.getDefault())
-        
-        val startTime = timeFormat.format(start)
-        val endTime = timeFormat.format(end)
 
-        // HTML decoding (simple version for this use case)
-        val cleanName = android.text.Html.fromHtml(show.name, android.text.Html.FROM_HTML_MODE_LEGACY).toString()
+        val timeFormat =
+            java.text.DateFormat.getTimeInstance(
+                java.text.DateFormat.SHORT,
+                Locale.getDefault()
+            )
+
+        val cleanName = android.text.Html
+            .fromHtml(show.name, android.text.Html.FROM_HTML_MODE_LEGACY)
+            .toString()
 
         return ScheduleItem(
             datePart = "${weekdayFormat.format(start)} ${monthDayFormat.format(start)}",
-            startTime = startTime,
-            endTime = endTime,
+            startTime = timeFormat.format(start),
+            endTime = timeFormat.format(end),
             showName = cleanName
         )
     }
