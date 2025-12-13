@@ -77,7 +77,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.material)
-    implementation("com.google.errorprone:error_prone_annotations:2.45.0")
+ //   implementation("com.google.errorprone:error_prone_annotations:2.45.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
