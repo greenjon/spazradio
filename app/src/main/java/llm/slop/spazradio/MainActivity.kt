@@ -63,9 +63,6 @@ enum class ConnectionState {
 
 class MainActivity : ComponentActivity() {
 
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -73,14 +70,6 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.Transparent.toArgb()),
             navigationBarStyle = SystemBarStyle.dark(Color.Transparent.toArgb())
         )
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
 
         setContent {
             SpazRadioTheme {

@@ -1,8 +1,8 @@
 package llm.slop.spazradio
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
-import android.media.audiofx.Visualizer
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
@@ -11,7 +11,11 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.TeeAudioProcessor
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -27,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 
 @OptIn(UnstableApi::class)
@@ -34,7 +39,6 @@ class RadioService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private var player: ExoPlayer? = null
-    private var visualizer: Visualizer? = null
     
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
@@ -45,6 +49,27 @@ class RadioService : MediaSessionService() {
     companion object {
         private val _waveformFlow = MutableStateFlow<ByteArray?>(null)
         val waveformFlow = _waveformFlow.asStateFlow()
+    }
+
+    private val audioBufferSink = object : TeeAudioProcessor.AudioBufferSink {
+        override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {
+            // No-op
+        }
+
+        override fun handleBuffer(buffer: ByteBuffer) {
+            val data = buffer.asReadOnlyBuffer()
+            data.order(java.nio.ByteOrder.nativeOrder())
+            
+            val len = data.remaining() / 2
+            val bytes = ByteArray(len)
+            
+            for (i in 0 until len) {
+                val sample = data.short
+                // 16-bit signed to 8-bit unsigned centered at 128
+                bytes[i] = ((sample.toInt() shr 8) + 128).toByte()
+            }
+            _waveformFlow.value = bytes
+        }
     }
 
     override fun onCreate() {
@@ -72,7 +97,21 @@ class RadioService : MediaSessionService() {
             )
             .build()
 
-        player = ExoPlayer.Builder(this)
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink {
+                return DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(TeeAudioProcessor(audioBufferSink)))
+                    .build()
+            }
+        }
+
+        player = ExoPlayer.Builder(this, renderersFactory)
             .setMediaSourceFactory(
                 DefaultMediaSourceFactory(this).setDataSourceFactory(okHttpDataSourceFactory)
             )
@@ -104,16 +143,12 @@ class RadioService : MediaSessionService() {
         
         player?.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) {
-                    startVisualizer()
-                } else {
-                    stopVisualizer()
-                }
+                // Visualizer handling moved to AudioProcessor
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
-                    stopVisualizer()
+                    _waveformFlow.value = null
                 }
             }
         })
@@ -136,9 +171,11 @@ class RadioService : MediaSessionService() {
                     withContext(Dispatchers.Main) {
                         player?.let { exoPlayer ->
                             // ... your existing logic to replace the media item's metadata
-                            val currentItem = exoPlayer.getMediaItemAt(0)
-                            val newItem = currentItem.buildUpon().setMediaMetadata(errorMetadata).build()
-                            exoPlayer.replaceMediaItem(0, newItem)
+                            if (exoPlayer.mediaItemCount > 0) {
+                                val currentItem = exoPlayer.getMediaItemAt(0)
+                                val newItem = currentItem.buildUpon().setMediaMetadata(errorMetadata).build()
+                                exoPlayer.replaceMediaItem(0, newItem)
+                            }
                         }
                     }
                 }
@@ -204,52 +241,6 @@ class RadioService : MediaSessionService() {
         }
     }
 
-    private fun startVisualizer() {
-        val sessionId = player?.audioSessionId ?: return
-        if (sessionId == 0) return 
-        
-        stopVisualizer()
-
-        try {
-            visualizer = Visualizer(sessionId).apply {
-                captureSize = Visualizer.getCaptureSizeRange()[1]
-                setDataCaptureListener(
-                    object : Visualizer.OnDataCaptureListener {
-                        override fun onWaveFormDataCapture(
-                            visualizer: Visualizer?,
-                            waveform: ByteArray?,
-                            samplingRate: Int
-                        ) {
-                            // Clone the array to ensure StateFlow emits a new value (reference equality check)
-                            _waveformFlow.value = waveform?.clone()
-                        }
-
-                        override fun onFftDataCapture(
-                            visualizer: Visualizer?,
-                            fft: ByteArray?,
-                            samplingRate: Int
-                        ) {
-                            // Not using FFT for now
-                        }
-                    },
-                    Visualizer.getMaxCaptureRate(),
-                    true,
-                    false
-                )
-                enabled = true
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun stopVisualizer() {
-        visualizer?.enabled = false
-        visualizer?.release()
-        visualizer = null
-        _waveformFlow.value = null
-    }
-
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
         return mediaSession
     }
@@ -261,7 +252,6 @@ class RadioService : MediaSessionService() {
             release()
             mediaSession = null
         }
-        stopVisualizer()
         super.onDestroy()
     }
 }
