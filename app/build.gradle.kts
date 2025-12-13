@@ -19,6 +19,9 @@ android {
     compileSdk = 36
 
     defaultConfig {
+        applicationId = "llm.slop.spazradio"
+        minSdk = 24
+        targetSdk = 36
         val vCode = project.findProperty("VERSION_CODE")?.toString()?.toInt() ?: 1
         val vName = project.findProperty("VERSION_NAME")?.toString() ?: "1.0.0"
 
