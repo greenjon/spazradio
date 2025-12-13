@@ -9,13 +9,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Required to create a release
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Required for commit counting and release notes
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -27,46 +27,42 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
-
-      - name: Get Version Number
-        id: get_version
+      - name: Compute Version
         run: |
           COUNT=$(git rev-list --count HEAD)
+          echo "VERSION_CODE=$COUNT" >> $GITHUB_ENV
+          echo "VERSION_NAME=1.0.$COUNT" >> $GITHUB_ENV
           echo "VERSION_TAG=v1.0.$COUNT" >> $GITHUB_ENV
+
+      - name: Build Debug APK
+        run: |
+          ./gradlew assembleDebug \
+            -PVERSION_CODE=${{ env.VERSION_CODE }} \
+            -PVERSION_NAME=${{ env.VERSION_NAME }}
 
       - name: Generate Commit Log (Full Messages)
         id: changelog
         run: |
-          # Find previous tag, if any
           PREV_TAG=$(git describe --tags --abbrev=0 --always "$(git rev-list --tags --max-count=1)^" 2>/dev/null || echo "")
-
           if [ -z "$PREV_TAG" ]; then
-            echo "No previous tag found. Using full history."
             RANGE=""
           else
-            echo "Previous tag: $PREV_TAG"
             RANGE="$PREV_TAG..HEAD"
           fi
 
-          # Collect full commit messages
           LOG=$(git log $RANGE --pretty=format:"%h%n%s%n%b%n---")
 
-          # Write multiline output safely
           {
             echo "commit_log<<EOF"
             echo "$LOG"
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-
       - name: Rename APK
         id: rename_apk
         run: |
-          VERSION="${{ env.VERSION_TAG }}"
           ORIGINAL="app/build/outputs/apk/debug/app-debug.apk"
-          RENAMED="SPAZ.Radio-${VERSION}-debug.apk"
+          RENAMED="SPAZ.Radio-${{ env.VERSION_TAG }}-debug.apk"
           cp "$ORIGINAL" "$RENAMED"
           echo "apk_name=$RENAMED" >> $GITHUB_OUTPUT
 
@@ -82,7 +78,6 @@ jobs:
 
             ## Full Diff
             https://github.com/${{ github.repository }}/compare/${{ env.VERSION_TAG }}^...${{ env.VERSION_TAG }}
-
           files: ${{ steps.rename_apk.outputs.apk_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
