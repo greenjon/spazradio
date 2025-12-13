@@ -19,31 +19,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "llm.slop.spazradio"
-        minSdk = 24
-        targetSdk = 35
+        val vCode = project.findProperty("VERSION_CODE")?.toString()?.toInt() ?: 1
+        val vName = project.findProperty("VERSION_NAME")?.toString() ?: "1.0.0"
 
-        // --- AUTOMATIC VERSIONING LOGIC (correct syntax) ---
-        val gitCommitCount = try {
-            val stdout = ByteArrayOutputStream()
-            execOperations.exec {
-                commandLine("git", "rev-list", "--count", "HEAD")
-                standardOutput = stdout
-            }
-            stdout.toString().trim().toInt()
-        } catch (e: Exception) {
-            1
-        }
-
-        versionCode = gitCommitCount
-        versionName = "1.0.$gitCommitCount"
-        // ----------------------------------------------------
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        vectorDrawables {
-            useSupportLibrary = true
-        }
+        versionCode = vCode
+        versionName = vName
     }
 
     compileOptions {
