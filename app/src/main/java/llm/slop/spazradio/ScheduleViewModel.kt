@@ -32,6 +32,8 @@ data class RawShow(
     val url: String
 )
 
+
+
 class ScheduleViewModel : ViewModel() {
     private val _schedule = MutableStateFlow<List<ScheduleItem>>(emptyList())
     val schedule: StateFlow<List<ScheduleItem>> = _schedule
@@ -54,10 +56,10 @@ class ScheduleViewModel : ViewModel() {
     private val gson = Gson()
 
     init {
-        fetchSchedule()
+        loadSchedule()
     }
 
-    private fun fetchSchedule() {
+    fun loadSchedule() {
         viewModelScope.launch(Dispatchers.IO) {
             _loading.value = true
             try {

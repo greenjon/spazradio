@@ -1,5 +1,6 @@
 package llm.slop.spazradio
 
+import kotlinx.coroutines.delay
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -384,12 +385,18 @@ fun InfoBox(
                     color = NeonGreen
                 )
             } else if (error != null) {
-                Text(
-                    text = "Error: $error",
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Schedule unavailable", color = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = { scheduleViewModel.loadSchedule() }) {
+                        Text("Retry")
+                    }
+                }
+            }
+            else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -544,9 +551,8 @@ fun Oscilloscope(
 
     LaunchedEffect(Unit) {
         while (true) {
-            withFrameNanos { time ->
-                frameClock.longValue = time
-            }
+            delay(16L * 2) // ~30 FPS
+            frameClock.longValue++
         }
     }
 
@@ -572,7 +578,7 @@ fun Oscilloscope(
             style = android.graphics.Paint.Style.STROKE
             strokeWidth = 5f
             isAntiAlias = true
-            setShadowLayer(10f, 0f, 0f, NeonGreen.toArgb())
+            setShadowLayer(6f, 0f, 0f, NeonGreen.toArgb())
         }
     }
 
@@ -663,7 +669,8 @@ fun Oscilloscope(
                 var lastB = 0f
                 var first = true
 
-                for (i in 0 until count) {
+                val step = (count / 256).coerceAtLeast(1)
+                for (i in 0 until count step step) {
 
                     val rawA =
                         ((waveform[i].toInt() and 0xFF) - 128) / 128f
