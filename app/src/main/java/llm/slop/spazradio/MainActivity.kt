@@ -538,6 +538,8 @@ fun Oscilloscope(
     lissajousMode: Boolean,
     modifier: Modifier = Modifier
 ) {
+    /* ---------- Frame Clock ---------- */
+
     val frameClock = remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(Unit) {
@@ -548,14 +550,19 @@ fun Oscilloscope(
         }
     }
 
+    /* ---------- Persistent Drawing State ---------- */
+
     val bitmapRef = remember { mutableStateOf<Bitmap?>(null) }
     val canvasRef = remember { mutableStateOf<AndroidCanvas?>(null) }
-    var loudnessEnv by remember { mutableFloatStateOf(0f) }
+
+    var loudnessEnv by remember { mutableFloatStateOf(12f) }
+
+    /* ---------- Paints ---------- */
 
     val fadePaint = remember {
         android.graphics.Paint().apply {
             xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
-            color = android.graphics.Color.argb(35, 0, 0, 0)
+            color = android.graphics.Color.argb(28, 0, 0, 0)
         }
     }
 
@@ -571,128 +578,126 @@ fun Oscilloscope(
 
     val path = remember { android.graphics.Path() }
 
+    /* ---------- Canvas ---------- */
+
     androidx.compose.foundation.Canvas(modifier = modifier) {
-        frameClock.longValue // Trigger redraw on frame by reading the state
+        frameClock.longValue // trigger redraw
 
         val width = size.width.toInt()
         val height = size.height.toInt()
 
-        if (bitmapRef.value == null || bitmapRef.value!!.width != width || bitmapRef.value!!.height != height) {
-            val newBitmap = createBitmap(width, height)
-            bitmapRef.value = newBitmap
-            canvasRef.value = AndroidCanvas(newBitmap)
+        if (bitmapRef.value == null ||
+            bitmapRef.value!!.width != width ||
+            bitmapRef.value!!.height != height
+        ) {
+            bitmapRef.value = createBitmap(width, height)
+            canvasRef.value = AndroidCanvas(bitmapRef.value!!)
         }
 
         val bmp = bitmapRef.value!!
         val cvs = canvasRef.value!!
 
+        /* ---------- Fade Previous Frame ---------- */
+
         cvs.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fadePaint)
 
-        if (isPlaying && waveform != null) {
-            // -------------------------------------------
-            // 1) Compute RMS of this audio frame
-            // -------------------------------------------
-            var sumSquares = 0f
-            var maxAmplitude = 0
+        if (isPlaying && waveform != null && waveform.size > 8) {
+
+            /* ---------- RMS + Peak ---------- */
+
+            var sumSq = 0f
+            var peak = 0
 
             for (b in waveform) {
                 val v = (b.toInt() and 0xFF) - 128
-                val absV = kotlin.math.abs(v)
-                if (absV > maxAmplitude) maxAmplitude = absV
-                sumSquares += v * v
+                val a = kotlin.math.abs(v)
+                if (a > peak) peak = a
+                sumSq += v * v
             }
 
-            val rms = if (waveform.isNotEmpty())
-                kotlin.math.sqrt(sumSquares / waveform.size)
-            else 0f
+            val rms = kotlin.math.sqrt(sumSq / waveform.size)
 
-            // -------------------------------------------
-            // 2) Smooth loudness envelope (volume follower)
-            // -------------------------------------------
-            val attack = 0.25f     // reacts fast to loud parts
-            val release = 0.05f    // falls back slowly on quiet parts
+            /* ---------- Loudness Envelope ---------- */
+
+            val attack = 0.22f
+            val release = 0.06f
 
             loudnessEnv += if (rms > loudnessEnv)
                 (rms - loudnessEnv) * attack
             else
                 (rms - loudnessEnv) * release
 
-            // -------------------------------------------
-            // 3) Convert loudness into explosion scale
-            // -------------------------------------------
-            // loudnessEnv is 0–128 range, normalize it
-            // tweak divisor (32f) to control overall sensitivity
-            val explosionScale = ((loudnessEnv / 50))
-                .coerceIn(0.3f, 4.5f)   // min size vs max explosion
+            /* ---------- Visual AGC (Signal Gain) ---------- */
 
-            // 4) Dynamic Trail Decay
-            val dynamicAlpha = when {
-                maxAmplitude < 10 -> 18
-                maxAmplitude < 30 -> 28
-                maxAmplitude < 60 -> 40
-                else -> 55
-            }
+            val targetRms = 34f
+            val gain = (targetRms / (loudnessEnv + 1f))
+                .coerceIn(1.3f, 6.5f)
 
-            fadePaint.color = android.graphics.Color.argb(dynamicAlpha, 0, 0, 0)
+            /* ---------- Dynamic Trail ---------- */
 
-            // 5) Geometry Setup
-            val centerY = height / 2f
-            val centerX = width / 2f
-            val xScale = width * 0.42f
-            val yScale = height * 0.42f
+            fadePaint.color = android.graphics.Color.argb(
+                when {
+                    peak < 10 -> 18
+                    peak < 30 -> 28
+                    peak < 60 -> 40
+                    else -> 55
+                },
+                0, 0, 0
+            )
+
+            /* ---------- Geometry ---------- */
+
+            val cx = width / 2f
+            val cy = height / 2f
+            val xScale = width * 0.48f
+            val yScale = height * 0.48f
 
             path.reset()
-            path.moveTo(0f, centerY)
 
             if (lissajousMode) {
-                path.reset()
 
-                if (maxAmplitude > 2 && waveform.size > 8) {
-//                    var firstPoint = true
-                    val count = waveform.size
-                    val phaseShift = (count * 0.37f).toInt()
+                val count = waveform.size
+                val phaseShift = (count * 0.37f).toInt()
 
-                    var firstPoint = true
-                    var lastA = 0f
-                    var lastB = 0f
+                var lastA = 0f
+                var lastB = 0f
+                var first = true
 
-                    for (i in 0 until count) {
+                for (i in 0 until count) {
 
-                        // 1. Raw waveform -> normalized [-1, 1]
-                        val rawA = ((waveform[i].toInt() and 0xFF) - 128) / 128f
-                        val bIndex = (i + phaseShift) % count
-                        val rawB = ((waveform[bIndex].toInt() and 0xFF) - 128) / 128f
+                    val rawA =
+                        ((waveform[i].toInt() and 0xFF) - 128) / 128f
+                    val j = (i + phaseShift) % count
+                    val rawB =
+                        ((waveform[j].toInt() and 0xFF) - 128) / 128f
 
-                        // 2. Difference operator (Fix C)
-                        val a = 0.85f * rawA + 0.15f * (rawA - lastA)
-                        val b = 0.85f * rawB + 0.15f * (rawB - lastB)
+                    val a =
+                        (0.85f * rawA + 0.15f * (rawA - lastA)) * gain
+                    val b =
+                        (0.85f * rawB + 0.15f * (rawB - lastB)) * gain
 
-                        // 3. Save for next loop iteration
-                        lastA = rawA
-                        lastB = rawB
+                    lastA = rawA
+                    lastB = rawB
 
-                        // 4. Map to screen
-                        val x = centerX + a * xScale * explosionScale
-                        val y = centerY + b * yScale * explosionScale
+                    val ax = a.coerceIn(-1.2f, 1.2f)
+                    val by = b.coerceIn(-1.2f, 1.2f)
 
-                        // 5. Draw path
-                        if (firstPoint) {
-                            path.moveTo(x, y)
-                            firstPoint = false
-                        } else {
-                            path.lineTo(x, y)
-                        }
+                    val x = cx + ax * xScale
+                    val y = cy + by * yScale
+
+                    if (first) {
+                        path.moveTo(x, y)
+                        first = false
+                    } else {
+                        path.lineTo(x, y)
                     }
-
-                    path.close()
-                } else {
-                    path.addCircle(centerX, centerY, 10f, android.graphics.Path.Direction.CW)
                 }
 
-                // Only draw the path if we are in Lissajous mode
+                path.close()
                 cvs.drawPath(path, linePaint)
             }
         }
-        drawImage(image = bmp.asImageBitmap())
+
+        drawImage(bmp.asImageBitmap())
     }
 }
