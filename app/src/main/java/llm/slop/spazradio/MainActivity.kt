@@ -101,6 +101,14 @@ fun RadioApp(
     var isPlaying by remember { mutableStateOf(false) }
     var connectionState by remember { mutableStateOf(ConnectionState.CONNECTING) }
 
+    // True only when audio should be audibly playing
+    var hasAudiblePlayback by remember { mutableStateOf(false) }
+
+// Debounced UI-facing connection state
+    var uiConnectionState by remember {
+        mutableStateOf(ConnectionState.CONNECTING)
+    }
+
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val showSchedule = remember { mutableStateOf(prefs.getBoolean("show_schedule", true)) }
     val lissajousMode = remember { mutableStateOf(prefs.getBoolean("visuals_enabled", true)) }
@@ -116,7 +124,7 @@ fun RadioApp(
     var trackTitle by remember { mutableStateOf("SPAZ.Radio") }
     var trackListeners by remember { mutableStateOf("") }
 
-    val displayedSecondLine = when (connectionState) {
+    val displayedSecondLine = when (uiConnectionState) {
         ConnectionState.CONNECTING -> "Connecting…"
         ConnectionState.BUFFERING -> "Buffering…"
         ConnectionState.RECONNECTING -> "Reconnecting…"
@@ -149,20 +157,26 @@ fun RadioApp(
                                 else
                                     ConnectionState.BUFFERING
                             Player.STATE_ENDED -> ConnectionState.RECONNECTING
-                            else -> connectionState
+                            else -> ConnectionState.CONNECTING
                         }
+
+                        // Audible playback only when READY + playing
+                        hasAudiblePlayback =
+                            state == Player.STATE_READY && mediaController?.isPlaying == true
                     }
 
                     override fun onIsPlayingChanged(playing: Boolean) {
                         isPlaying = playing
-                        if (playing) {
-                            connectionState = ConnectionState.PLAYING
-                        }
+
+                        hasAudiblePlayback =
+                            playing && mediaController?.playbackState == Player.STATE_READY
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
                         connectionState = ConnectionState.RECONNECTING
+                        hasAudiblePlayback = false
                     }
+
 
                     override fun onMediaMetadataChanged(metadata: MediaMetadata) {
                         trackTitle = metadata.title?.toString() ?: "SPAZ.Radio"
@@ -177,6 +191,21 @@ fun RadioApp(
             }
         }, MoreExecutors.directExecutor())
     }
+
+    LaunchedEffect(hasAudiblePlayback, connectionState) {
+        if (hasAudiblePlayback) {
+            // Audio is flowing → always show title
+            uiConnectionState = ConnectionState.PLAYING
+        } else {
+            // Audio stopped → wait before showing a message
+            delay(750L)
+
+            if (!hasAudiblePlayback) {
+                uiConnectionState = connectionState
+            }
+        }
+    }
+
 
     /* ---------- UI ---------- */
 
@@ -202,6 +231,7 @@ fun RadioApp(
                                 else mediaController?.play()
                             },
                             trackListeners = trackListeners,
+                            connectionState = uiConnectionState,
                             onToggleSettings = { showSettings = !showSettings }
                         )
 
@@ -242,6 +272,7 @@ fun RadioApp(
                             else mediaController?.play()
                         },
                         trackListeners = trackListeners,
+                        connectionState = uiConnectionState,
                         onToggleSettings = { showSettings = !showSettings }
                     )
 
@@ -296,6 +327,7 @@ fun PlayerHeader(
     isPlaying: Boolean,
     onPlayPause: () -> Unit,
     trackListeners: String,
+    connectionState: ConnectionState,
     onToggleSettings: () -> Unit
 ) {
     Row(
@@ -316,8 +348,19 @@ fun PlayerHeader(
         }
 
         // Center: Listeners count
+        val headerText = when {
+            connectionState != ConnectionState.PLAYING ->
+                "SPAZ.Radio"
+
+            trackListeners.isNotBlank() ->
+                "SPAZ.Radio   -   $trackListeners"
+
+            else ->
+                "SPAZ.Radio"
+        }
+
         Text(
-            text = "SPAZ.Radio   -   $trackListeners", // Contains "N listening"
+            text = headerText,
             style = MaterialTheme.typography.titleLarge,
             color = Color(0xFFFFFF00)
         )
