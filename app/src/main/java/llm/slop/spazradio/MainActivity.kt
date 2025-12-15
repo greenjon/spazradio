@@ -724,3 +724,4 @@ fun Oscilloscope(
         drawImage(bmp.asImageBitmap())
     }
 }
+
