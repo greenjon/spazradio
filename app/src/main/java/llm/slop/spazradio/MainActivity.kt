@@ -42,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -78,15 +77,6 @@ import kotlinx.coroutines.delay
 import llm.slop.spazradio.ui.theme.SpazRadioTheme
 import android.graphics.Canvas as AndroidCanvas
 
-/* ---------- Connection State ---------- */
-
-enum class ConnectionState {
-    CONNECTING,
-    BUFFERING,
-    RECONNECTING,
-    PLAYING
-}
-
 /* ---------- Activity ---------- */
 
 class MainActivity : ComponentActivity() {
@@ -114,177 +104,147 @@ val DeepBlue = Color(0xFF120A8F)
 val Magenta = Color(0xFFFF00FF)
 
 /* ---------- App Root ---------- */
+/* ---------- Helpers for PlaybackUiState ---------- */
 
+fun PlaybackUiState.trackTitle(): String = when (this) {
+    is PlaybackUiState.Playing -> title
+    is PlaybackUiState.Paused -> title
+    else -> ""
+}
+
+fun PlaybackUiState.trackListeners(): String = when (this) {
+    is PlaybackUiState.Playing -> listeners
+    is PlaybackUiState.Paused -> listeners
+    else -> ""
+}
+
+/* ---------- Sealed Playback State ---------- */
+sealed interface PlaybackUiState {
+    object Connecting : PlaybackUiState
+    object Buffering : PlaybackUiState
+    object Reconnecting : PlaybackUiState
+    data class Playing(val title: String, val listeners: String) : PlaybackUiState
+    data class Paused(val title: String, val listeners: String) : PlaybackUiState
+}
+
+/* ---------- App Root (RadioApp) ---------- */
 @Composable
 fun RadioApp(
     scheduleViewModel: ScheduleViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val prefs = remember {
-        context.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE)
-    }
+    val prefs = remember { context.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE) }
 
     var mediaController by remember { mutableStateOf<MediaController?>(null) }
-    var isPlaying by remember { mutableStateOf(false) }
-    var connectionState by remember { mutableStateOf(ConnectionState.CONNECTING) }
+    var trackTitle by remember { mutableStateOf("SPAZ.Radio") }
+    var trackListeners by remember { mutableStateOf("") }
 
-    // True only when audio should be audibly playing
-    var hasAudiblePlayback by remember { mutableStateOf(false) }
+    var playbackUiState by remember { mutableStateOf<PlaybackUiState>(PlaybackUiState.Connecting) }
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val showSchedule = remember { mutableStateOf(prefs.getBoolean("show_schedule", true)) }
     val lissajousMode = remember { mutableStateOf(prefs.getBoolean("visuals_enabled", true)) }
 
-    /* ---------- UI-Safe Connection State ---------- */
-
-// Authoritative, instantaneous state (never debounced)
-    val rawUiConnectionState by remember(hasAudiblePlayback, connectionState) {
-        derivedStateOf {
-            if (hasAudiblePlayback) {
-                ConnectionState.PLAYING
-            } else {
-                connectionState
-            }
-        }
-    }
-
-// Debounced state actually shown to the user
-    var uiConnectionState by remember {
-        mutableStateOf(ConnectionState.CONNECTING)
-    }
-
-    LaunchedEffect(rawUiConnectionState) {
-        if (rawUiConnectionState == ConnectionState.PLAYING) {
-            // Audio is flowing → update immediately and cancel any pending delay
-            uiConnectionState = ConnectionState.PLAYING
-        } else {
-            // Audio not flowing → wait before showing a message
-            delay(750L)
-
-            // Re-check after delay (coroutine is cancelled if state changed)
-            if (rawUiConnectionState != ConnectionState.PLAYING) {
-                uiConnectionState = rawUiConnectionState
-            }
-        }
-    }
-
-
-    LaunchedEffect(showSchedule.value) {
-        prefs.edit { putBoolean("show_schedule", showSchedule.value) }
-    }
-
-    LaunchedEffect(lissajousMode.value) {
-        prefs.edit { putBoolean("visuals_enabled", lissajousMode.value) }
-    }
-
-    var trackTitle by remember { mutableStateOf("SPAZ.Radio") }
-    var trackListeners by remember { mutableStateOf("") }
-
-    val displayedSecondLine by remember(uiConnectionState, trackTitle) {
-        derivedStateOf {
-            when (uiConnectionState) {
-                ConnectionState.CONNECTING -> "Connecting…"
-                ConnectionState.BUFFERING -> "Buffering…"
-                ConnectionState.RECONNECTING -> "Reconnecting…"
-                ConnectionState.PLAYING -> trackTitle
-            }
-        }
-    }
+    LaunchedEffect(showSchedule.value) { prefs.edit { putBoolean("show_schedule", showSchedule.value) } }
+    LaunchedEffect(lissajousMode.value) { prefs.edit { putBoolean("visuals_enabled", lissajousMode.value) } }
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val waveform by RadioService.waveformFlow.collectAsState()
+    val isPlaying = playbackUiState is PlaybackUiState.Playing
+    val showInfoBox = showSettings || showSchedule.value
 
-    /* ---------- Media Controller ---------- */
+// Play/Pause lambda
+    val onPlayPause: () -> Unit = {
+        if (playbackUiState is PlaybackUiState.Playing) {
+            mediaController?.pause() ?: Unit  // Ensure return type is Unit
+        } else {
+            mediaController?.play() ?: Unit
+        }
+    }
 
+    // Toggle Settings lambda
+    val onToggleSettings: () -> Unit = {
+        showSettings = !showSettings      // Already returns Unit, no change needed
+    }
+
+    // MediaController setup
     LaunchedEffect(Unit) {
         val token = SessionToken(context, ComponentName(context, RadioService::class.java))
-        val future: ListenableFuture<MediaController> =
-            MediaController.Builder(context, token).buildAsync()
-
+        val future: ListenableFuture<MediaController> = MediaController.Builder(context, token).buildAsync()
         future.addListener({
             try {
                 mediaController = future.get()
-
                 mediaController?.addListener(object : Player.Listener {
 
                     override fun onPlaybackStateChanged(state: Int) {
-                        connectionState = when (state) {
-                            Player.STATE_IDLE -> ConnectionState.CONNECTING
-                            Player.STATE_BUFFERING -> ConnectionState.BUFFERING
-                            Player.STATE_READY ->
+                        playbackUiState = when (state) {
+                            Player.STATE_IDLE -> PlaybackUiState.Connecting
+                            Player.STATE_BUFFERING -> PlaybackUiState.Buffering
+                            Player.STATE_READY -> {
                                 if (mediaController?.isPlaying == true)
-                                    ConnectionState.PLAYING
+                                    PlaybackUiState.Playing(trackTitle, trackListeners)
                                 else
-                                    ConnectionState.BUFFERING
-                            Player.STATE_ENDED -> ConnectionState.RECONNECTING
-                            else -> ConnectionState.CONNECTING
+                                    PlaybackUiState.Paused(trackTitle, trackListeners) // paused but ready
+                            }
+                            Player.STATE_ENDED -> PlaybackUiState.Reconnecting
+                            else -> PlaybackUiState.Connecting
                         }
-
-                        // Audible playback only when READY + playing
-                        hasAudiblePlayback =
-                            state == Player.STATE_READY && mediaController?.isPlaying == true
                     }
 
                     override fun onIsPlayingChanged(playing: Boolean) {
-                        isPlaying = playing
-
-                        hasAudiblePlayback =
-                            playing && mediaController?.playbackState == Player.STATE_READY
+                        playbackUiState = when {
+                            playing && mediaController?.playbackState == Player.STATE_READY ->
+                                PlaybackUiState.Playing(trackTitle, trackListeners)
+                            !playing && mediaController?.playbackState == Player.STATE_READY ->
+                                PlaybackUiState.Paused(trackTitle, trackListeners)
+                            else -> playbackUiState
+                        }
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
-                        connectionState = ConnectionState.RECONNECTING
-                        hasAudiblePlayback = false
+                        playbackUiState = PlaybackUiState.Reconnecting
                     }
-
 
                     override fun onMediaMetadataChanged(metadata: MediaMetadata) {
                         trackTitle = metadata.title?.toString() ?: "SPAZ.Radio"
                         trackListeners = metadata.artist?.toString() ?: ""
+                        if (mediaController?.isPlaying == true) {
+                            playbackUiState = PlaybackUiState.Playing(trackTitle, trackListeners)
+                        } else if (mediaController?.playbackState == Player.STATE_READY) {
+                            playbackUiState = PlaybackUiState.Paused(trackTitle, trackListeners)
+                        }
                     }
                 })
-
-                isPlaying = mediaController?.isPlaying == true
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (e: Exception) { e.printStackTrace() }
         }, MoreExecutors.directExecutor())
     }
 
+    // Displayed track line
+    val displayedSecondLine = when (playbackUiState) {
+        PlaybackUiState.Connecting -> "Connecting…"
+        PlaybackUiState.Buffering -> "Buffering…"
+        PlaybackUiState.Reconnecting -> "Reconnecting…"
+        is PlaybackUiState.Playing, is PlaybackUiState.Paused -> playbackUiState.trackTitle()
+    }
 
-
-
-    /* ---------- UI ---------- */
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(listOf(DeepBlue, Magenta, DeepBlue))
-                )
+                .background(Brush.verticalGradient(listOf(DeepBlue, Magenta, DeepBlue)))
                 .padding(innerPadding)
         ) {
-            val waveform by RadioService.waveformFlow.collectAsState()
-
             if (isLandscape) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.weight(1f)) {
-
                         PlayerHeader(
-                            isPlaying = isPlaying,
-                            onPlayPause = {
-                                if (isPlaying) mediaController?.pause()
-                                else mediaController?.play()
-                            },
-                            trackListeners = trackListeners,
-                            connectionState = uiConnectionState,
+                            playbackUiState = playbackUiState,
+                            onPlayPause = onPlayPause,
                             onToggleSettings = { showSettings = !showSettings }
                         )
-
                         TrackTitle(displayedSecondLine)
-
                         Oscilloscope(
                             waveform = waveform,
                             isPlaying = isPlaying,
@@ -295,8 +255,7 @@ fun RadioApp(
                                 .padding(16.dp)
                         )
                     }
-
-                    if (showSettings || showSchedule.value) {
+                    if (showInfoBox) {
                         InfoBox(
                             showSettings = showSettings,
                             onCloseSettings = { showSettings = false },
@@ -312,41 +271,24 @@ fun RadioApp(
                 }
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
-
                     PlayerHeader(
-                        isPlaying = isPlaying,
-                        onPlayPause = {
-                            if (isPlaying) mediaController?.pause()
-                            else mediaController?.play()
-                        },
-                        trackListeners = trackListeners,
-                        connectionState = uiConnectionState,
+                        playbackUiState = playbackUiState,
+                        onPlayPause = onPlayPause,
                         onToggleSettings = { showSettings = !showSettings }
                     )
-
                     TrackTitle(displayedSecondLine)
-
-                    val showInfoBox = showSettings || showSchedule.value
-
                     if (lissajousMode.value) {
                         Oscilloscope(
                             waveform = waveform,
                             isPlaying = isPlaying,
                             lissajousMode = lissajousMode.value,
                             modifier = if (showInfoBox) {
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(300.dp)
-                                    .padding(16.dp)
+                                Modifier.fillMaxWidth().height(300.dp).padding(16.dp)
                             } else {
-                                Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
-                                    .padding(16.dp)
+                                Modifier.fillMaxWidth().weight(1f).padding(16.dp)
                             }
                         )
                     }
-
                     if (showInfoBox) {
                         InfoBox(
                             showSettings = showSettings,
@@ -354,10 +296,7 @@ fun RadioApp(
                             lissajousMode = lissajousMode,
                             showSchedule = showSchedule,
                             scheduleViewModel = scheduleViewModel,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .padding(16.dp)
+                            modifier = Modifier.fillMaxWidth().weight(1f).padding(16.dp)
                         )
                     }
                 }
@@ -366,18 +305,17 @@ fun RadioApp(
     }
 }
 
-/* ---------- Existing Composables ---------- */
-/* PlayerHeader, TrackTitle, InfoBox, SettingsScreen,
-   ScheduleItemRow, Oscilloscope remain unchanged */
-
 @Composable
 fun PlayerHeader(
-    isPlaying: Boolean,
+    playbackUiState: PlaybackUiState,
     onPlayPause: () -> Unit,
-    trackListeners: String,
-    connectionState: ConnectionState,
     onToggleSettings: () -> Unit
 ) {
+    val isPlaying = playbackUiState is PlaybackUiState.Playing
+    val headerText = if (playbackUiState.trackListeners().isNotBlank())
+        "SPAZ.Radio   -   ${playbackUiState.trackListeners()}"
+    else "SPAZ.Radio"
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -385,7 +323,6 @@ fun PlayerHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Top Left Play/Pause Button
         IconButton(onClick = onPlayPause) {
             Icon(
                 painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
@@ -394,26 +331,12 @@ fun PlayerHeader(
                 modifier = Modifier.size(48.dp)
             )
         }
-
-        // Center: Listeners count
-        val headerText = when {
-            connectionState != ConnectionState.PLAYING ->
-                "SPAZ.Radio"
-
-            trackListeners.isNotBlank() ->
-                "SPAZ.Radio   -   $trackListeners"
-
-            else ->
-                "SPAZ.Radio"
-        }
-
         Text(
             text = headerText,
             style = MaterialTheme.typography.titleLarge,
-            color = Color(0xFFFFFF00)
+            color = Color(0xFFFFFF00),
+            textAlign = TextAlign.Center
         )
-
-        // Top Right Settings Button
         IconButton(onClick = onToggleSettings) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_settings),
@@ -424,6 +347,8 @@ fun PlayerHeader(
         }
     }
 }
+
+
 
 @Composable
 fun TrackTitle(trackTitle: String) {
