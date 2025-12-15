@@ -131,14 +131,43 @@ fun RadioApp(
     // True only when audio should be audibly playing
     var hasAudiblePlayback by remember { mutableStateOf(false) }
 
-// Debounced UI-facing connection state
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    val showSchedule = remember { mutableStateOf(prefs.getBoolean("show_schedule", true)) }
+    val lissajousMode = remember { mutableStateOf(prefs.getBoolean("visuals_enabled", true)) }
+
+    /* ---------- UI-Safe Connection State ---------- */
+
+// Authoritative, instantaneous state (never debounced)
+    val rawUiConnectionState by remember(hasAudiblePlayback, connectionState) {
+        derivedStateOf {
+            if (hasAudiblePlayback) {
+                ConnectionState.PLAYING
+            } else {
+                connectionState
+            }
+        }
+    }
+
+// Debounced state actually shown to the user
     var uiConnectionState by remember {
         mutableStateOf(ConnectionState.CONNECTING)
     }
 
-    var showSettings by rememberSaveable { mutableStateOf(false) }
-    val showSchedule = remember { mutableStateOf(prefs.getBoolean("show_schedule", true)) }
-    val lissajousMode = remember { mutableStateOf(prefs.getBoolean("visuals_enabled", true)) }
+    LaunchedEffect(rawUiConnectionState) {
+        if (rawUiConnectionState == ConnectionState.PLAYING) {
+            // Audio is flowing → update immediately and cancel any pending delay
+            uiConnectionState = ConnectionState.PLAYING
+        } else {
+            // Audio not flowing → wait before showing a message
+            delay(750L)
+
+            // Re-check after delay (coroutine is cancelled if state changed)
+            if (rawUiConnectionState != ConnectionState.PLAYING) {
+                uiConnectionState = rawUiConnectionState
+            }
+        }
+    }
+
 
     LaunchedEffect(showSchedule.value) {
         prefs.edit { putBoolean("show_schedule", showSchedule.value) }
@@ -223,19 +252,7 @@ fun RadioApp(
         }, MoreExecutors.directExecutor())
     }
 
-    LaunchedEffect(hasAudiblePlayback, connectionState) {
-        if (hasAudiblePlayback) {
-            // Audio is flowing → always show title
-            uiConnectionState = ConnectionState.PLAYING
-        } else {
-            // Audio stopped → wait before showing a message
-            delay(750L)
 
-            if (!hasAudiblePlayback) {
-                uiConnectionState = connectionState
-            }
-        }
-    }
 
 
     /* ---------- UI ---------- */
