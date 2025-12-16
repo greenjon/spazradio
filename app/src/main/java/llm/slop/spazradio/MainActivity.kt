@@ -2,7 +2,9 @@ package llm.slop.spazradio
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -53,6 +55,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import llm.slop.spazradio.ui.components.FooterToolbar
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
 import llm.slop.spazradio.ui.theme.DeepBlue
@@ -231,6 +234,14 @@ fun RadioApp(
                                 .weight(1f)
                                 .padding(16.dp)
                         )
+                        FooterToolbar(
+                            onRadioClick = { /* No-op, we're on Radio */ },
+                            onArchivesClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://spaz.org/radio/archive"))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.padding(16.dp)
+                        )
                     }
                     if (showInfoBox) {
                         InfoBox(
@@ -276,6 +287,14 @@ fun RadioApp(
                             modifier = Modifier.fillMaxWidth().weight(1f).padding(16.dp)
                         )
                     }
+                    FooterToolbar(
+                        onRadioClick = { /* No-op */ },
+                        onArchivesClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://spaz.org/radio/archive"))
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.padding(16.dp)
+                    )
                 }
             }
         }
