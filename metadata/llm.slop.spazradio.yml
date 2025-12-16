@@ -1,17 +1,16 @@
 Id: llm.slop.spazradio
-Name: SpazRadio
-Summary: Plays the SPAZ.Radio audio stream with audio-reactive visuals.
-Description: |
-  SPAZ Radio is an open-source radio player for the SPAZ.Radio audio stream featuring real-time, sound-reactive visualizations.
-  - Live audio streaming
-  - Lissajous-based visualizer
-  - Lightweight, native Android implementation
-  - No ads, no tracking
 
 SourceCode: https://github.com/greenjon/spazradio
 WebSite: https://github.com/greenjon/spazradio
 IssueTracker: https://github.com/greenjon/spazradio/issues
 License: MIT
+
+Categories:
+  Multimedia 
+  Online Media Player
+
+AuthorName: greenjon
+
 
 RepoType: git
 Repo: https://github.com/greenjon/spazradio.git
