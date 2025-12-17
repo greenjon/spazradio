@@ -17,7 +17,7 @@ class ArchiveRepository(private val client: OkHttpClient) {
     suspend fun fetchArchiveFeed(): List<ArchiveShow> = withContext(Dispatchers.IO) {
         val shows = mutableListOf<ArchiveShow>()
         val request = Request.Builder()
-            .url("https://spaz.org/radio/archive/feed.xml")
+            .url("https://spaz.org/archives/archives.rss")
             .build()
 
         try {
@@ -33,6 +33,7 @@ class ArchiveRepository(private val client: OkHttpClient) {
                 var currentTitle: String? = null
                 var currentUrl: String? = null
                 var currentPubDate: String? = null
+                var currentImageUrl: String? = null
 
                 while (eventType != XmlPullParser.END_DOCUMENT) {
                     val name = parser.name
@@ -43,6 +44,7 @@ class ArchiveRepository(private val client: OkHttpClient) {
                                     currentTitle = null
                                     currentUrl = null
                                     currentPubDate = null
+                                    currentImageUrl = null
                                 }
                                 "title" -> {
                                     if (currentTitle == null) currentTitle = parser.nextText()
@@ -52,6 +54,9 @@ class ArchiveRepository(private val client: OkHttpClient) {
                                 }
                                 "enclosure" -> {
                                     currentUrl = parser.getAttributeValue(null, "url")
+                                }
+                                "itunes:image" -> {
+                                    currentImageUrl = parser.getAttributeValue(null, "href")
                                 }
                             }
                         }
@@ -63,7 +68,8 @@ class ArchiveRepository(private val client: OkHttpClient) {
                                         title = currentTitle,
                                         url = currentUrl,
                                         date = formattedDate,
-                                        originalDate = currentPubDate ?: ""
+                                        originalDate = currentPubDate ?: "",
+                                        imageUrl = currentImageUrl
                                     )
                                 )
                             }
