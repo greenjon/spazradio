@@ -22,11 +22,12 @@ android {
         applicationId = "llm.slop.spazradio"
         minSdk = 24
         targetSdk = 36
-        val vCode = project.findProperty("VERSION_CODE")?.toString()?.toInt() ?: 2
-        val vName = project.findProperty("VERSION_NAME")?.toString() ?: "1.1.0"
 
-        versionCode = vCode
-        versionName = vName
+        val fdroidVersionCode = System.getenv("FDROID_VERSION_CODE")?.toInt()
+        val fdroidVersionName = System.getenv("FDROID_VERSION_NAME")
+
+        versionCode = fdroidVersionCode ?: 110
+        versionName = fdroidVersionName ?: "1.1"
     }
 
     compileOptions {
