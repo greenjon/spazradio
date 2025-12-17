@@ -13,6 +13,7 @@ AuthorName: greenjon
 
 RepoType: git
 Repo: https://github.com/greenjon/spazradio.git
+Subdir: app
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
