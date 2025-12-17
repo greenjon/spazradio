@@ -11,7 +11,7 @@ import llm.slop.spazradio.data.ArchiveShow
 import okhttp3.OkHttpClient
 
 sealed class ArchiveUiState {
-    object Loading : ArchiveUiState()
+    data object Loading : ArchiveUiState()
     data class Success(val shows: List<ArchiveShow>) : ArchiveUiState()
     data class Error(val message: String) : ArchiveUiState()
 }

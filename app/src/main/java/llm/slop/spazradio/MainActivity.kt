@@ -1,8 +1,6 @@
 package llm.slop.spazradio
 
-import android.content.Intent
 import android.content.res.Configuration
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -24,9 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import llm.slop.spazradio.ui.components.ArchiveContent
 import llm.slop.spazradio.ui.components.FooterToolbar
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
@@ -62,9 +60,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun RadioApp(
     radioViewModel: RadioViewModel = viewModel(),
-    scheduleViewModel: ScheduleViewModel = viewModel()
+    scheduleViewModel: ScheduleViewModel = viewModel(),
+    archiveViewModel: ArchiveViewModel = viewModel()
 ) {
-    val context = LocalContext.current
     val headerTitle by radioViewModel.headerTitle.collectAsState()
     val trackSubtitle by radioViewModel.trackSubtitle.collectAsState()
     val isPlaying by radioViewModel.isPlaying.collectAsState()
@@ -112,14 +110,10 @@ fun RadioApp(
                     InfoDisplay.SETTINGS -> SettingsContent(radioViewModel)
                     InfoDisplay.SCHEDULE -> ScheduleContent(scheduleViewModel)
                     InfoDisplay.ARCHIVES -> {
-                        // Placeholder for ArchiveContent()
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            androidx.compose.material3.Text(
-                                text = "Archives coming soon...",
-                                color = llm.slop.spazradio.ui.theme.NeonGreen,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
+                        ArchiveContent(
+                            archiveViewModel = archiveViewModel,
+                            radioViewModel = radioViewModel
+                        )
                     }
                     else -> {}
                 }
