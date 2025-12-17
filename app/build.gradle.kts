@@ -26,7 +26,7 @@ android {
         val fdroidVersionCode = System.getenv("FDROID_VERSION_CODE")?.toInt()
         val fdroidVersionName = System.getenv("FDROID_VERSION_NAME")
 
-        versionCode = fdroidVersionCode ?: 110
+        versionCode = fdroidVersionCode ?: 111
         versionName = fdroidVersionName ?: "1.1"
     }
 
