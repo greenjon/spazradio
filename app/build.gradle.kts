@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     
     // Icons
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
     
     implementation(libs.androidx.media3.exoplayer)
