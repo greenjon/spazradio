@@ -1,6 +1,5 @@
 package llm.slop.spazradio
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -48,13 +47,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.common.MediaMetadata
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
-import com.google.common.util.concurrent.ListenableFuture
-import com.google.common.util.concurrent.MoreExecutors
 import llm.slop.spazradio.ui.components.FooterToolbar
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
@@ -83,43 +75,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/* ---------- App Root ---------- */
-/* ---------- Helpers for PlaybackUiState ---------- */
-
-fun PlaybackUiState.trackTitle(): String = when (this) {
-    is PlaybackUiState.Playing -> title
-    is PlaybackUiState.Paused -> title
-    else -> ""
-}
-
-fun PlaybackUiState.trackListeners(): String = when (this) {
-    is PlaybackUiState.Playing -> listeners
-    is PlaybackUiState.Paused -> listeners
-    else -> ""
-}
-
-/* ---------- Sealed Playback State ---------- */
-sealed interface PlaybackUiState {
-    object Connecting : PlaybackUiState
-    object Buffering : PlaybackUiState
-    object Reconnecting : PlaybackUiState
-    data class Playing(val title: String, val listeners: String) : PlaybackUiState
-    data class Paused(val title: String, val listeners: String) : PlaybackUiState
-}
-
 /* ---------- App Root (RadioApp) ---------- */
 @Composable
 fun RadioApp(
+    radioViewModel: RadioViewModel = viewModel(),
     scheduleViewModel: ScheduleViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE) }
 
-    var mediaController by remember { mutableStateOf<MediaController?>(null) }
-    var trackTitle by remember { mutableStateOf("SPAZ.Radio") }
-    var trackListeners by remember { mutableStateOf("") }
-
-    var playbackUiState by remember { mutableStateOf<PlaybackUiState>(PlaybackUiState.Connecting) }
+    val playbackUiState by radioViewModel.playbackUiState.collectAsState()
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val showSchedule = remember { mutableStateOf(prefs.getBoolean("show_schedule", true)) }
@@ -134,70 +99,9 @@ fun RadioApp(
     val isPlaying = playbackUiState is PlaybackUiState.Playing
     val showInfoBox = showSettings || showSchedule.value
 
-// Play/Pause lambda
-    val onPlayPause: () -> Unit = {
-        if (playbackUiState is PlaybackUiState.Playing) {
-            mediaController?.pause() ?: Unit  // Ensure return type is Unit
-        } else {
-            mediaController?.play() ?: Unit
-        }
-    }
-
     // Toggle Settings lambda
     val onToggleSettings: () -> Unit = {
         showSettings = !showSettings
-    }
-
-    // MediaController setup
-    LaunchedEffect(Unit) {
-        val token = SessionToken(context, ComponentName(context, RadioService::class.java))
-        val future: ListenableFuture<MediaController> = MediaController.Builder(context, token).buildAsync()
-        future.addListener({
-            try {
-                mediaController = future.get()
-                mediaController?.addListener(object : Player.Listener {
-
-                    override fun onPlaybackStateChanged(state: Int) {
-                        playbackUiState = when (state) {
-                            Player.STATE_IDLE -> PlaybackUiState.Connecting
-                            Player.STATE_BUFFERING -> PlaybackUiState.Buffering
-                            Player.STATE_READY -> {
-                                if (mediaController?.isPlaying == true)
-                                    PlaybackUiState.Playing(trackTitle, trackListeners)
-                                else
-                                    PlaybackUiState.Paused(trackTitle, trackListeners) // paused but ready
-                            }
-                            Player.STATE_ENDED -> PlaybackUiState.Reconnecting
-                            else -> PlaybackUiState.Connecting
-                        }
-                    }
-
-                    override fun onIsPlayingChanged(playing: Boolean) {
-                        playbackUiState = when {
-                            playing && mediaController?.playbackState == Player.STATE_READY ->
-                                PlaybackUiState.Playing(trackTitle, trackListeners)
-                            !playing && mediaController?.playbackState == Player.STATE_READY ->
-                                PlaybackUiState.Paused(trackTitle, trackListeners)
-                            else -> playbackUiState
-                        }
-                    }
-
-                    override fun onPlayerError(error: PlaybackException) {
-                        playbackUiState = PlaybackUiState.Reconnecting
-                    }
-
-                    override fun onMediaMetadataChanged(metadata: MediaMetadata) {
-                        trackTitle = metadata.title?.toString() ?: "SPAZ.Radio"
-                        trackListeners = metadata.artist?.toString() ?: ""
-                        if (mediaController?.isPlaying == true) {
-                            playbackUiState = PlaybackUiState.Playing(trackTitle, trackListeners)
-                        } else if (mediaController?.playbackState == Player.STATE_READY) {
-                            playbackUiState = PlaybackUiState.Paused(trackTitle, trackListeners)
-                        }
-                    }
-                })
-            } catch (e: Exception) { e.printStackTrace() }
-        }, MoreExecutors.directExecutor())
     }
 
     // Displayed track line
@@ -207,7 +111,6 @@ fun RadioApp(
         PlaybackUiState.Reconnecting -> "Reconnecting…"
         is PlaybackUiState.Playing, is PlaybackUiState.Paused -> playbackUiState.trackTitle()
     }
-
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Box(
@@ -221,7 +124,7 @@ fun RadioApp(
                     Column(modifier = Modifier.weight(1f)) {
                         PlayerHeader(
                             playbackUiState = playbackUiState,
-                            onPlayPause = onPlayPause,
+                            onPlayPause = { radioViewModel.togglePlayPause() },
                             onToggleSettings = onToggleSettings
                         )
                         TrackTitle(displayedSecondLine)
@@ -261,7 +164,7 @@ fun RadioApp(
                 Column(modifier = Modifier.fillMaxSize()) {
                     PlayerHeader(
                         playbackUiState = playbackUiState,
-                        onPlayPause = onPlayPause,
+                        onPlayPause = { radioViewModel.togglePlayPause() },
                         onToggleSettings = onToggleSettings
                     )
                     TrackTitle(displayedSecondLine)
@@ -343,8 +246,6 @@ fun PlayerHeader(
         }
     }
 }
-
-
 
 @Composable
 fun TrackTitle(trackTitle: String) {
