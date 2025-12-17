@@ -156,7 +156,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         } else if (isLive) {
             "SPAZ.Radio"
         } else {
-            "SPAZ Archive"
+            "SPAZ.Radio - Archives"
         }
 
         _trackSubtitle.value = when (val state = _playbackUiState.value) {
@@ -202,8 +202,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         controller.setMediaItem(mediaItem)
         controller.prepare()
         controller.play()
-        
-        // Removed closeInfoBox() to keep Archives open as requested
     }
 
     fun showLiveStream() {

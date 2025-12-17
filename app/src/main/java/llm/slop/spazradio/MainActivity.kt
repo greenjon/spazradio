@@ -130,7 +130,7 @@ fun RadioApp(
             FooterToolbar(
                 onRadioClick = { radioViewModel.showLiveStream() },
                 onArchivesClick = { radioViewModel.showArchives() },
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp)
             )
         }
     )
@@ -181,7 +181,12 @@ fun AdaptiveLayout(
                             if (showOscilloscope) {
                                 oscilloscope(Modifier.fillMaxWidth().height(300.dp).padding(16.dp))
                             }
-                            infoBox(Modifier.fillMaxWidth().weight(1f).padding(16.dp))
+                            infoBox(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 0.dp)
+                            )
                         } else {
                             // If no info box, let oscilloscope take all space if it exists
                             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
