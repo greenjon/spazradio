@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -75,7 +76,7 @@ fun PlayerHeader(
                 position = playbackPosition,
                 duration = playbackDuration,
                 onSeek = onSeek,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
         }
     }
@@ -88,7 +89,18 @@ fun PlaybackControls(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = formatTime(position),
+            style = MaterialTheme.typography.labelSmall,
+            color = NeonGreen,
+            fontSize = 12.sp,
+            modifier = Modifier.widthIn(min = 45.dp)
+        )
         Slider(
             value = position.toFloat(),
             onValueChange = { onSeek(it.toLong()) },
@@ -98,27 +110,16 @@ fun PlaybackControls(
                 activeTrackColor = NeonGreen,
                 inactiveTrackColor = NeonGreen.copy(alpha = 0.24f)
             ),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.weight(1f)
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = formatTime(position),
-                style = MaterialTheme.typography.labelSmall,
-                color = NeonGreen,
-                fontSize = 10.sp
-            )
-            Text(
-                text = formatTime(duration),
-                style = MaterialTheme.typography.labelSmall,
-                color = NeonGreen,
-                fontSize = 10.sp
-            )
-        }
+        Text(
+            text = formatTime(duration),
+            style = MaterialTheme.typography.labelSmall,
+            color = NeonGreen,
+            fontSize = 12.sp,
+            modifier = Modifier.widthIn(min = 45.dp),
+            textAlign = TextAlign.End
+        )
     }
 }
 
