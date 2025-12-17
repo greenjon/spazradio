@@ -4,14 +4,15 @@ IssueTracker: https://github.com/greenjon/spazradio/issues
 License: MIT
 
 Categories:
-  Multimedia 
-  Online Media Player
+  - Multimedia 
+  - Internet
 
 AuthorName: greenjon
 
 
 RepoType: git
 Repo: https://github.com/greenjon/spazradio.git
+Subdir: app
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
