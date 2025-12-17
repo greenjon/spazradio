@@ -124,7 +124,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         _trackListeners.value = metadata.artist?.toString() ?: _trackListeners.value
 
         val mediaId = controller.currentMediaItem?.mediaId
-        _isArchivePlaying.value = mediaId?.startsWith("archive_") == true || mediaId != liveStreamId && mediaId != null
+        _isArchivePlaying.value = mediaId?.startsWith("archive_") == true || (mediaId != liveStreamId && mediaId != null)
         
         if (_isArchivePlaying.value) {
             _playbackDuration.value = if (controller.duration > 0) controller.duration else 0L
@@ -203,7 +203,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         controller.prepare()
         controller.play()
         
-        closeInfoBox()
+        // Removed closeInfoBox() to keep Archives open as requested
     }
 
     fun showLiveStream() {
