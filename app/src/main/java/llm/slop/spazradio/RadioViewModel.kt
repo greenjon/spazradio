@@ -13,6 +13,7 @@ import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -20,10 +21,16 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     val playbackUiState: StateFlow<PlaybackUiState> = _playbackUiState.asStateFlow()
 
     private val _trackTitle = MutableStateFlow("SPAZ.Radio")
-    val trackTitle: StateFlow<String> = _trackTitle.asStateFlow()
-
     private val _trackListeners = MutableStateFlow("")
-    val trackListeners: StateFlow<String> = _trackListeners.asStateFlow()
+
+    private val _headerTitle = MutableStateFlow("SPAZ.Radio")
+    val headerTitle: StateFlow<String> = _headerTitle.asStateFlow()
+
+    private val _trackSubtitle = MutableStateFlow("Connecting…")
+    val trackSubtitle: StateFlow<String> = _trackSubtitle.asStateFlow()
+
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
     private var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -56,6 +63,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
             override fun onPlayerError(error: PlaybackException) {
                 _playbackUiState.value = PlaybackUiState.Reconnecting
+                updateDisplayStrings()
             }
 
             override fun onMediaMetadataChanged(metadata: MediaMetadata) {
@@ -69,6 +77,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateState(controller: MediaController) {
         val state = controller.playbackState
         val isPlaying = controller.isPlaying
+        _isPlaying.value = isPlaying
         
         _trackTitle.value = controller.mediaMetadata.title?.toString() ?: _trackTitle.value
         _trackListeners.value = controller.mediaMetadata.artist?.toString() ?: _trackListeners.value
@@ -82,6 +91,20 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             }
             Player.STATE_ENDED -> PlaybackUiState.Reconnecting
             else -> PlaybackUiState.Connecting
+        }
+        updateDisplayStrings()
+    }
+
+    private fun updateDisplayStrings() {
+        val listeners = _trackListeners.value
+        _headerTitle.value = if (listeners.isNotBlank()) "SPAZ.Radio   -   $listeners" else "SPAZ.Radio"
+
+        _trackSubtitle.value = when (val state = _playbackUiState.value) {
+            PlaybackUiState.Connecting -> "Connecting…"
+            PlaybackUiState.Buffering -> "Buffering…"
+            PlaybackUiState.Reconnecting -> "Reconnecting…"
+            is PlaybackUiState.Playing -> state.title
+            is PlaybackUiState.Paused -> state.title
         }
     }
 

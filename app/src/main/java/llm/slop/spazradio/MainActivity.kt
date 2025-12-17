@@ -10,7 +10,6 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,12 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -33,26 +27,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spazradio.ui.components.FooterToolbar
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
+import llm.slop.spazradio.ui.components.PlayerHeader
+import llm.slop.spazradio.ui.components.TrackTitle
 import llm.slop.spazradio.ui.theme.DeepBlue
 import llm.slop.spazradio.ui.theme.Magenta
-import llm.slop.spazradio.ui.theme.NeonGreen
 import llm.slop.spazradio.ui.theme.SpazRadioTheme
 
 /* ---------- Activity ---------- */
@@ -63,8 +51,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(Color.Transparent.toArgb()),
-            navigationBarStyle = SystemBarStyle.dark(Color.Transparent.toArgb())
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
 
         setContent {
@@ -73,6 +61,10 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+enum class InfoDisplay {
+    NONE, SETTINGS, SCHEDULE
 }
 
 /* ---------- App Root (RadioApp) ---------- */
@@ -84,33 +76,29 @@ fun RadioApp(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE) }
 
-    val playbackUiState by radioViewModel.playbackUiState.collectAsState()
+    val headerTitle by radioViewModel.headerTitle.collectAsState()
+    val trackSubtitle by radioViewModel.trackSubtitle.collectAsState()
+    val isPlaying by radioViewModel.isPlaying.collectAsState()
 
-    var showSettings by rememberSaveable { mutableStateOf(false) }
-    val showSchedule = remember { mutableStateOf(prefs.getBoolean("show_schedule", true)) }
+    var infoDisplay by rememberSaveable { mutableStateOf(InfoDisplay.NONE) }
+    
+    val showSchedulePref = remember { mutableStateOf(prefs.getBoolean("show_schedule", true)) }
     val lissajousMode = remember { mutableStateOf(prefs.getBoolean("visuals_enabled", true)) }
 
-    LaunchedEffect(showSchedule.value) { prefs.edit { putBoolean("show_schedule", showSchedule.value) } }
+    LaunchedEffect(showSchedulePref.value) { prefs.edit { putBoolean("show_schedule", showSchedulePref.value) } }
     LaunchedEffect(lissajousMode.value) { prefs.edit { putBoolean("visuals_enabled", lissajousMode.value) } }
+
+    // If schedule is preferred and we aren't in settings, show schedule
+    val currentInfoDisplay = when {
+        infoDisplay == InfoDisplay.SETTINGS -> InfoDisplay.SETTINGS
+        showSchedulePref.value -> InfoDisplay.SCHEDULE
+        else -> InfoDisplay.NONE
+    }
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val waveform by RadioService.waveformFlow.collectAsState()
-    val isPlaying = playbackUiState is PlaybackUiState.Playing
-    val showInfoBox = showSettings || showSchedule.value
-
-    // Toggle Settings lambda
-    val onToggleSettings: () -> Unit = {
-        showSettings = !showSettings
-    }
-
-    // Displayed track line
-    val displayedSecondLine = when (playbackUiState) {
-        PlaybackUiState.Connecting -> "Connecting…"
-        PlaybackUiState.Buffering -> "Buffering…"
-        PlaybackUiState.Reconnecting -> "Reconnecting…"
-        is PlaybackUiState.Playing, is PlaybackUiState.Paused -> playbackUiState.trackTitle()
-    }
+    val showInfoBox = currentInfoDisplay != InfoDisplay.NONE
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Box(
@@ -123,11 +111,14 @@ fun RadioApp(
                 Row(modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.weight(1f)) {
                         PlayerHeader(
-                            playbackUiState = playbackUiState,
+                            title = headerTitle,
+                            isPlaying = isPlaying,
                             onPlayPause = { radioViewModel.togglePlayPause() },
-                            onToggleSettings = onToggleSettings
+                            onToggleSettings = { 
+                                infoDisplay = if (infoDisplay == InfoDisplay.SETTINGS) InfoDisplay.NONE else InfoDisplay.SETTINGS 
+                            }
                         )
-                        TrackTitle(displayedSecondLine)
+                        TrackTitle(trackSubtitle)
                         Oscilloscope(
                             waveform = waveform,
                             isPlaying = isPlaying,
@@ -138,7 +129,7 @@ fun RadioApp(
                                 .padding(16.dp)
                         )
                         FooterToolbar(
-                            onRadioClick = { /* No-op, we're on Radio */ },
+                            onRadioClick = { /* No-op */ },
                             onArchivesClick = {
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://spaz.org/radio/archive"))
                                 context.startActivity(intent)
@@ -148,10 +139,10 @@ fun RadioApp(
                     }
                     if (showInfoBox) {
                         InfoBox(
-                            showSettings = showSettings,
-                            onCloseSettings = { showSettings = false },
+                            showSettings = (currentInfoDisplay == InfoDisplay.SETTINGS),
+                            onCloseSettings = { infoDisplay = InfoDisplay.NONE },
                             lissajousMode = lissajousMode,
-                            showSchedule = showSchedule,
+                            showSchedule = showSchedulePref,
                             scheduleViewModel = scheduleViewModel,
                             modifier = Modifier
                                 .weight(1f)
@@ -163,13 +154,15 @@ fun RadioApp(
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
                     PlayerHeader(
-                        playbackUiState = playbackUiState,
+                        title = headerTitle,
+                        isPlaying = isPlaying,
                         onPlayPause = { radioViewModel.togglePlayPause() },
-                        onToggleSettings = onToggleSettings
+                        onToggleSettings = { 
+                            infoDisplay = if (infoDisplay == InfoDisplay.SETTINGS) InfoDisplay.NONE else InfoDisplay.SETTINGS 
+                        }
                     )
-                    TrackTitle(displayedSecondLine)
+                    TrackTitle(trackSubtitle)
                     
-                    // Main content area that takes up available space
                     Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         if (lissajousMode.value) {
                             Oscilloscope(
@@ -185,10 +178,10 @@ fun RadioApp(
                         }
                         if (showInfoBox) {
                             InfoBox(
-                                showSettings = showSettings,
-                                onCloseSettings = { showSettings = false },
+                                showSettings = (currentInfoDisplay == InfoDisplay.SETTINGS),
+                                onCloseSettings = { infoDisplay = InfoDisplay.NONE },
                                 lissajousMode = lissajousMode,
-                                showSchedule = showSchedule,
+                                showSchedule = showSchedulePref,
                                 scheduleViewModel = scheduleViewModel,
                                 modifier = Modifier.fillMaxWidth().weight(1f).padding(16.dp)
                             )
@@ -206,66 +199,5 @@ fun RadioApp(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun PlayerHeader(
-    playbackUiState: PlaybackUiState,
-    onPlayPause: () -> Unit,
-    onToggleSettings: () -> Unit
-) {
-    val isPlaying = playbackUiState is PlaybackUiState.Playing
-    val headerText = if (playbackUiState.trackListeners().isNotBlank())
-        "SPAZ.Radio   -   ${playbackUiState.trackListeners()}"
-    else "SPAZ.Radio"
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onPlayPause) {
-            Icon(
-                painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
-                contentDescription = if (isPlaying) "Pause" else "Play",
-                tint = NeonGreen,
-                modifier = Modifier.size(48.dp)
-            )
-        }
-        Text(
-            text = headerText,
-            style = MaterialTheme.typography.titleLarge,
-            color = Color(0xFFFFFF00),
-            textAlign = TextAlign.Center
-        )
-        IconButton(onClick = onToggleSettings) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_settings),
-                contentDescription = stringResource(R.string.settings_title),
-                tint = NeonGreen,
-                modifier = Modifier.size(48.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun TrackTitle(trackTitle: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = trackTitle,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            color = NeonGreen
-        )
     }
 }
