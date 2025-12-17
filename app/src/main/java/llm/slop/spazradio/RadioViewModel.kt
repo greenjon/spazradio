@@ -142,8 +142,12 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         updateCurrentInfoDisplay()
     }
 
-    fun closeSettings() {
-        _infoDisplay.value = InfoDisplay.NONE
+    fun closeInfoBox() {
+        if (_infoDisplay.value == InfoDisplay.SETTINGS) {
+            _infoDisplay.value = InfoDisplay.NONE
+        } else if (_showSchedulePref.value) {
+            setShowSchedule(false)
+        }
         updateCurrentInfoDisplay()
     }
 

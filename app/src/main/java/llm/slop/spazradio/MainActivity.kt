@@ -108,7 +108,7 @@ fun RadioApp(
             }
             InfoBox(
                 title = title,
-                onClose = { radioViewModel.closeSettings() },
+                onClose = { radioViewModel.closeInfoBox() },
                 modifier = modifier
             ) {
                 when (currentInfoDisplay) {
