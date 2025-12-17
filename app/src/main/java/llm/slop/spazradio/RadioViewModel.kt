@@ -159,8 +159,8 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         controller.prepare()
         controller.play()
         
-        // Optionally close archives box
-        // closeInfoBox()
+        // Auto-close info box once playing an archive
+        closeInfoBox()
     }
 
     fun showLiveStream() {
