@@ -1,15 +1,24 @@
 package llm.slop.spazradio.ui.components
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -37,6 +46,12 @@ fun ArchiveContent(
 ) {
     val uiState by archiveViewModel.uiState.collectAsState()
 
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        // Permission result handled by the system notification logic
+    }
+
     LaunchedEffect(Unit) {
         archiveViewModel.fetchArchivesIfNeeded()
     }
@@ -50,9 +65,25 @@ fun ArchiveContent(
         is ArchiveUiState.Success -> {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(state.shows) { show ->
+                    val isDownloaded = state.downloadedUrls.contains(show.url)
                     ArchiveShowRow(
                         show = show,
-                        onPlay = { radioViewModel.playArchive(show) }
+                        isDownloaded = isDownloaded,
+                        onPlay = {
+                            val localFile = archiveViewModel.getLocalFileIfDownloaded(show)
+                            if (localFile != null) {
+                                // Optimized play: pass the local file URI if it exists
+                                radioViewModel.playArchive(show.copy(url = "file://${localFile.absolutePath}"))
+                            } else {
+                                radioViewModel.playArchive(show)
+                            }
+                        },
+                        onDownload = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            archiveViewModel.downloadArchive(show)
+                        }
                     )
                 }
             }
@@ -77,7 +108,9 @@ fun ArchiveContent(
 @Composable
 fun ArchiveShowRow(
     show: ArchiveShow,
-    onPlay: () -> Unit
+    isDownloaded: Boolean,
+    onPlay: () -> Unit,
+    onDownload: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -86,7 +119,7 @@ fun ArchiveShowRow(
             .padding(vertical = 8.dp, horizontal = 4.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.fillMaxWidth(0.85f)) {
+            Column(modifier = Modifier.fillMaxWidth(0.7f)) {
                 Text(
                     text = show.date,
                     style = MaterialTheme.typography.labelSmall,
@@ -98,17 +131,32 @@ fun ArchiveShowRow(
                     color = Color.White
                 )
             }
-            IconButton(
-                onClick = onPlay,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .size(40.dp)
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = NeonGreen
-                )
+                IconButton(
+                    onClick = onDownload,
+                    modifier = Modifier.size(40.dp),
+                    enabled = !isDownloaded
+                ) {
+                    Icon(
+                        imageVector = if (isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
+                        contentDescription = if (isDownloaded) "Downloaded" else "Download",
+                        tint = if (isDownloaded) NeonGreen else Color.Gray
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(
+                    onClick = onPlay,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Play",
+                        tint = NeonGreen
+                    )
+                }
             }
         }
     }
