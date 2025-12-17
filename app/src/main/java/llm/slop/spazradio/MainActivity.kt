@@ -58,10 +58,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-enum class InfoDisplay {
-    NONE, SETTINGS, SCHEDULE
-}
-
 /* ---------- App Root (RadioApp) ---------- */
 @Composable
 fun RadioApp(
@@ -104,6 +100,7 @@ fun RadioApp(
             val title = when (currentInfoDisplay) {
                 InfoDisplay.SETTINGS -> "Settings"
                 InfoDisplay.SCHEDULE -> "Schedule"
+                InfoDisplay.ARCHIVES -> "Archives"
                 else -> ""
             }
             InfoBox(
@@ -114,17 +111,24 @@ fun RadioApp(
                 when (currentInfoDisplay) {
                     InfoDisplay.SETTINGS -> SettingsContent(radioViewModel)
                     InfoDisplay.SCHEDULE -> ScheduleContent(scheduleViewModel)
+                    InfoDisplay.ARCHIVES -> {
+                        // Placeholder for ArchiveContent()
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            androidx.compose.material3.Text(
+                                text = "Archives coming soon...",
+                                color = llm.slop.spazradio.ui.theme.NeonGreen,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
                     else -> {}
                 }
             }
         },
         footer = {
             FooterToolbar(
-                onRadioClick = { /* No-op */ },
-                onArchivesClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://spaz.org/radio/archive"))
-                    context.startActivity(intent)
-                },
+                onRadioClick = { radioViewModel.showLiveStream() },
+                onArchivesClick = { radioViewModel.showArchives() },
                 modifier = Modifier.padding(16.dp)
             )
         }

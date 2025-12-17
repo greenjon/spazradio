@@ -142,8 +142,18 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         updateCurrentInfoDisplay()
     }
 
+    fun showArchives() {
+        _infoDisplay.value = InfoDisplay.ARCHIVES
+        updateCurrentInfoDisplay()
+    }
+
+    fun showLiveStream() {
+        _infoDisplay.value = InfoDisplay.NONE
+        updateCurrentInfoDisplay()
+    }
+
     fun closeInfoBox() {
-        if (_infoDisplay.value == InfoDisplay.SETTINGS) {
+        if (_infoDisplay.value != InfoDisplay.NONE) {
             _infoDisplay.value = InfoDisplay.NONE
         } else if (_showSchedulePref.value) {
             setShowSchedule(false)
@@ -164,7 +174,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun updateCurrentInfoDisplay() {
         _currentInfoDisplay.value = when {
-            _infoDisplay.value == InfoDisplay.SETTINGS -> InfoDisplay.SETTINGS
+            _infoDisplay.value != InfoDisplay.NONE -> _infoDisplay.value
             _showSchedulePref.value -> InfoDisplay.SCHEDULE
             else -> InfoDisplay.NONE
         }
