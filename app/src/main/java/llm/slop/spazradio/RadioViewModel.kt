@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ComponentName
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -12,9 +13,12 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import llm.slop.spazradio.data.ArchiveShow
 
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
@@ -38,6 +42,15 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
+    private val _isArchivePlaying = MutableStateFlow(false)
+    val isArchivePlaying: StateFlow<Boolean> = _isArchivePlaying.asStateFlow()
+
+    private val _playbackPosition = MutableStateFlow(0L)
+    val playbackPosition: StateFlow<Long> = _playbackPosition.asStateFlow()
+
+    private val _playbackDuration = MutableStateFlow(0L)
+    val playbackDuration: StateFlow<Long> = _playbackDuration.asStateFlow()
 
     // --- UI / Navigation State ---
     private val _infoDisplay = MutableStateFlow(InfoDisplay.NONE)
@@ -70,6 +83,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }, MoreExecutors.directExecutor())
         
         updateCurrentInfoDisplay()
+        startPositionPolling()
     }
 
     private fun setupController(controller: MediaController) {
@@ -93,6 +107,10 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 _trackListeners.value = metadata.artist?.toString() ?: ""
                 updateState(controller)
             }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                updateState(controller)
+            }
         })
     }
 
@@ -104,6 +122,16 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         val metadata = controller.mediaMetadata
         _trackTitle.value = metadata.title?.toString() ?: _trackTitle.value
         _trackListeners.value = metadata.artist?.toString() ?: _trackListeners.value
+
+        val mediaId = controller.currentMediaItem?.mediaId
+        _isArchivePlaying.value = mediaId?.startsWith("archive_") == true || mediaId != liveStreamId && mediaId != null
+        
+        if (_isArchivePlaying.value) {
+            _playbackDuration.value = if (controller.duration > 0) controller.duration else 0L
+        } else {
+            _playbackDuration.value = 0L
+            _playbackPosition.value = 0L
+        }
 
         _playbackUiState.value = when (state) {
             Player.STATE_IDLE -> PlaybackUiState.Connecting
@@ -140,6 +168,22 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun startPositionPolling() {
+        viewModelScope.launch {
+            while (isActive) {
+                mediaController?.let { controller ->
+                    if (_isArchivePlaying.value && controller.isPlaying) {
+                        _playbackPosition.value = controller.currentPosition
+                        if (_playbackDuration.value <= 0 && controller.duration > 0) {
+                            _playbackDuration.value = controller.duration
+                        }
+                    }
+                }
+                delay(1000)
+            }
+        }
+    }
+
     // --- Playback Actions ---
 
     fun playArchive(show: ArchiveShow) {
@@ -159,7 +203,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         controller.prepare()
         controller.play()
         
-        // Auto-close info box once playing an archive
         closeInfoBox()
     }
 
@@ -179,6 +222,11 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
         _infoDisplay.value = InfoDisplay.NONE
         updateCurrentInfoDisplay()
+    }
+
+    fun seekTo(position: Long) {
+        mediaController?.seekTo(position)
+        _playbackPosition.value = position
     }
 
     // --- Settings / UI Actions ---

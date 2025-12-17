@@ -66,6 +66,9 @@ fun RadioApp(
     val headerTitle by radioViewModel.headerTitle.collectAsState()
     val trackSubtitle by radioViewModel.trackSubtitle.collectAsState()
     val isPlaying by radioViewModel.isPlaying.collectAsState()
+    val isArchivePlaying by radioViewModel.isArchivePlaying.collectAsState()
+    val playbackPosition by radioViewModel.playbackPosition.collectAsState()
+    val playbackDuration by radioViewModel.playbackDuration.collectAsState()
     val lissajousMode by radioViewModel.lissajousMode.collectAsState()
     val currentInfoDisplay by radioViewModel.currentInfoDisplay.collectAsState()
 
@@ -81,8 +84,12 @@ fun RadioApp(
             PlayerHeader(
                 title = headerTitle,
                 isPlaying = isPlaying,
+                isArchivePlaying = isArchivePlaying,
+                playbackPosition = playbackPosition,
+                playbackDuration = playbackDuration,
                 onPlayPause = { radioViewModel.togglePlayPause() },
-                onToggleSettings = { radioViewModel.toggleSettings() }
+                onToggleSettings = { radioViewModel.toggleSettings() },
+                onSeek = { radioViewModel.seekTo(it) }
             )
         },
         trackTitle = { TrackTitle(trackSubtitle) },

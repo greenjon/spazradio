@@ -2,6 +2,7 @@ package llm.slop.spazradio.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,45 +22,115 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import llm.slop.spazradio.R
 import llm.slop.spazradio.ui.theme.NeonGreen
+import java.util.Locale
 
 @Composable
 fun PlayerHeader(
     title: String,
     isPlaying: Boolean,
+    isArchivePlaying: Boolean,
+    playbackPosition: Long,
+    playbackDuration: Long,
     onPlayPause: () -> Unit,
-    onToggleSettings: () -> Unit
+    onToggleSettings: () -> Unit,
+    onSeek: (Long) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onPlayPause) {
-            Icon(
-                painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
-                contentDescription = if (isPlaying) "Pause" else "Play",
-                tint = NeonGreen,
-                modifier = Modifier.size(48.dp)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onPlayPause) {
+                Icon(
+                    painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = NeonGreen,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                color = Color(0xFFFFFF00),
+                textAlign = TextAlign.Center
+            )
+            IconButton(onClick = onToggleSettings) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_settings),
+                    contentDescription = stringResource(R.string.settings_title),
+                    tint = NeonGreen,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
+
+        if (isArchivePlaying && playbackDuration > 0) {
+            PlaybackControls(
+                position = playbackPosition,
+                duration = playbackDuration,
+                onSeek = onSeek,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp)
             )
         }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            color = Color(0xFFFFFF00),
-            textAlign = TextAlign.Center
+    }
+}
+
+@Composable
+fun PlaybackControls(
+    position: Long,
+    duration: Long,
+    onSeek: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Slider(
+            value = position.toFloat(),
+            onValueChange = { onSeek(it.toLong()) },
+            valueRange = 0f..duration.toFloat(),
+            colors = SliderDefaults.colors(
+                thumbColor = NeonGreen,
+                activeTrackColor = NeonGreen,
+                inactiveTrackColor = NeonGreen.copy(alpha = 0.24f)
+            ),
+            modifier = Modifier.fillMaxWidth()
         )
-        IconButton(onClick = onToggleSettings) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_settings),
-                contentDescription = stringResource(R.string.settings_title),
-                tint = NeonGreen,
-                modifier = Modifier.size(48.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = formatTime(position),
+                style = MaterialTheme.typography.labelSmall,
+                color = NeonGreen,
+                fontSize = 10.sp
+            )
+            Text(
+                text = formatTime(duration),
+                style = MaterialTheme.typography.labelSmall,
+                color = NeonGreen,
+                fontSize = 10.sp
             )
         }
+    }
+}
+
+private fun formatTime(ms: Long): String {
+    val totalSeconds = ms / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
     }
 }
 
