@@ -2,6 +2,7 @@ package llm.slop.spazradio
 
 import android.app.Application
 import android.content.ComponentName
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -13,10 +14,12 @@ import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val prefs = application.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE)
+
+    // --- Playback State ---
     private val _playbackUiState = MutableStateFlow<PlaybackUiState>(PlaybackUiState.Connecting)
     val playbackUiState: StateFlow<PlaybackUiState> = _playbackUiState.asStateFlow()
 
@@ -31,6 +34,19 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
+    // --- UI / Navigation State ---
+    private val _infoDisplay = MutableStateFlow(InfoDisplay.NONE)
+    val infoDisplay: StateFlow<InfoDisplay> = _infoDisplay.asStateFlow()
+
+    private val _showSchedulePref = MutableStateFlow(prefs.getBoolean("show_schedule", true))
+    val showSchedulePref: StateFlow<Boolean> = _showSchedulePref.asStateFlow()
+
+    private val _lissajousMode = MutableStateFlow(prefs.getBoolean("visuals_enabled", true))
+    val lissajousMode: StateFlow<Boolean> = _lissajousMode.asStateFlow()
+
+    private val _currentInfoDisplay = MutableStateFlow(InfoDisplay.NONE)
+    val currentInfoDisplay: StateFlow<InfoDisplay> = _currentInfoDisplay.asStateFlow()
 
     private var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -48,6 +64,8 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 e.printStackTrace()
             }
         }, MoreExecutors.directExecutor())
+        
+        updateCurrentInfoDisplay()
     }
 
     private fun setupController(controller: MediaController) {
@@ -108,12 +126,43 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // --- Settings / UI Actions ---
+
     fun togglePlayPause() {
         val controller = mediaController ?: return
         if (controller.isPlaying) {
             controller.pause()
         } else {
             controller.play()
+        }
+    }
+
+    fun toggleSettings() {
+        _infoDisplay.value = if (_infoDisplay.value == InfoDisplay.SETTINGS) InfoDisplay.NONE else InfoDisplay.SETTINGS
+        updateCurrentInfoDisplay()
+    }
+
+    fun closeSettings() {
+        _infoDisplay.value = InfoDisplay.NONE
+        updateCurrentInfoDisplay()
+    }
+
+    fun setShowSchedule(enabled: Boolean) {
+        _showSchedulePref.value = enabled
+        prefs.edit().putBoolean("show_schedule", enabled).apply()
+        updateCurrentInfoDisplay()
+    }
+
+    fun setLissajousMode(enabled: Boolean) {
+        _lissajousMode.value = enabled
+        prefs.edit().putBoolean("visuals_enabled", enabled).apply()
+    }
+
+    private fun updateCurrentInfoDisplay() {
+        _currentInfoDisplay.value = when {
+            _infoDisplay.value == InfoDisplay.SETTINGS -> InfoDisplay.SETTINGS
+            _showSchedulePref.value -> InfoDisplay.SCHEDULE
+            else -> InfoDisplay.NONE
         }
     }
 
