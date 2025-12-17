@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -19,6 +20,8 @@ import androidx.media3.exoplayer.audio.TeeAudioProcessor
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +47,7 @@ class RadioService : MediaSessionService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
     private lateinit var okHttpClient: OkHttpClient
     
-    private val mediaID = "spaz_radio_stream"
+    private val liveMediaID = "spaz_radio_stream"
 
     companion object {
         private val _waveformFlow = MutableStateFlow<ByteArray?>(null)
@@ -75,26 +78,18 @@ class RadioService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         
-        // Configure OkHttpClient with increased timeouts
         okHttpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
-         //   .hostnameVerifier { _, _ -> true } // Trust all hostnames for debugging
             .build()
 
         val okHttpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
             .setUserAgent("SpazRadio/1.0")
 
-        // Increase buffer sizes for stream stability
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                60000,  // 1 minute min buffer
-                120000, // 2 minutes max buffer
-                5000,   // 5 seconds to start playback
-                10000   // 10 seconds to resume after rebuffer
-            )
+            .setBufferDurationsMs(60000, 120000, 5000, 10000)
             .build()
 
         val renderersFactory = object : DefaultRenderersFactory(this) {
@@ -118,9 +113,8 @@ class RadioService : MediaSessionService() {
             .setLoadControl(loadControl)
             .build()
         
-        player?.playWhenReady = true // Autostart playback when ready
+        player?.playWhenReady = true
 
-        // Ensure we have a valid intent for the session activity
         val sessionActivityPendingIntent =
             PendingIntent.getActivity(
                 this,
@@ -131,21 +125,19 @@ class RadioService : MediaSessionService() {
 
         mediaSession = MediaSession.Builder(this, player!!)
             .setSessionActivity(sessionActivityPendingIntent)
+            .setCallback(MediaSessionCallback())
             .build()
 
         val mediaItem = MediaItem.Builder()
             .setUri("https://radio.spaz.org:8060/radio.ogg")
-            .setMediaId(mediaID)
+            .setMediaId(liveMediaID)
+            .setMimeType(MimeTypes.AUDIO_OGG)
             .build()
             
         player?.setMediaItem(mediaItem)
         player?.prepare()
         
         player?.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                // Visualizer handling moved to AudioProcessor
-            }
-
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
                     _waveformFlow.value = null
@@ -156,30 +148,40 @@ class RadioService : MediaSessionService() {
         startMetadataPolling()
     }
 
+    private inner class MediaSessionCallback : MediaSession.Callback {
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>
+        ): ListenableFuture<List<MediaItem>> {
+            val updatedItems = mediaItems.map { item ->
+                if (item.mediaId.startsWith("archive_")) {
+                    item.buildUpon()
+                        .setMimeType(MimeTypes.AUDIO_OGG)
+                        .build()
+                } else {
+                    item
+                }
+            }
+            return Futures.immediateFuture(updatedItems)
+        }
+    }
+
     private fun startMetadataPolling() {
         serviceScope.launch(Dispatchers.IO) {
             while (isActive) {
                 try {
-                    fetchAndUpdateMetadata()
-                } catch (e: Exception) {    Log.e("RadioService", "Error parsing metadata", e)
-                    val errorMetadata = MediaMetadata.Builder()
-                        .setTitle("Radio Spaz")
-                        .setArtist("Error loading metadata")
-                        .build()
-
-                    // Update the UI with the error message
-                    withContext(Dispatchers.Main) {
-                        player?.let { exoPlayer ->
-                            // ... your existing logic to replace the media item's metadata
-                            if (exoPlayer.mediaItemCount > 0) {
-                                val currentItem = exoPlayer.getMediaItemAt(0)
-                                val newItem = currentItem.buildUpon().setMediaMetadata(errorMetadata).build()
-                                exoPlayer.replaceMediaItem(0, newItem)
-                            }
-                        }
+                    val currentMediaId = withContext(Dispatchers.Main) {
+                        player?.currentMediaItem?.mediaId
                     }
+                    
+                    if (currentMediaId == liveMediaID) {
+                        fetchAndUpdateMetadata()
+                    }
+                } catch (e: Exception) {
+                    Log.e("RadioService", "Error in metadata polling", e)
                 }
-                delay(10000) // Poll every 10 seconds
+                delay(10000)
             }
         }
     }
@@ -224,12 +226,10 @@ class RadioService : MediaSessionService() {
                 player?.let { exoPlayer ->
                     if (exoPlayer.mediaItemCount > 0) {
                         val currentItem = exoPlayer.getMediaItemAt(0)
-                        if (currentItem.mediaId == mediaID) {
+                        if (currentItem.mediaId == liveMediaID) {
                             val newItem = currentItem.buildUpon()
                                 .setMediaMetadata(newMetadata)
                                 .build()
-                            
-                            // replaceMediaItem at index 0
                             exoPlayer.replaceMediaItem(0, newItem)
                         }
                     }
