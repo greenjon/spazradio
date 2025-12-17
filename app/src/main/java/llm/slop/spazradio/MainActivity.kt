@@ -168,28 +168,33 @@ fun RadioApp(
                         onToggleSettings = onToggleSettings
                     )
                     TrackTitle(displayedSecondLine)
-                    if (lissajousMode.value) {
-                        Oscilloscope(
-                            waveform = waveform,
-                            isPlaying = isPlaying,
-                            lissajousMode = lissajousMode.value,
-                            modifier = if (showInfoBox) {
-                                Modifier.fillMaxWidth().height(300.dp).padding(16.dp)
-                            } else {
-                                Modifier.fillMaxWidth().weight(1f).padding(16.dp)
-                            }
-                        )
+                    
+                    // Main content area that takes up available space
+                    Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        if (lissajousMode.value) {
+                            Oscilloscope(
+                                waveform = waveform,
+                                isPlaying = isPlaying,
+                                lissajousMode = lissajousMode.value,
+                                modifier = if (showInfoBox) {
+                                    Modifier.fillMaxWidth().height(300.dp).padding(16.dp)
+                                } else {
+                                    Modifier.fillMaxWidth().weight(1f).padding(16.dp)
+                                }
+                            )
+                        }
+                        if (showInfoBox) {
+                            InfoBox(
+                                showSettings = showSettings,
+                                onCloseSettings = { showSettings = false },
+                                lissajousMode = lissajousMode,
+                                showSchedule = showSchedule,
+                                scheduleViewModel = scheduleViewModel,
+                                modifier = Modifier.fillMaxWidth().weight(1f).padding(16.dp)
+                            )
+                        }
                     }
-                    if (showInfoBox) {
-                        InfoBox(
-                            showSettings = showSettings,
-                            onCloseSettings = { showSettings = false },
-                            lissajousMode = lissajousMode,
-                            showSchedule = showSchedule,
-                            scheduleViewModel = scheduleViewModel,
-                            modifier = Modifier.fillMaxWidth().weight(1f).padding(16.dp)
-                        )
-                    }
+
                     FooterToolbar(
                         onRadioClick = { /* No-op */ },
                         onArchivesClick = {
