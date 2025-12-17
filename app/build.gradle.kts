@@ -27,7 +27,7 @@ android {
         val fdroidVersionName = System.getenv("FDROID_VERSION_NAME")
 
         versionCode = fdroidVersionCode ?: 111
-        versionName = fdroidVersionName ?: "1.1"
+        versionName = fdroidVersionName ?: "1.1.1"
     }
 
     compileOptions {
