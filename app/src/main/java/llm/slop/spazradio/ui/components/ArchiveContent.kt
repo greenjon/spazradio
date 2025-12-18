@@ -42,10 +42,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import llm.slop.spazradio.ArchiveUiState
 import llm.slop.spazradio.ArchiveViewModel
+import llm.slop.spazradio.R
 import llm.slop.spazradio.RadioViewModel
 import llm.slop.spazradio.data.ArchiveShow
 import llm.slop.spazradio.ui.theme.NeonGreen
@@ -80,7 +82,7 @@ fun ArchiveContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp),
-                    placeholder = { Text("Search archives...", color = Color.Gray, fontSize = 14.sp) },
+                    placeholder = { Text(stringResource(R.string.search_archives), color = Color.Gray, fontSize = 14.sp) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = NeonGreen) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -129,7 +131,7 @@ fun ArchiveContent(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(text = state.message, color = Color.Red, modifier = Modifier.padding(16.dp))
                     Text(
-                        text = "Retry",
+                        text = stringResource(R.string.label_retry),
                         color = NeonGreen,
                         modifier = Modifier
                             .clickable { archiveViewModel.fetchArchives() }
@@ -156,7 +158,7 @@ fun LoadingArchivesText() {
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            text = "Loading Archives...",
+            text = stringResource(R.string.loading_archives),
             color = NeonGreen.copy(alpha = alpha),
             style = MaterialTheme.typography.titleLarge
         )
@@ -208,7 +210,7 @@ fun ArchiveShowRow(
                     } else {
                         Icon(
                             imageVector = if (isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
-                            contentDescription = if (isDownloaded) "Downloaded" else "Download",
+                            contentDescription = if (isDownloaded) stringResource(R.string.label_downloaded) else stringResource(R.string.label_download),
                             tint = if (isDownloaded) NeonGreen else Color.Gray
                         )
                     }
@@ -220,7 +222,7 @@ fun ArchiveShowRow(
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Play",
+                        contentDescription = stringResource(R.string.label_play),
                         tint = NeonGreen
                     )
                 }

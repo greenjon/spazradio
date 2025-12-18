@@ -50,7 +50,7 @@ fun PlayerHeader(
             IconButton(onClick = onPlayPause) {
                 Icon(
                     painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
-                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    contentDescription = if (isPlaying) stringResource(R.string.label_pause) else stringResource(R.string.label_play),
                     tint = NeonGreen,
                     modifier = Modifier.size(48.dp)
                 )

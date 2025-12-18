@@ -14,7 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import llm.slop.spazradio.R
 import llm.slop.spazradio.ui.theme.NeonGreen
 
 @Composable
@@ -29,12 +31,12 @@ fun FooterToolbar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         FooterButton(
-            text = "Radio",
+            text = stringResource(R.string.label_radio),
             onClick = onRadioClick,
             modifier = Modifier.weight(1f)
         )
         FooterButton(
-            text = "Archives",
+            text = stringResource(R.string.label_archives),
             onClick = onArchivesClick,
             modifier = Modifier.weight(1f)
         )

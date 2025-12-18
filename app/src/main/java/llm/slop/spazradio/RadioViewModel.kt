@@ -23,7 +23,8 @@ import llm.slop.spazradio.data.ArchiveShow
 
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val prefs = application.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE)
+    private val context = application.applicationContext
+    private val prefs = context.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE)
     private val liveStreamUrl = "https://radio.spaz.org:8060/radio.ogg"
     private val liveStreamId = "spaz_radio_stream"
 
@@ -37,7 +38,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _headerTitle = MutableStateFlow("SPAZ.Radio")
     val headerTitle: StateFlow<String> = _headerTitle.asStateFlow()
 
-    private val _trackSubtitle = MutableStateFlow("Connecting…")
+    private val _trackSubtitle = MutableStateFlow("")
     val trackSubtitle: StateFlow<String> = _trackSubtitle.asStateFlow()
 
     private val _isPlaying = MutableStateFlow(false)
@@ -69,7 +70,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private var controllerFuture: ListenableFuture<MediaController>? = null
 
     init {
-        val context = application.applicationContext
         val token = SessionToken(context, ComponentName(context, RadioService::class.java))
         controllerFuture = MediaController.Builder(context, token).buildAsync()
         controllerFuture?.addListener({
@@ -156,13 +156,13 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         } else if (isLive) {
             "SPAZ.Radio"
         } else {
-            "SPAZ.Radio - Archives"
+            context.getString(R.string.label_archives)
         }
 
         _trackSubtitle.value = when (val state = _playbackUiState.value) {
-            PlaybackUiState.Connecting -> "Connecting…"
-            PlaybackUiState.Buffering -> "Buffering…"
-            PlaybackUiState.Reconnecting -> "Reconnecting…"
+            PlaybackUiState.Connecting -> context.getString(R.string.status_connecting)
+            PlaybackUiState.Buffering -> context.getString(R.string.status_buffering)
+            PlaybackUiState.Reconnecting -> context.getString(R.string.status_reconnecting)
             is PlaybackUiState.Playing -> state.title
             is PlaybackUiState.Paused -> state.title
         }

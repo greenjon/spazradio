@@ -5,4 +5,22 @@
     <string name="settings_title">Settings</string>
     <string name="show_schedule">Show Schedule</string>
     <string name="show_visuals">Show Visuals</string>
+    
+    <string name="status_connecting">Connecting</string>
+    <string name="status_reconnecting">Reconnecting</string>
+    <string name="status_buffering">Buffering</string>
+    <string name="label_archive">Archive</string>
+    <string name="label_archives">Archives</string>
+    <string name="search_archives">Search archives…</string>
+    <string name="action_close">Close</string>
+    <string name="label_live">Live</string>
+    <string name="toast_download_started">Download started: %s</string>
+    <string name="loading_archives">Loading Archives…</string>
+    <string name="label_radio">Radio</string>
+    <string name="label_play">Play</string>
+    <string name="label_pause">Pause</string>
+    <string name="label_retry">Retry</string>
+    <string name="label_download">Download</string>
+    <string name="label_downloaded">Downloaded</string>
+    <string name="error_archives">No archives found or network error.</string>
 </resources>

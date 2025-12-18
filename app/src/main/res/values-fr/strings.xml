@@ -1,7 +1,26 @@
 <resources>
-    <string name="listening_template">%d à l\'écoute</string>
+    <string name="app_name">SPAZ Radio</string>
+    <string name="listening_template">%d auditeurs</string>
     <string name="schedule_title">Programme</string>
     <string name="settings_title">Paramètres</string>
     <string name="show_schedule">Afficher le programme</string>
     <string name="show_visuals">Afficher les visuels</string>
+
+    <string name="status_connecting">Connexion</string>
+    <string name="status_reconnecting">Reconnexion</string>
+    <string name="status_buffering">Mise en mémoire</string>
+    <string name="label_archive">Archive</string>
+    <string name="label_archives">Archives</string>
+    <string name="search_archives">Rechercher…</string>
+    <string name="action_close">Fermer</string>
+    <string name="label_live">En direct</string>
+    <string name="toast_download_started">Téléchargement lancé: %s</string>
+    <string name="loading_archives">Chargement des archives…</string>
+    <string name="label_radio">Radio</string>
+    <string name="label_play">Jouer</string>
+    <string name="label_pause">Pause</string>
+    <string name="label_retry">Réessayer</string>
+    <string name="label_download">Télécharger</string>
+    <string name="label_downloaded">Téléchargé</string>
+    <string name="error_archives">Aucune archive trouvée ou erreur réseau.</string>
 </resources>
