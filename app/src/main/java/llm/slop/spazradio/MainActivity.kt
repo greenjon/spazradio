@@ -74,7 +74,6 @@ fun RadioApp(
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val waveform by RadioService.waveformFlow.collectAsState()
 
     AdaptiveLayout(
         isLandscape = isLandscape,
@@ -94,6 +93,8 @@ fun RadioApp(
         },
         trackTitle = { TrackTitle(trackSubtitle) },
         oscilloscope = { modifier ->
+            // Collect waveform ONLY here to avoid recomposing the whole RadioApp
+            val waveform by RadioService.waveformFlow.collectAsState()
             Oscilloscope(
                 waveform = waveform,
                 isPlaying = isPlaying,

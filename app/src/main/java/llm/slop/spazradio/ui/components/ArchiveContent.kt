@@ -95,9 +95,12 @@ fun ArchiveContent(
                         key = { show -> show.url }
                     ) { show ->
                         val isDownloaded = state.downloadedUrls.contains(show.url)
+                        val isDownloading = state.downloadingUrls.contains(show.url)
+                        
                         ArchiveShowRow(
                             show = show,
                             isDownloaded = isDownloaded,
+                            isDownloading = isDownloading,
                             onPlay = {
                                 val localFile = archiveViewModel.getLocalFileIfDownloaded(show)
                                 if (localFile != null) {
@@ -138,6 +141,7 @@ fun ArchiveContent(
 fun ArchiveShowRow(
     show: ArchiveShow,
     isDownloaded: Boolean,
+    isDownloading: Boolean,
     onPlay: () -> Unit,
     onDownload: () -> Unit
 ) {
@@ -167,13 +171,21 @@ fun ArchiveShowRow(
                 IconButton(
                     onClick = onDownload,
                     modifier = Modifier.size(40.dp),
-                    enabled = !isDownloaded
+                    enabled = !isDownloaded && !isDownloading
                 ) {
-                    Icon(
-                        imageVector = if (isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
-                        contentDescription = if (isDownloaded) "Downloaded" else "Download",
-                        tint = if (isDownloaded) NeonGreen else Color.Gray
-                    )
+                    if (isDownloading) {
+                        CircularProgressIndicator(
+                            color = NeonGreen,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
+                            contentDescription = if (isDownloaded) "Downloaded" else "Download",
+                            tint = if (isDownloaded) NeonGreen else Color.Gray
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 IconButton(

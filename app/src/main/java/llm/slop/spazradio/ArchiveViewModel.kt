@@ -3,16 +3,19 @@ package llm.slop.spazradio
 import android.app.Application
 import android.app.DownloadManager
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
 import android.os.Environment
+import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import llm.slop.spazradio.data.ArchiveRepository
@@ -21,11 +24,12 @@ import okhttp3.OkHttpClient
 import java.io.File
 
 sealed class ArchiveUiState {
-    object Loading : ArchiveUiState()
+    data object Loading : ArchiveUiState()
     data class Success(
         val shows: List<ArchiveShow>,
         val filteredShows: List<ArchiveShow>,
         val downloadedUrls: Set<String> = emptySet(),
+        val downloadingUrls: Set<String> = emptySet(),
         val searchQuery: String = ""
     ) : ArchiveUiState()
     data class Error(val message: String) : ArchiveUiState()
@@ -38,9 +42,9 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     private val _uiState = MutableStateFlow<ArchiveUiState>(ArchiveUiState.Loading)
     val uiState: StateFlow<ArchiveUiState> = _uiState.asStateFlow()
 
-    private val _searchQuery = MutableStateFlow("")
-    
     private var hasFetched = false
+    private val activeDownloadIds = mutableMapOf<String, Long>()
+    private var searchJob: Job? = null
 
     fun fetchArchivesIfNeeded() {
         if (hasFetched) {
@@ -61,6 +65,7 @@ class ArchiveViewModel(application: Application, private val repository: Archive
                         shows = shows,
                         filteredShows = shows,
                         downloadedUrls = downloaded,
+                        downloadingUrls = emptySet(),
                         searchQuery = ""
                     )
                     hasFetched = true
@@ -76,15 +81,23 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     fun updateSearchQuery(query: String) {
         val currentState = _uiState.value
         if (currentState is ArchiveUiState.Success) {
-            val filtered = if (query.isBlank()) {
-                currentState.shows
-            } else {
-                currentState.shows.filter { it.title.contains(query, ignoreCase = true) || it.date.contains(query, ignoreCase = true) }
+            searchJob?.cancel()
+            searchJob = viewModelScope.launch(Dispatchers.Default) {
+                val filtered = if (query.isBlank()) {
+                    currentState.shows
+                } else {
+                    currentState.shows.filter { 
+                        it.title.contains(query, ignoreCase = true) || 
+                        it.date.contains(query, ignoreCase = true) 
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    _uiState.value = currentState.copy(
+                        searchQuery = query,
+                        filteredShows = filtered
+                    )
+                }
             }
-            _uiState.value = currentState.copy(
-                searchQuery = query,
-                filteredShows = filtered
-            )
         }
     }
 
@@ -93,7 +106,11 @@ class ArchiveViewModel(application: Application, private val repository: Archive
         if (currentState is ArchiveUiState.Success) {
             viewModelScope.launch {
                 val downloaded = getDownloadedUrls(currentState.shows)
-                _uiState.value = currentState.copy(downloadedUrls = downloaded)
+                val stillDownloading = currentState.downloadingUrls.filterNot { downloaded.contains(it) }.toSet()
+                _uiState.value = currentState.copy(
+                    downloadedUrls = downloaded,
+                    downloadingUrls = stillDownloading
+                )
             }
         }
     }
@@ -104,12 +121,14 @@ class ArchiveViewModel(application: Application, private val repository: Archive
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
             "SPAZRadio"
         )
-        if (directory.exists() && directory.isDirectory) {
-            shows.forEach { show ->
-                val file = File(directory, getFileName(show))
-                if (file.exists()) {
-                    downloaded.add(show.url)
-                }
+        
+        val filesOnDisk = directory.list()?.toSet() ?: emptySet()
+        
+        shows.forEach { show ->
+            val fileName = getFileName(show)
+            // It's downloaded if file exists AND we're NOT actively downloading it right now
+            if (filesOnDisk.contains(fileName) && !activeDownloadIds.containsKey(show.url)) {
+                downloaded.add(show.url)
             }
         }
         downloaded
@@ -117,21 +136,80 @@ class ArchiveViewModel(application: Application, private val repository: Archive
 
     fun downloadArchive(show: ArchiveShow) {
         val context = getApplication<Application>()
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        
-        val fileName = getFileName(show)
-        val request = DownloadManager.Request(Uri.parse(show.url))
-            .setTitle(show.title)
-            .setDescription("Downloading Spaz Radio Archive")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "SPAZRadio/$fileName")
+        val currentState = _uiState.value
+        if (currentState is ArchiveUiState.Success) {
+            if (currentState.downloadingUrls.contains(show.url) || currentState.downloadedUrls.contains(show.url)) return
 
-        try {
-            downloadManager.enqueue(request)
-            Toast.makeText(context, "Download started: $fileName", Toast.LENGTH_SHORT).show()
-            refreshDownloadStatus()
-        } catch (e: Exception) {
-            Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val fileName = getFileName(show)
+            val request = DownloadManager.Request(Uri.parse(show.url))
+                .setTitle(show.title)
+                .setDescription("Downloading Spaz Radio Archive")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "SPAZRadio/$fileName")
+
+            try {
+                val id = downloadManager.enqueue(request)
+                activeDownloadIds[show.url] = id
+                
+                _uiState.value = currentState.copy(
+                    downloadingUrls = currentState.downloadingUrls + show.url
+                )
+                
+                Toast.makeText(context, "Download started: $fileName", Toast.LENGTH_SHORT).show()
+                startPollingForDownload(show.url, id)
+            } catch (e: Exception) {
+                Log.e("ArchiveViewModel", "Download failed", e)
+                Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun startPollingForDownload(url: String, downloadId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val downloadManager = getApplication<Application>().getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            var isFinished = false
+            
+            while (!isFinished) {
+                delay(2000)
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                val cursor: Cursor = downloadManager.query(query)
+                if (cursor.moveToFirst()) {
+                    val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                    if (statusIndex != -1) {
+                        val status = cursor.getInt(statusIndex)
+                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                            isFinished = true
+                            activeDownloadIds.remove(url)
+                            withContext(Dispatchers.Main) {
+                                refreshDownloadStatus()
+                            }
+                        } else if (status == DownloadManager.STATUS_FAILED) {
+                            isFinished = true
+                            activeDownloadIds.remove(url)
+                            withContext(Dispatchers.Main) {
+                                handleDownloadFailure(url)
+                            }
+                        }
+                    }
+                } else {
+                    isFinished = true
+                    activeDownloadIds.remove(url)
+                    withContext(Dispatchers.Main) {
+                        refreshDownloadStatus()
+                    }
+                }
+                cursor.close()
+            }
+        }
+    }
+
+    private fun handleDownloadFailure(url: String) {
+        val currentState = _uiState.value
+        if (currentState is ArchiveUiState.Success) {
+            _uiState.value = currentState.copy(
+                downloadingUrls = currentState.downloadingUrls - url
+            )
         }
     }
 
@@ -142,6 +220,8 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     }
 
     fun getLocalFileIfDownloaded(show: ArchiveShow): File? {
+        if (activeDownloadIds.containsKey(show.url)) return null
+        
         val directory = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
             "SPAZRadio"
