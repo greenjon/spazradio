@@ -16,6 +16,12 @@ android {
     namespace = "llm.slop.spazradio"
     compileSdk = 36
 
+    buildTypes {
+        release {
+            // REQUIRED for reproducible builds
+        }
+    }
+
     defaultConfig {
         applicationId = "llm.slop.spazradio"
         minSdk = 24
