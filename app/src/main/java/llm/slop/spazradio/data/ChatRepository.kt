@@ -6,12 +6,12 @@ import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.datatypes.MqttQos
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionStage
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 class ChatRepository(
@@ -24,27 +24,34 @@ class ChatRepository(
     private val _onlineUsers = MutableStateFlow<Map<String, String>>(emptyMap())
     private val _incomingMessages = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 64)
     private var connectedFuture = CompletableFuture<Unit>()
+    private val scheduler = Executors.newSingleThreadScheduledExecutor()
 
     suspend fun fetchHistory(): List<ChatMessage> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("https://radio.spaz.org/djdash/chatlog")
+            .header("User-Agent", "Mozilla/5.0 (Android)")
             .build()
 
-        try {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    Log.e("ChatRepo", "History fetch failed: ${response.code}")
-                    return@withContext emptyList()
+        var result: List<ChatMessage>? = null
+        for (i in 1..3) {
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body.string()
+                        val historyResponse = gson.fromJson(body, HistoryResponse::class.java)
+                        result = historyResponse.history
+                        Log.d("ChatRepo", "History loaded on attempt $i")
+                        break
+                    } else {
+                        Log.e("ChatRepo", "History fetch failed (attempt $i): ${response.code}")
+                    }
                 }
-                val body = response.body?.string() ?: return@withContext emptyList()
-                Log.d("ChatRepo", "History raw body received")
-                val historyResponse = gson.fromJson(body, HistoryResponse::class.java)
-                historyResponse.history
+            } catch (e: Exception) {
+                Log.e("ChatRepo", "History fetch exception (attempt $i): ${e.message}")
+                if (i < 3) delay(1000)
             }
-        } catch (e: Exception) {
-            Log.e("ChatRepo", "Failed to fetch history", e)
-            emptyList()
         }
+        result ?: emptyList()
     }
 
     private fun getOrCreateMqttClient(): Mqtt3AsyncClient {
@@ -58,7 +65,7 @@ class ChatRepository(
             .serverPort(1885)
             .webSocketConfig()
                 .serverPath("/mqtt")
-                .subprotocol("mqttv3.1")
+                .subprotocol("mqttv3.1") // Force legacy subprotocol
                 .applyWebSocketConfig()
             .sslWithDefaultConfig()
             .buildAsync()
@@ -76,7 +83,8 @@ class ChatRepository(
             return
         }
 
-        client.connectWith()
+        Log.d("ChatRepo", "Sending MQTT CONNECT request...")
+        val connectFuture = client.connectWith()
             .keepAlive(30)
             .cleanSession(true)
             .willPublish()
@@ -86,29 +94,34 @@ class ChatRepository(
                 .retain(true)
                 .applyWillPublish()
             .send()
-            .thenCompose { connAck ->
-                Log.d("ChatRepo", "MQTT Connected (RC: ${connAck.returnCode})")
+
+        // Handle timeout manually for API < 31
+        val timeoutTask = scheduler.schedule({
+            if (!connectFuture.isDone) {
+                connectFuture.cancel(true)
+                Log.e("ChatRepo", "MQTT Connect Timed Out after 60s")
+            }
+        }, 60, TimeUnit.SECONDS)
+
+        connectFuture.whenComplete { connAck, throwable ->
+            timeoutTask.cancel(false)
+            if (throwable != null) {
+                Log.e("ChatRepo", "MQTT Connect Failed: ${throwable.message}")
+                logErrorTree(throwable)
+            } else if (connAck != null) {
+                Log.d("ChatRepo", "MQTT Connected! RC: ${connAck.returnCode}")
+                
                 subscribe()
-            }
-            .thenCompose { 
-                Log.d("ChatRepo", "Subscribed to spazradio")
                 subscribePresence()
-            }
-            .thenCompose { 
-                Log.d("ChatRepo", "Subscribed to presence/#")
                 publishPresence(username)
-            }
-            .thenAccept {
-                Log.d("ChatRepo", "Presence published. Ready.")
+                
                 connectedFuture.complete(Unit)
             }
-            .exceptionally { e ->
-                Log.e("ChatRepo", "Connection/Handshake failed", e)
-                null
-            }
+        }
     }
 
     private fun subscribe(): CompletableFuture<*> {
+        Log.d("ChatRepo", "Subscribing to spazradio...")
         return mqttClient?.subscribeWith()
             ?.topicFilter("spazradio")
             ?.qos(MqttQos.EXACTLY_ONCE)
@@ -125,6 +138,7 @@ class ChatRepository(
     }
 
     private fun subscribePresence(): CompletableFuture<*> {
+        Log.d("ChatRepo", "Subscribing to presence/#...")
         return mqttClient?.subscribeWith()
             ?.topicFilter("presence/#")
             ?.qos(MqttQos.EXACTLY_ONCE)
@@ -146,7 +160,7 @@ class ChatRepository(
     }
 
     private fun publishPresence(username: String): CompletableFuture<*> {
-        Log.d("ChatRepo", "Publishing presence: $username")
+        Log.d("ChatRepo", "Publishing presence for $username...")
         return mqttClient?.publishWith()
             ?.topic("presence/$clientId")
             ?.payload(username.toByteArray())
@@ -167,14 +181,15 @@ class ChatRepository(
         }
 
         val payload = gson.toJson(mapOf("user" to username, "message" to text))
-        Log.d("ChatRepo", "Sending: $payload")
+        Log.d("ChatRepo", "Sending message: $payload")
         client.publishWith()
             .topic("spazradio")
             .payload(payload.toByteArray())
             .qos(MqttQos.EXACTLY_ONCE)
             .send()
             .exceptionally { e ->
-                Log.e("ChatRepo", "Send failed", e)
+                Log.e("ChatRepo", "Send failed: ${e.message}")
+                logErrorTree(e)
                 null
             }
     }
@@ -184,5 +199,15 @@ class ChatRepository(
         mqttClient?.disconnect()
         mqttClient = null
         connectedFuture = CompletableFuture()
+    }
+
+    private fun logErrorTree(e: Throwable?) {
+        var current = e
+        var depth = 0
+        while (current != null && depth < 10) {
+            Log.e("ChatRepo", "  Cause $depth: ${current.javaClass.simpleName}: ${current.message}")
+            current = current.cause
+            depth++
+        }
     }
 }
