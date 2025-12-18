@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.material)
+    implementation(libs.hivemq.mqtt-client)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
