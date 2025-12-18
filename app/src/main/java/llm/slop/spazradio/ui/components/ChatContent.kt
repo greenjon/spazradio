@@ -1,5 +1,6 @@
 package llm.slop.spazradio.ui.components
 
+import android.text.util.Linkify
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,11 +16,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.TextView
 import androidx.core.text.HtmlCompat
 import llm.slop.spazradio.ChatViewModel
 import llm.slop.spazradio.R
-import llm.slop.spazradio.ui.theme.Cyan
+import llm.slop.spazradio.ui.theme.NeonGreen
 import llm.slop.spazradio.ui.theme.Magenta
 
 @Composable
@@ -71,7 +73,7 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
         Button(
             onClick = { if (text.isNotBlank()) onJoin(text) },
             enabled = text.isNotBlank(),
-            colors = ButtonDefaults.buttonColors(containerColor = Cyan)
+            colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
         ) {
             Text(stringResource(R.string.label_chat), color = Color.Black)
         }
@@ -88,9 +90,17 @@ fun ChatLayout(
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
+    // Automatic scrolling logic
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItemsCount = layoutInfo.totalItemsCount
+            
+            // Only scroll if we're near the bottom (within 2 items)
+            if (lastVisibleItemIndex >= totalItemsCount - 3) {
+                listState.animateScrollToItem(messages.size - 1)
+            }
         }
     }
 
@@ -99,7 +109,7 @@ fun ChatLayout(
         Text(
             text = stringResource(R.string.chat_online_count, onlineCount),
             style = MaterialTheme.typography.labelSmall,
-            color = Cyan,
+            color = NeonGreen,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
 
@@ -145,7 +155,7 @@ fun ChatLayout(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
-                    tint = Cyan
+                    tint = NeonGreen
                 )
             }
         }
@@ -154,10 +164,6 @@ fun ChatLayout(
 
 @Composable
 fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
-    val decodedMessage = remember(msg.message) {
-        HtmlCompat.fromHtml(msg.message, HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
-    }
-
     Column {
         Text(
             text = msg.user,
@@ -166,10 +172,21 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
                 color = Magenta
             )
         )
-        Text(
-            text = decodedMessage,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White
+        // Use AndroidView for Linkify support which is robust for URLs
+        AndroidView(
+            factory = { context ->
+                TextView(context).apply {
+                    setTextColor(android.graphics.Color.WHITE)
+                    setTextSize(14f)
+                    autoLinkMask = Linkify.WEB_URLS
+                    setLinkTextColor(android.graphics.Color.CYAN)
+                }
+            },
+            update = { textView ->
+                val decoded = HtmlCompat.fromHtml(msg.message, HtmlCompat.FROM_HTML_MODE_LEGACY)
+                textView.text = decoded
+            },
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }
