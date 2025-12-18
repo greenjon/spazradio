@@ -1,6 +1,7 @@
 package llm.slop.spazradio.ui.components
 
 import android.text.util.Linkify
+import android.widget.TextView
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,7 +18,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import android.widget.TextView
 import androidx.core.text.HtmlCompat
 import llm.slop.spazradio.ChatViewModel
 import llm.slop.spazradio.R
@@ -172,14 +172,14 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
                 color = Magenta
             )
         )
-        // Use AndroidView for Linkify support which is robust for URLs
         AndroidView(
             factory = { context ->
                 TextView(context).apply {
                     setTextColor(android.graphics.Color.WHITE)
                     setTextSize(14f)
                     autoLinkMask = Linkify.WEB_URLS
-                    setLinkTextColor(android.graphics.Color.CYAN)
+                    // Match NeonGreen for links
+                    setLinkTextColor(android.graphics.Color.parseColor("#39FF14"))
                 }
             },
             update = { textView ->
