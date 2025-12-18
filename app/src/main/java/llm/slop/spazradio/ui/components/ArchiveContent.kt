@@ -64,7 +64,10 @@ fun ArchiveContent(
         }
         is ArchiveUiState.Success -> {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(state.shows) { show ->
+                items(
+                    items = state.shows,
+                    key = { show -> show.url } // Use unique URL as key for performance
+                ) { show ->
                     val isDownloaded = state.downloadedUrls.contains(show.url)
                     ArchiveShowRow(
                         show = show,
