@@ -23,4 +23,10 @@
     <string name="label_download">Descargar</string>
     <string name="label_downloaded">Descargado</string>
     <string name="error_archives">No se encontraron archivos o hay un error de red.</string>
+
+    <string name="label_chat">Chat</string>
+    <string name="chat_hint">Escribe un mensaje…</string>
+    <string name="chat_join">Entrar al Chat</string>
+    <string name="chat_name_hint">Nombre de usuario</string>
+    <string name="chat_online_count">%d en línea</string>
 </resources>
