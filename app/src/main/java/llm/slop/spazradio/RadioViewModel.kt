@@ -248,6 +248,11 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         updateCurrentInfoDisplay()
     }
 
+    fun showChat() {
+        _infoDisplay.value = InfoDisplay.CHAT
+        updateCurrentInfoDisplay()
+    }
+
     fun closeInfoBox() {
         if (_infoDisplay.value != InfoDisplay.NONE) {
             _infoDisplay.value = InfoDisplay.NONE

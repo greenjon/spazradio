@@ -22,6 +22,7 @@ import llm.slop.spazradio.ui.theme.NeonGreen
 @Composable
 fun FooterToolbar(
     onRadioClick: () -> Unit,
+    onChatClick: () -> Unit,
     onArchivesClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -33,6 +34,11 @@ fun FooterToolbar(
         FooterButton(
             text = stringResource(R.string.label_radio),
             onClick = onRadioClick,
+            modifier = Modifier.weight(1f)
+        )
+        FooterButton(
+            text = stringResource(R.string.label_chat),
+            onClick = onChatClick,
             modifier = Modifier.weight(1f)
         )
         FooterButton(
