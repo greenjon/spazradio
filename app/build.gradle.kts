@@ -1,10 +1,5 @@
-import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
-// Inject the ExecOperations service for this build script
-@get:Inject
-val execOperations: ExecOperations
-    get() = error("This should be injected by Gradle")
+import java.io.File
 
 plugins {
     alias(libs.plugins.android.application)
@@ -18,7 +13,8 @@ android {
 
     buildTypes {
         release {
-            // REQUIRED for reproducible builds
+            isShrinkResources = false
+            isMinifyEnabled = true
         }
     }
 
@@ -34,11 +30,22 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     dependenciesInfo {
-        // Disables dependency metadata when building APKs.
         includeInApk = false
-        // Disables dependency metadata when building Android App Bundles.
         includeInBundle = false
+    }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "**/baseline.prof",
+                "**/baseline.profm",
+                "**/*.baseline.prof",
+                "**/*.baseline.profm",
+                "assets/dexopt/*"
+            )
+        }
     }
 }
 
@@ -57,11 +64,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    
-    // Icons
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material:material-icons-extended")
-    
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.common)
@@ -79,4 +83,60 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// THE F-DROID FIX:
+// This hooks into the task graph to delete the profiles from the staging area
+// AFTER they are generated but BEFORE the APK is zipped.
+androidComponents {
+    onVariants { variant ->
+        val capName = variant.name.replaceFirstChar { it.uppercase() }
+
+        // Target the process that actually puts assets into the APK structure
+        tasks.matching { it.name.contains("package${capName}Resources") || it.name.contains("merge${capName}Assets") }
+            .configureEach {
+                doLast {
+                    outputs.files.forEach { file ->
+                        // Path 1: assets/dexopt/
+                        val dexoptDir = File(file, "assets/dexopt")
+                        if (dexoptDir.exists()) {
+                            println("F-Droid: Stripping ${dexoptDir.absolutePath}")
+                            dexoptDir.deleteRecursively()
+                        }
+                        // Path 2: flat baseline.prof in the root
+                        val rootProf = File(file, "baseline.prof")
+                        if (rootProf.exists()) rootProf.delete()
+                    }
+                }
+            }
+    }
+}
+// Add this to the very bottom of /app/build.gradle.kts
+androidComponents {onVariants { variant ->
+    val capName = variant.name.replaceFirstChar { it.uppercase() }
+
+    // 1. Disable the task that compiles the profiles into binary
+    tasks.matching { it.name.contains("ArtProfile") }.configureEach {
+        enabled = false
+    }
+
+    // 2. Brutally delete the dexopt directory from all possible intermediate outputs
+    tasks.matching {
+        it.name.contains("merge${capName}Assets") ||
+                it.name.contains("package${capName}Resources") ||
+                it.name.contains("process${capName}JavaRes")
+    }.configureEach {
+        doLast {
+            outputs.files.forEach { root ->
+                // Recursively look for any file named baseline.prof or any directory named dexopt
+                root.walkBottomUp().forEach { file ->
+                    if (file.name == "baseline.prof" || file.name == "baseline.profm" || file.name == "dexopt") {
+                        println("F-Droid: Deleting non-deterministic file: ${file.absolutePath}")
+                        file.deleteRecursively()
+                    }
+                }
+            }
+        }
+    }
+}
 }
