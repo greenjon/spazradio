@@ -4,6 +4,12 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,9 +69,7 @@ fun ArchiveContent(
 
     when (val state = uiState) {
         is ArchiveUiState.Loading -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NeonGreen)
-            }
+            LoadingArchivesText()
         }
         is ArchiveUiState.Success -> {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -134,6 +138,28 @@ fun ArchiveContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun LoadingArchivesText() {
+    val infiniteTransition = rememberInfiniteTransition(label = "loadingPulsing")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            text = "Loading Archives...",
+            color = NeonGreen.copy(alpha = alpha),
+            style = MaterialTheme.typography.titleLarge
+        )
     }
 }
 
