@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import llm.slop.spazradio.data.ArchiveRepository
@@ -21,18 +22,24 @@ import java.io.File
 
 sealed class ArchiveUiState {
     object Loading : ArchiveUiState()
-    data class Success(val shows: List<ArchiveShow>, val downloadedUrls: Set<String> = emptySet()) : ArchiveUiState()
+    data class Success(
+        val shows: List<ArchiveShow>,
+        val filteredShows: List<ArchiveShow>,
+        val downloadedUrls: Set<String> = emptySet(),
+        val searchQuery: String = ""
+    ) : ArchiveUiState()
     data class Error(val message: String) : ArchiveUiState()
 }
 
 class ArchiveViewModel(application: Application, private val repository: ArchiveRepository) : AndroidViewModel(application) {
 
-    // Simple constructor for manual DI or a factory
     constructor(application: Application) : this(application, ArchiveRepository(OkHttpClient()))
 
     private val _uiState = MutableStateFlow<ArchiveUiState>(ArchiveUiState.Loading)
     val uiState: StateFlow<ArchiveUiState> = _uiState.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow("")
+    
     private var hasFetched = false
 
     fun fetchArchivesIfNeeded() {
@@ -50,7 +57,12 @@ class ArchiveViewModel(application: Application, private val repository: Archive
                 val shows = repository.fetchArchiveFeed()
                 if (shows.isNotEmpty()) {
                     val downloaded = getDownloadedUrls(shows)
-                    _uiState.value = ArchiveUiState.Success(shows, downloaded)
+                    _uiState.value = ArchiveUiState.Success(
+                        shows = shows,
+                        filteredShows = shows,
+                        downloadedUrls = downloaded,
+                        searchQuery = ""
+                    )
                     hasFetched = true
                 } else {
                     _uiState.value = ArchiveUiState.Error("No archives found or network error.")
@@ -58,6 +70,21 @@ class ArchiveViewModel(application: Application, private val repository: Archive
             } catch (e: Exception) {
                 _uiState.value = ArchiveUiState.Error(e.message ?: "Unknown error")
             }
+        }
+    }
+
+    fun updateSearchQuery(query: String) {
+        val currentState = _uiState.value
+        if (currentState is ArchiveUiState.Success) {
+            val filtered = if (query.isBlank()) {
+                currentState.shows
+            } else {
+                currentState.shows.filter { it.title.contains(query, ignoreCase = true) || it.date.contains(query, ignoreCase = true) }
+            }
+            _uiState.value = currentState.copy(
+                searchQuery = query,
+                filteredShows = filtered
+            )
         }
     }
 
@@ -98,13 +125,10 @@ class ArchiveViewModel(application: Application, private val repository: Archive
             .setDescription("Downloading Spaz Radio Archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "SPAZRadio/$fileName")
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
 
         try {
             downloadManager.enqueue(request)
             Toast.makeText(context, "Download started: $fileName", Toast.LENGTH_SHORT).show()
-            // Optimistically update UI or refresh after a delay
             refreshDownloadStatus()
         } catch (e: Exception) {
             Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
@@ -112,7 +136,6 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     }
 
     fun getFileName(show: ArchiveShow): String {
-        // Sanitize title for filename
         val safeTitle = show.title.replace(Regex("[^a-zA-Z0-9.-]"), "_")
         val safeDate = show.originalDate.replace(Regex("[^a-zA-Z0-9.-]"), "_")
         return "${safeTitle}_${safeDate}.ogg"

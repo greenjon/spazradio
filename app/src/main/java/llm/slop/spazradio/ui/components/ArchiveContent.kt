@@ -16,14 +16,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import llm.slop.spazradio.ArchiveUiState
 import llm.slop.spazradio.ArchiveViewModel
 import llm.slop.spazradio.RadioViewModel
@@ -63,31 +68,52 @@ fun ArchiveContent(
             }
         }
         is ArchiveUiState.Success -> {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(
-                    items = state.shows,
-                    key = { show -> show.url } // Use unique URL as key for performance
-                ) { show ->
-                    val isDownloaded = state.downloadedUrls.contains(show.url)
-                    ArchiveShowRow(
-                        show = show,
-                        isDownloaded = isDownloaded,
-                        onPlay = {
-                            val localFile = archiveViewModel.getLocalFileIfDownloaded(show)
-                            if (localFile != null) {
-                                // Optimized play: pass the local file URI if it exists
-                                radioViewModel.playArchive(show.copy(url = "file://${localFile.absolutePath}"))
-                            } else {
-                                radioViewModel.playArchive(show)
-                            }
-                        },
-                        onDownload = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            }
-                            archiveViewModel.downloadArchive(show)
-                        }
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Search Bar
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = { archiveViewModel.updateSearchQuery(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    placeholder = { Text("Search archives...", color = Color.Gray, fontSize = 14.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = NeonGreen) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = NeonGreen,
+                        unfocusedBorderColor = NeonGreen.copy(alpha = 0.5f),
+                        cursorColor = NeonGreen,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
                     )
+                )
+
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(
+                        items = state.filteredShows,
+                        key = { show -> show.url }
+                    ) { show ->
+                        val isDownloaded = state.downloadedUrls.contains(show.url)
+                        ArchiveShowRow(
+                            show = show,
+                            isDownloaded = isDownloaded,
+                            onPlay = {
+                                val localFile = archiveViewModel.getLocalFileIfDownloaded(show)
+                                if (localFile != null) {
+                                    radioViewModel.playArchive(show.copy(url = "file://${localFile.absolutePath}"))
+                                } else {
+                                    radioViewModel.playArchive(show)
+                                }
+                            },
+                            onDownload = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                                archiveViewModel.downloadArchive(show)
+                            }
+                        )
+                    }
                 }
             }
         }
