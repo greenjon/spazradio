@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -20,7 +21,7 @@ class ChatRepository(
     private val client: OkHttpClient,
     private val gson: Gson
 ) {
-    private val clientId = "mut${Random.nextInt(1000, 9999)}"
+    private val clientId = "mut${Random.nextInt(1, 1000000)}"
     private var mqttClient: Mqtt3AsyncClient? = null
 
     private val _onlineUsers = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -33,12 +34,8 @@ class ChatRepository(
 
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    Log.e("ChatRepo", "History fetch failed: ${response.code}")
-                    return@withContext emptyList()
-                }
+                if (!response.isSuccessful) return@withContext emptyList()
                 val body = response.body?.string() ?: return@withContext emptyList()
-                Log.d("ChatRepo", "History raw body: $body")
                 val historyResponse = gson.fromJson(body, HistoryResponse::class.java)
                 historyResponse.history
             }
@@ -51,15 +48,11 @@ class ChatRepository(
     private fun getOrCreateMqttClient(): Mqtt3AsyncClient {
         mqttClient?.let { return it }
 
-        Log.d("ChatRepo", "Creating Mqtt3Client for $clientId")
-        // The Paho source reveals it uses "mqttv3.1" as the subprotocol for WebSocket connections
-        // and defaults to MQTT 3.1.1 (v4 in Paho terms) or 3.1 (v3). 
-        // We force MQTT 3.1 behavior by using the Mqtt3Client.
         val client = MqttClient.builder()
-            .useMqttVersion3() 
+            .useMqttVersion3()
             .identifier(clientId)
             .serverHost("radio.spaz.org")
-            .serverPort(443) // Switched to 443 as WSS is usually on standard HTTPS port
+            .serverPort(1885)
             .webSocketConfig()
                 .serverPath("/mqtt")
                 .subprotocol("mqttv3.1")
@@ -73,9 +66,12 @@ class ChatRepository(
 
     fun connect(username: String) {
         val client = getOrCreateMqttClient()
-        if (client.state.isConnected) return
+        if (client.state.isConnected) {
+            // If already connected, just publish presence as Paho does in its loop
+            publishPresence(username)
+            return
+        }
 
-        Log.d("ChatRepo", "Attempting connection for $username to wss://radio.spaz.org:443/mqtt...")
         client.connectWith()
             .keepAlive(30)
             .cleanSession(true)
@@ -86,92 +82,97 @@ class ChatRepository(
                 .retain(true)
                 .applyWillPublish()
             .send()
-            .thenCompose { connAck ->
-                Log.d("ChatRepo", "Connected! RC: ${connAck.returnCode}. Publishing presence...")
-                client.publishWith()
-                    .topic("presence/$clientId")
-                    .payload(username.toByteArray())
-                    .qos(MqttQos.EXACTLY_ONCE)
-                    .retain(true)
-                    .send()
+            .thenCompose { 
+                subscribe()
+                subscribePresence()
+                publishPresence(username)
             }
             .thenAccept {
-                Log.d("ChatRepo", "Presence published successfully.")
                 connectedFuture.complete(Unit)
             }
             .exceptionally { e ->
-                Log.e("ChatRepo", "Connection error tree:", e)
-                // If 443 fails, we might want to retry with 1885 if the server is non-standard
+                Log.e("ChatRepo", "MQTT Connect Failed", e)
                 null
             }
     }
 
-    fun observeMessages(): Flow<ChatMessage> = callbackFlow {
-        val client = getOrCreateMqttClient()
-
-        connectedFuture.thenAccept {
-            Log.d("ChatRepo", "Subscribing to spazradio...")
-            client.subscribeWith()
-                .topicFilter("spazradio")
-                .qos(MqttQos.EXACTLY_ONCE)
-                .callback { publish ->
-                    val messageStr = String(publish.payloadAsBytes)
-                    try {
-                        val message = gson.fromJson(messageStr, ChatMessage::class.java)
-                        trySend(message)
-                    } catch (e: Exception) {
-                        Log.e("ChatRepo", "JSON Error: $messageStr", e)
-                    }
+    private fun subscribe(): CompletableFuture<*> {
+        return mqttClient?.subscribeWith()
+            ?.topicFilter("spazradio")
+            ?.qos(MqttQos.EXACTLY_ONCE)
+            ?.callback { publish ->
+                val payload = String(publish.payloadAsBytes)
+                try {
+                    val message = gson.fromJson(payload, ChatMessage::class.java)
+                    _incomingMessages.value = message
+                } catch (e: Exception) {
+                    Log.e("ChatRepo", "JSON parse error: $payload", e)
                 }
-                .send()
-        }
+            }
+            ?.send() ?: CompletableFuture.completedFuture(null)
+    }
 
-        awaitClose { }
+    private fun subscribePresence(): CompletableFuture<*> {
+        return mqttClient?.subscribeWith()
+            ?.topicFilter("presence/#")
+            ?.qos(MqttQos.EXACTLY_ONCE)
+            ?.callback { publish ->
+                val topic = publish.topic.toString()
+                val id = topic.substringAfter("presence/")
+                val name = String(publish.payloadAsBytes)
+                
+                val current = _onlineUsers.value.toMutableMap()
+                if (name.isEmpty()) {
+                    current.remove(id)
+                } else {
+                    current[id] = name
+                }
+                _onlineUsers.value = current
+            }
+            ?.send() ?: CompletableFuture.completedFuture(null)
+    }
+
+    private fun publishPresence(username: String): CompletableFuture<*> {
+        return mqttClient?.publishWith()
+            ?.topic("presence/$clientId")
+            ?.payload(username.toByteArray())
+            ?.qos(MqttQos.EXACTLY_ONCE)
+            ?.retain(true)
+            ?.send() ?: CompletableFuture.completedFuture(null)
+    }
+
+    private val _incomingMessages = MutableStateFlow<ChatMessage?>(null)
+
+    fun observeMessages(): Flow<ChatMessage> = callbackFlow {
+        val job = kotlinx.coroutines.MainScope().launch(Dispatchers.Default) {
+            _incomingMessages.collect { msg ->
+                if (msg != null) trySend(msg)
+            }
+        }
+        awaitClose { job.cancel() }
     }
 
     fun observePresence(): Flow<Int> = callbackFlow {
-        val client = getOrCreateMqttClient()
-
-        connectedFuture.thenAccept {
-            Log.d("ChatRepo", "Subscribing to presence/#...")
-            client.subscribeWith()
-                .topicFilter("presence/#")
-                .qos(MqttQos.EXACTLY_ONCE)
-                .callback { publish ->
-                    val topic = publish.topic.toString()
-                    val clientPath = topic.removePrefix("presence/")
-                    val payload = String(publish.payloadAsBytes)
-
-                    val currentUsers = _onlineUsers.value.toMutableMap()
-                    if (payload.isEmpty()) {
-                        currentUsers.remove(clientPath)
-                    } else {
-                        currentUsers[clientPath] = payload
-                    }
-                    _onlineUsers.value = currentUsers
-                    
-                    val uniqueCount = currentUsers.values.distinct().size
-                    trySend(uniqueCount)
-                }
-                .send()
+        val job = kotlinx.coroutines.MainScope().launch(Dispatchers.Default) {
+            _onlineUsers.collect { users ->
+                trySend(users.values.distinct().size)
+            }
         }
-
-        awaitClose { }
+        awaitClose { job.cancel() }
     }
 
     fun sendMessage(username: String, text: String) {
         val client = mqttClient ?: return
         if (!client.state.isConnected) return
 
-        val message = ChatMessage(user = username, message = text, timeReceived = "")
-        val json = gson.toJson(message)
+        val payload = gson.toJson(mapOf("user" to username, "message" to text))
         client.publishWith()
             .topic("spazradio")
-            .payload(json.toByteArray())
+            .payload(payload.toByteArray())
             .qos(MqttQos.EXACTLY_ONCE)
             .send()
     }
-    
+
     fun disconnect() {
         mqttClient?.disconnect()
         mqttClient = null

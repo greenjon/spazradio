@@ -8,5 +8,5 @@ data class ChatMessage(
     @SerializedName("message")
     val message: String,
     @SerializedName("time_received")
-    val timeReceived: String
+    val timeReceived: Long
 )
