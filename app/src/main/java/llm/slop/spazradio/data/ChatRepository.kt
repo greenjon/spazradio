@@ -33,8 +33,12 @@ class ChatRepository(
 
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext emptyList()
+                if (!response.isSuccessful) {
+                    Log.e("ChatRepo", "History fetch failed: ${response.code}")
+                    return@withContext emptyList()
+                }
                 val body = response.body?.string() ?: return@withContext emptyList()
+                Log.d("ChatRepo", "History raw body: $body")
                 val historyResponse = gson.fromJson(body, HistoryResponse::class.java)
                 historyResponse.history
             }
@@ -48,7 +52,6 @@ class ChatRepository(
         mqttClient?.let { return it }
 
         Log.d("ChatRepo", "Creating Mqtt3Client for $clientId")
-        // Force the use of Mqtt3Client builder for strictly MQTT 3.1.1/3.1 behavior
         val client = MqttClient.builder()
             .useMqttVersion3() 
             .identifier(clientId)
@@ -56,7 +59,7 @@ class ChatRepository(
             .serverPort(1885)
             .webSocketConfig()
                 .serverPath("/mqtt")
-                .subprotocol("mqttv3.1") // Crucial for IBM/Paho legacy brokers
+                .subprotocol("mqttv3.1")
                 .applyWebSocketConfig()
             .sslWithDefaultConfig()
             .buildAsync()
@@ -69,32 +72,32 @@ class ChatRepository(
         val client = getOrCreateMqttClient()
         if (client.state.isConnected) return
 
-        Log.d("ChatRepo", "Connecting to MQTT 3.1 legacy with username: $username")
+        Log.d("ChatRepo", "Attempting connection for $username...")
         client.connectWith()
             .keepAlive(30)
             .cleanSession(true)
             .willPublish()
                 .topic("presence/$clientId")
-                .payload(ByteArray(0)) // Empty LWT payload
+                .payload(ByteArray(0))
                 .qos(MqttQos.EXACTLY_ONCE)
                 .retain(true)
                 .applyWillPublish()
             .send()
             .thenCompose { connAck ->
-                Log.d("ChatRepo", "MQTT Connected. Publishing presence raw payload.")
+                Log.d("ChatRepo", "Connected! RC: ${connAck.returnCode}. Publishing presence...")
                 client.publishWith()
                     .topic("presence/$clientId")
-                    .payload(username.toByteArray()) // Raw nickname string
+                    .payload(username.toByteArray())
                     .qos(MqttQos.EXACTLY_ONCE)
                     .retain(true)
                     .send()
             }
             .thenAccept {
-                Log.d("ChatRepo", "Initial handshake complete.")
+                Log.d("ChatRepo", "Presence published successfully.")
                 connectedFuture.complete(Unit)
             }
             .exceptionally { e ->
-                Log.e("ChatRepo", "Connection/Presence failed", e)
+                Log.e("ChatRepo", "Connection error tree:", e)
                 null
             }
     }
@@ -103,7 +106,7 @@ class ChatRepository(
         val client = getOrCreateMqttClient()
 
         connectedFuture.thenAccept {
-            Log.d("ChatRepo", "Subscribing to spazradio (QoS 2)...")
+            Log.d("ChatRepo", "Subscribing to spazradio...")
             client.subscribeWith()
                 .topicFilter("spazradio")
                 .qos(MqttQos.EXACTLY_ONCE)
@@ -126,7 +129,7 @@ class ChatRepository(
         val client = getOrCreateMqttClient()
 
         connectedFuture.thenAccept {
-            Log.d("ChatRepo", "Subscribing to presence/# (QoS 2)...")
+            Log.d("ChatRepo", "Subscribing to presence/#...")
             client.subscribeWith()
                 .topicFilter("presence/#")
                 .qos(MqttQos.EXACTLY_ONCE)
@@ -143,9 +146,7 @@ class ChatRepository(
                     }
                     _onlineUsers.value = currentUsers
                     
-                    // Count unique nicknames as requested
                     val uniqueCount = currentUsers.values.distinct().size
-                    Log.d("ChatRepo", "Roster updated: $uniqueCount unique users")
                     trySend(uniqueCount)
                 }
                 .send()
