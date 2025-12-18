@@ -1,5 +1,6 @@
 package llm.slop.spazradio.data
 
+import android.util.Log
 import com.google.gson.Gson
 import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.datatypes.MqttQos
@@ -23,7 +24,7 @@ class ChatRepository(
     private var mqttClient: Mqtt3AsyncClient? = null
 
     private val _onlineUsers = MutableStateFlow<Map<String, String>>(emptyMap())
-    private var connectionFuture: CompletableFuture<*>? = null
+    private val connectedFuture = CompletableFuture<Unit>()
 
     suspend fun fetchHistory(): List<ChatMessage> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
@@ -38,7 +39,7 @@ class ChatRepository(
                 historyResponse.history
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ChatRepo", "Failed to fetch history", e)
             emptyList()
         }
     }
@@ -46,14 +47,15 @@ class ChatRepository(
     private fun getOrCreateMqttClient(): Mqtt3AsyncClient {
         mqttClient?.let { return it }
 
+        Log.d("ChatRepo", "Creating Mqtt3Client for $clientId")
         val client = MqttClient.builder()
-            .useMqttVersion3() // Force MQTT 3.1.1
+            .useMqttVersion3() // MQTT 3.1.1 (often used for 3.1 targets)
             .identifier(clientId)
             .serverHost("radio.spaz.org")
             .serverPort(1885)
             .webSocketConfig()
                 .serverPath("/mqtt")
-                .subprotocol("mqttv3.1") // Set WebSocket Sub-Protocol
+                .subprotocol("mqttv3.1") // Crucial legacy subprotocol
                 .applyWebSocketConfig()
             .sslWithDefaultConfig()
             .buildAsync()
@@ -62,12 +64,14 @@ class ChatRepository(
         return client
     }
 
-    fun connect(username: String): CompletableFuture<*> {
+    fun connect(username: String) {
         val client = getOrCreateMqttClient()
-        
-        val future = client.connectWith()
+        if (client.state.isConnected) return
+
+        Log.d("ChatRepo", "Connecting to MQTT with username: $username")
+        client.connectWith()
             .keepAlive(30)
-            .cleanSession(true) // Clean Session true
+            .cleanSession(true)
             .willPublish()
                 .topic("presence/$clientId")
                 .payload(ByteArray(0))
@@ -76,7 +80,7 @@ class ChatRepository(
                 .applyWillPublish()
             .send()
             .thenCompose { 
-                // Publish presence raw string
+                Log.d("ChatRepo", "MQTT Connected, publishing presence...")
                 client.publishWith()
                     .topic("presence/$clientId")
                     .payload(username.toByteArray())
@@ -84,35 +88,34 @@ class ChatRepository(
                     .retain(true)
                     .send()
             }
-        
-        connectionFuture = future
-        return future
+            .thenAccept {
+                Log.d("ChatRepo", "Presence published. Connection ready.")
+                connectedFuture.complete(Unit)
+            }
+            .exceptionally {
+                Log.e("ChatRepo", "MQTT Connection failed", it)
+                null
+            }
     }
 
     fun observeMessages(): Flow<ChatMessage> = callbackFlow {
         val client = getOrCreateMqttClient()
 
-        val setupSubscription = {
+        connectedFuture.thenAccept {
+            Log.d("ChatRepo", "Subscribing to spazradio...")
             client.subscribeWith()
                 .topicFilter("spazradio")
                 .qos(MqttQos.EXACTLY_ONCE)
                 .callback { publish ->
-                    val payload = publish.payloadAsBytes
-                    val messageStr = String(payload)
+                    val messageStr = String(publish.payloadAsBytes)
                     try {
                         val message = gson.fromJson(messageStr, ChatMessage::class.java)
                         trySend(message)
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        Log.e("ChatRepo", "Error parsing message: $messageStr", e)
                     }
                 }
                 .send()
-        }
-
-        if (client.state.isConnected) {
-            setupSubscription()
-        } else {
-            connectionFuture?.thenAccept { setupSubscription() }
         }
 
         awaitClose { }
@@ -121,7 +124,8 @@ class ChatRepository(
     fun observePresence(): Flow<Int> = callbackFlow {
         val client = getOrCreateMqttClient()
 
-        val setupPresenceSubscription = {
+        connectedFuture.thenAccept {
+            Log.d("ChatRepo", "Subscribing to presence/#...")
             client.subscribeWith()
                 .topicFilter("presence/#")
                 .qos(MqttQos.EXACTLY_ONCE)
@@ -137,15 +141,10 @@ class ChatRepository(
                         currentUsers[clientPath] = username
                     }
                     _onlineUsers.value = currentUsers
+                    Log.d("ChatRepo", "Online users: ${currentUsers.size}")
                     trySend(currentUsers.size)
                 }
                 .send()
-        }
-
-        if (client.state.isConnected) {
-            setupPresenceSubscription()
-        } else {
-            connectionFuture?.thenAccept { setupPresenceSubscription() }
         }
 
         awaitClose { }
@@ -153,14 +152,14 @@ class ChatRepository(
 
     fun sendMessage(username: String, text: String) {
         val client = mqttClient ?: return
-        if (!client.state.isConnected) return
+        if (!client.state.isConnected) {
+            Log.w("ChatRepo", "Send failed: Not connected")
+            return
+        }
 
-        val message = ChatMessage(
-            user = username,
-            message = text,
-            timeReceived = "" 
-        )
+        val message = ChatMessage(user = username, message = text, timeReceived = "")
         val json = gson.toJson(message)
+        Log.d("ChatRepo", "Publishing to spazradio: $json")
         client.publishWith()
             .topic("spazradio")
             .payload(json.toByteArray())
@@ -171,6 +170,5 @@ class ChatRepository(
     fun disconnect() {
         mqttClient?.disconnect()
         mqttClient = null
-        connectionFuture = null
     }
 }
