@@ -52,11 +52,14 @@ class ChatRepository(
         mqttClient?.let { return it }
 
         Log.d("ChatRepo", "Creating Mqtt3Client for $clientId")
+        // The Paho source reveals it uses "mqttv3.1" as the subprotocol for WebSocket connections
+        // and defaults to MQTT 3.1.1 (v4 in Paho terms) or 3.1 (v3). 
+        // We force MQTT 3.1 behavior by using the Mqtt3Client.
         val client = MqttClient.builder()
             .useMqttVersion3() 
             .identifier(clientId)
             .serverHost("radio.spaz.org")
-            .serverPort(1885)
+            .serverPort(443) // Switched to 443 as WSS is usually on standard HTTPS port
             .webSocketConfig()
                 .serverPath("/mqtt")
                 .subprotocol("mqttv3.1")
@@ -72,7 +75,7 @@ class ChatRepository(
         val client = getOrCreateMqttClient()
         if (client.state.isConnected) return
 
-        Log.d("ChatRepo", "Attempting connection for $username...")
+        Log.d("ChatRepo", "Attempting connection for $username to wss://radio.spaz.org:443/mqtt...")
         client.connectWith()
             .keepAlive(30)
             .cleanSession(true)
@@ -98,6 +101,7 @@ class ChatRepository(
             }
             .exceptionally { e ->
                 Log.e("ChatRepo", "Connection error tree:", e)
+                // If 443 fails, we might want to retry with 1885 if the server is non-standard
                 null
             }
     }
