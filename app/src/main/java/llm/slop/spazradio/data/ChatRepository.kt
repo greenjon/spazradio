@@ -3,7 +3,7 @@ package llm.slop.spazradio.data
 import com.google.gson.Gson
 import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.datatypes.MqttQos
-import com.hivemq.client.mqtt.mqtt5.Mqtt5AsyncClient
+import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +20,7 @@ class ChatRepository(
     private val gson: Gson
 ) {
     private val clientId = "mut${Random.nextInt(1000, 9999)}"
-    private var mqttClient: Mqtt5AsyncClient? = null
+    private var mqttClient: Mqtt3AsyncClient? = null
 
     private val _onlineUsers = MutableStateFlow<Map<String, String>>(emptyMap())
     private var connectionFuture: CompletableFuture<*>? = null
@@ -43,16 +43,17 @@ class ChatRepository(
         }
     }
 
-    private fun getOrCreateMqttClient(): Mqtt5AsyncClient {
+    private fun getOrCreateMqttClient(): Mqtt3AsyncClient {
         mqttClient?.let { return it }
 
         val client = MqttClient.builder()
-            .useMqttVersion5()
+            .useMqttVersion3() // Force MQTT 3.1.1
             .identifier(clientId)
             .serverHost("radio.spaz.org")
             .serverPort(1885)
             .webSocketConfig()
-                .serverPath("/mqtt") // Added leading slash
+                .serverPath("/mqtt")
+                .subprotocol("mqttv3.1") // Set WebSocket Sub-Protocol
                 .applyWebSocketConfig()
             .sslWithDefaultConfig()
             .buildAsync()
@@ -66,19 +67,20 @@ class ChatRepository(
         
         val future = client.connectWith()
             .keepAlive(30)
+            .cleanSession(true) // Clean Session true
             .willPublish()
                 .topic("presence/$clientId")
                 .payload(ByteArray(0))
-                .qos(MqttQos.EXACTLY_ONCE) // QoS 2
+                .qos(MqttQos.EXACTLY_ONCE)
                 .retain(true)
                 .applyWillPublish()
             .send()
             .thenCompose { 
-                // Publish presence
+                // Publish presence raw string
                 client.publishWith()
                     .topic("presence/$clientId")
                     .payload(username.toByteArray())
-                    .qos(MqttQos.EXACTLY_ONCE) // QoS 2
+                    .qos(MqttQos.EXACTLY_ONCE)
                     .retain(true)
                     .send()
             }
@@ -90,11 +92,10 @@ class ChatRepository(
     fun observeMessages(): Flow<ChatMessage> = callbackFlow {
         val client = getOrCreateMqttClient()
 
-        // Wait for connection before subscribing
         val setupSubscription = {
             client.subscribeWith()
                 .topicFilter("spazradio")
-                .qos(MqttQos.EXACTLY_ONCE) // QoS 2
+                .qos(MqttQos.EXACTLY_ONCE)
                 .callback { publish ->
                     val payload = publish.payloadAsBytes
                     val messageStr = String(payload)
@@ -123,7 +124,7 @@ class ChatRepository(
         val setupPresenceSubscription = {
             client.subscribeWith()
                 .topicFilter("presence/#")
-                .qos(MqttQos.EXACTLY_ONCE) // QoS 2
+                .qos(MqttQos.EXACTLY_ONCE)
                 .callback { publish ->
                     val topic = publish.topic.toString()
                     val clientPath = topic.removePrefix("presence/")
@@ -163,7 +164,7 @@ class ChatRepository(
         client.publishWith()
             .topic("spazradio")
             .payload(json.toByteArray())
-            .qos(MqttQos.EXACTLY_ONCE) // QoS 2
+            .qos(MqttQos.EXACTLY_ONCE)
             .send()
     }
     
