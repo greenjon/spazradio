@@ -72,7 +72,6 @@ fun RadioApp(
     val playbackPosition by radioViewModel.playbackPosition.collectAsState()
     val playbackDuration by radioViewModel.playbackDuration.collectAsState()
     val lissajousMode by radioViewModel.lissajousMode.collectAsState()
-    val currentInfoDisplay by radioViewModel.currentInfoDisplay.collectAsState()
     val appMode by radioViewModel.appMode.collectAsState()
     val activeUtility by radioViewModel.activeUtility.collectAsState()
 
@@ -82,7 +81,7 @@ fun RadioApp(
     AdaptiveLayout(
         isLandscape = isLandscape,
         showOscilloscope = lissajousMode || activeUtility == ActiveUtility.VISUALS,
-        showInfoBox = activeUtility != ActiveUtility.NONE,
+        showInfoBox = activeUtility != ActiveUtility.NONE && activeUtility != ActiveUtility.VISUALS,
         header = {
             PlayerHeader(
                 title = headerTitle,
@@ -137,9 +136,6 @@ fun RadioApp(
                         else -> {}
                     }
                 }
-            } else if (activeUtility == ActiveUtility.VISUALS) {
-                // Visuals is just the oscilloscope which is handled by AdaptiveLayout
-                // We might put controls here later, for now we just show the name in a small overlay or nothing
             }
         },
         footer = {
