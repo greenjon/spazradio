@@ -57,7 +57,8 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _appMode = MutableStateFlow(AppMode.RADIO)
     val appMode: StateFlow<AppMode> = _appMode.asStateFlow()
 
-    private val _activeUtility = MutableStateFlow(ActiveUtility.NONE)
+    // Default to INFO (Schedule) on launch
+    private val _activeUtility = MutableStateFlow(ActiveUtility.INFO)
     val activeUtility: StateFlow<ActiveUtility> = _activeUtility.asStateFlow()
 
     private val _lissajousMode = MutableStateFlow(prefs.getBoolean("visuals_enabled", true))
@@ -228,8 +229,16 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     // --- Navigation & Utility Actions ---
 
     fun setAppMode(mode: AppMode) {
-        if (_appMode.value == mode) return
+        if (_appMode.value == mode) {
+            // Even if already in this mode, if info box is closed, we might want to force it open?
+            // But usually this is called from the Top TabRow which switches the mode.
+            _activeUtility.value = ActiveUtility.INFO
+            return
+        }
         _appMode.value = mode
+        
+        // Force Schedule/List to be active when switching modes
+        _activeUtility.value = ActiveUtility.INFO
         
         // Logical side effects
         if (mode == AppMode.RADIO) {

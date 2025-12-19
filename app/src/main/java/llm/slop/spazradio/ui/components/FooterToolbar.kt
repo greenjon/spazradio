@@ -4,8 +4,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.Icon
@@ -39,24 +39,24 @@ fun FooterToolbar(
         // Disable automatic window insets because we handle them in the parent Scaffold/Box
         windowInsets = WindowInsets(0, 0, 0, 0)
     ) {
-        // Chat
-        NavigationBarItem(
-            selected = activeUtility == ActiveUtility.CHAT,
-            onClick = { onUtilityClick(ActiveUtility.CHAT) },
-            icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat") },
-            label = { Text("Chat") },
-            colors = navigationBarItemColors()
-        )
-
-        // Info (Dynamic: Schedule or Archive List)
+        // Info (Dynamic: Schedule or Archive List) - Moved to the left
         val infoLabel = if (appMode == AppMode.RADIO) "Schedule" else "List"
-        val infoIcon = if (appMode == AppMode.RADIO) Icons.AutoMirrored.Filled.EventNote else Icons.AutoMirrored.Filled.List
+        val infoIcon = if (appMode == AppMode.RADIO) Icons.Default.EventNote else Icons.AutoMirrored.Filled.List
         
         NavigationBarItem(
             selected = activeUtility == ActiveUtility.INFO,
             onClick = { onUtilityClick(ActiveUtility.INFO) },
             icon = { Icon(infoIcon, contentDescription = infoLabel) },
             label = { Text(infoLabel) },
+            colors = navigationBarItemColors()
+        )
+
+        // Chat
+        NavigationBarItem(
+            selected = activeUtility == ActiveUtility.CHAT,
+            onClick = { onUtilityClick(ActiveUtility.CHAT) },
+            icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat") },
+            label = { Text("Chat") },
             colors = navigationBarItemColors()
         )
 
