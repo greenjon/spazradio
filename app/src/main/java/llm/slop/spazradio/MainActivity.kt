@@ -119,7 +119,7 @@ fun RadioApp(
                     modifier = modifier
                 ) {
                     when (activeUtility) {
-                        ActiveUtility.SETTINGS -> SettingsContent(radioViewModel)
+                        ActiveUtility.SETTINGS -> SettingsContent(radioViewModel, chatViewModel)
                         ActiveUtility.INFO -> {
                             if (appMode == AppMode.RADIO) {
                                 ScheduleContent(scheduleViewModel)
@@ -186,7 +186,6 @@ fun AdaptiveLayout(
                             footer()
                         }
                         if (showInfoBox) {
-                            // Removing top/bottom padding to match the player column height exactly
                             infoBox(
                                 Modifier
                                     .weight(1f)
