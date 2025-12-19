@@ -29,4 +29,14 @@
     <string name="chat_join">Chat beitreten</string>
     <string name="chat_name_hint">Spitznamen eingeben</string>
     <string name="chat_online_count">%d online</string>
+
+    <string name="chat_settings">Chat-Einstellungen</string>
+    <string name="reset_username">Chat-Benutzernamen zurücksetzen</string>
+    <string name="reset_dialog_title">Benutzernamen zurücksetzen?</string>
+    <string name="reset_dialog_text">Dadurch wird die Verbindung zum Chat getrennt und Ihr aktueller Name gelöscht. Sie werden beim nächsten Öffnen des Chats zur Eingabe eines neuen Namens aufgefordert.</string>
+    <string name="action_reset">Zurücksetzen</string>
+    <string name="action_cancel">Abbrechen</string>
+    <string name="settings_placeholder">Weitere Einstellungen werden hier angezeigt.</string>
+    <string name="label_visuals">Visuals</string>
+    <string name="label_list">Liste</string>
 </resources>

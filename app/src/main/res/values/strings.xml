@@ -29,4 +29,14 @@
     <string name="chat_join">Join Chat</string>
     <string name="chat_name_hint">Enter Nickname</string>
     <string name="chat_online_count">%d online</string>
+
+    <string name="chat_settings">Chat Settings</string>
+    <string name="reset_username">Reset Chat Username</string>
+    <string name="reset_dialog_title">Reset Username?</string>
+    <string name="reset_dialog_text">This will disconnect you from chat and clear your current handle. You will be prompted for a new one next time you open Chat.</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="settings_placeholder">Other settings will appear here.</string>
+    <string name="label_visuals">Visuals</string>
+    <string name="label_list">List</string>
 </resources>

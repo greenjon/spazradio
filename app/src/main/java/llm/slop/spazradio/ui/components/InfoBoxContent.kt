@@ -28,8 +28,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import llm.slop.spazradio.ChatViewModel
+import llm.slop.spazradio.R
 import llm.slop.spazradio.RadioViewModel
 import llm.slop.spazradio.ScheduleItem
 import llm.slop.spazradio.ScheduleViewModel
@@ -54,7 +56,7 @@ fun SettingsContent(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "Chat Settings",
+                text = stringResource(R.string.chat_settings),
                 style = MaterialTheme.typography.titleMedium,
                 color = NeonGreen
             )
@@ -70,14 +72,14 @@ fun SettingsContent(
             ) {
                 Icon(Icons.Default.PersonRemove, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Reset Chat Username")
+                Text(stringResource(R.string.reset_username))
             }
 
             if (showResetDialog) {
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showResetDialog = false },
-                    title = { Text("Reset Username?") },
-                    text = { Text("This will disconnect you from chat and clear your current handle. You will be prompted for a new one next time you open Chat.") },
+                    title = { Text(stringResource(R.string.reset_dialog_title)) },
+                    text = { Text(stringResource(R.string.reset_dialog_text)) },
                     confirmButton = {
                         Button(
                             onClick = {
@@ -86,12 +88,12 @@ fun SettingsContent(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                         ) {
-                            Text("Reset")
+                            Text(stringResource(R.string.action_reset))
                         }
                     },
                     dismissButton = {
                         Button(onClick = { showResetDialog = false }) {
-                            Text("Cancel")
+                            Text(stringResource(R.string.action_cancel))
                         }
                     },
                     containerColor = Color(0xFF1A1A1A),
@@ -102,7 +104,7 @@ fun SettingsContent(
 
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Other settings will appear here.",
+                text = stringResource(R.string.settings_placeholder),
                 style = MaterialTheme.typography.bodySmall,
                 color = NeonGreen.copy(alpha = 0.5f)
             )
@@ -121,7 +123,7 @@ fun ScheduleContent(
     if (loading) {
         LoadingContent()
     } else if (error != null) {
-        ErrorContent(message = "Schedule unavailable", onRetry = { scheduleViewModel.loadSchedule() })
+        ErrorContent(message = stringResource(R.string.error_archives), onRetry = { scheduleViewModel.loadSchedule() })
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize()
@@ -140,6 +142,8 @@ fun ScheduleItemRow(item: ScheduleItem) {
             .fillMaxWidth()
             .padding(vertical = 4.dp)
     ) {
+        // Note: item.datePart, startTime, endTime are assumed to be formatted by the ViewModel/Data layer.
+        // If not, they should be localized here.
         Text(
             text = "${item.datePart} • ${item.startTime} - ${item.endTime}",
             style = MaterialTheme.typography.bodyLarge,

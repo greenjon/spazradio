@@ -29,4 +29,14 @@
     <string name="chat_join">Rejoindre le chat</string>
     <string name="chat_name_hint">Entrez un pseudonyme</string>
     <string name="chat_online_count">%d en ligne</string>
+
+    <string name="chat_settings">Paramètres du chat</string>
+    <string name="reset_username">Réinitialiser le pseudo</string>
+    <string name="reset_dialog_title">Réinitialiser le pseudo ?</string>
+    <string name="reset_dialog_text">Cela vous déconnectera du chat et effacera votre pseudo actuel. Un nouveau pseudo vous sera demandé lors de votre prochaine connexion.</string>
+    <string name="action_reset">Réinitialiser</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="settings_placeholder">D\'autres paramètres apparaîtront ici.</string>
+    <string name="label_visuals">Visuels</string>
+    <string name="label_list">Liste</string>
 </resources>
