@@ -90,32 +90,32 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
-// THE F-DROID FIX:
-// This hooks into the task graph to delete the profiles from the staging area
-// AFTER they are generated but BEFORE the APK is zipped.
-androidComponents {
-    onVariants { variant ->
-        val capName = variant.name.replaceFirstChar { it.uppercase() }
-
-        // Target the process that actually puts assets into the APK structure
-        tasks.matching { it.name.contains("package${capName}Resources") || it.name.contains("merge${capName}Assets") }
-            .configureEach {
-                doLast {
-                    outputs.files.forEach { file ->
-                        // Path 1: assets/dexopt/
-                        val dexoptDir = File(file, "assets/dexopt")
-                        if (dexoptDir.exists()) {
-                            println("F-Droid: Stripping ${dexoptDir.absolutePath}")
-                            dexoptDir.deleteRecursively()
-                        }
-                        // Path 2: flat baseline.prof in the root
-                        val rootProf = File(file, "baseline.prof")
-                        if (rootProf.exists()) rootProf.delete()
-                    }
-                }
-            }
-    }
-}
+//// THE F-DROID FIX:
+//// This hooks into the task graph to delete the profiles from the staging area
+//// AFTER they are generated but BEFORE the APK is zipped.
+//androidComponents {
+//    onVariants { variant ->
+//        val capName = variant.name.replaceFirstChar { it.uppercase() }
+//
+//        // Target the process that actually puts assets into the APK structure
+//        tasks.matching { it.name.contains("package${capName}Resources") || it.name.contains("merge${capName}Assets") }
+//            .configureEach {
+//                doLast {
+//                    outputs.files.forEach { file ->
+//                        // Path 1: assets/dexopt/
+//                        val dexoptDir = File(file, "assets/dexopt")
+//                        if (dexoptDir.exists()) {
+//                            println("F-Droid: Stripping ${dexoptDir.absolutePath}")
+//                            dexoptDir.deleteRecursively()
+//                        }
+//                        // Path 2: flat baseline.prof in the root
+//                        val rootProf = File(file, "baseline.prof")
+//                        if (rootProf.exists()) rootProf.delete()
+//                    }
+//                }
+//            }
+//    }
+//}
 // Add this to the very bottom of /app/build.gradle.kts
 androidComponents {onVariants { variant ->
     val capName = variant.name.replaceFirstChar { it.uppercase() }
