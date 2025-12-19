@@ -1,5 +1,6 @@
 package llm.slop.spazradio.ui.components
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -33,7 +34,9 @@ fun FooterToolbar(
         modifier = modifier.fillMaxWidth(),
         containerColor = Color.Black.copy(alpha = 0.5f),
         contentColor = NeonGreen,
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
+        // Disable automatic window insets because we handle them in the parent Scaffold/Box
+        windowInsets = WindowInsets(0, 0, 0, 0)
     ) {
         // Chat
         NavigationBarItem(

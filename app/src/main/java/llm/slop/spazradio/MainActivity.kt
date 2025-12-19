@@ -161,20 +161,17 @@ fun AdaptiveLayout(
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        bottomBar = footer
+        bottomBar = if (isLandscape) ({}) else footer
     ) { innerPadding ->
-        // Main container with gradient background
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Brush.verticalGradient(listOf(DeepBlue, Magenta, DeepBlue)))
         ) {
-            // Edge-to-edge Visuals Layer (drawn behind everything)
             if (showOscilloscope) {
                 oscilloscope(Modifier.fillMaxSize())
             }
 
-            // Foreground Content Layer (respects system bars/padding)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -185,18 +182,23 @@ fun AdaptiveLayout(
                         Column(modifier = Modifier.weight(1f)) {
                             header()
                             trackTitle()
-                            // Keep empty space for layout consistency if needed
                             Box(modifier = Modifier.weight(1f).fillMaxWidth())
+                            footer()
                         }
                         if (showInfoBox) {
-                            infoBox(Modifier.weight(1f).fillMaxHeight().padding(16.dp))
+                            // Removing top/bottom padding to match the player column height exactly
+                            infoBox(
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 0.dp)
+                            )
                         }
                     }
                 } else {
                     Column(modifier = Modifier.fillMaxSize()) {
                         header()
                         trackTitle()
-                        // Central area for overlays
                         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                             if (showInfoBox) {
                                 infoBox(
