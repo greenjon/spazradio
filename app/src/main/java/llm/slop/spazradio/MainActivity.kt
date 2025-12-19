@@ -1,6 +1,5 @@
 package llm.slop.spazradio
 
-import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -9,8 +8,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,7 +17,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spazradio.ui.components.ArchiveContent
@@ -74,11 +70,7 @@ fun RadioApp(
     val appMode by radioViewModel.appMode.collectAsState()
     val activeUtility by radioViewModel.activeUtility.collectAsState()
 
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    AdaptiveLayout(
-        isLandscape = isLandscape,
+    MainLayout(
         showOscilloscope = lissajousMode,
         showInfoBox = activeUtility != ActiveUtility.NONE,
         header = {
@@ -149,8 +141,7 @@ fun RadioApp(
 }
 
 @Composable
-fun AdaptiveLayout(
-    isLandscape: Boolean,
+fun MainLayout(
     showOscilloscope: Boolean,
     showInfoBox: Boolean,
     header: @Composable () -> Unit,
@@ -161,51 +152,35 @@ fun AdaptiveLayout(
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        bottomBar = if (isLandscape) ({}) else footer
+        bottomBar = footer
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Brush.verticalGradient(listOf(DeepBlue, Magenta, DeepBlue)))
         ) {
+            // Edge-to-edge Visuals Layer
             if (showOscilloscope) {
                 oscilloscope(Modifier.fillMaxSize())
             }
 
+            // Foreground Content Layer
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                if (isLandscape) {
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            header()
-                            trackTitle()
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth())
-                            footer()
-                        }
+                Column(modifier = Modifier.fillMaxSize()) {
+                    header()
+                    trackTitle()
+                    // Middle section: HUD style overlay area
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         if (showInfoBox) {
                             infoBox(
                                 Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 0.dp)
+                                    .fillMaxSize()
+                                    .padding(16.dp)
                             )
-                        }
-                    }
-                } else {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        header()
-                        trackTitle()
-                        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                            if (showInfoBox) {
-                                infoBox(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .padding(16.dp)
-                                )
-                            }
                         }
                     }
                 }
