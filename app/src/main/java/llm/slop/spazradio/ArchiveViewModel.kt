@@ -81,8 +81,14 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     fun updateSearchQuery(query: String) {
         val currentState = _uiState.value
         if (currentState is ArchiveUiState.Success) {
+            // Update searchQuery immediately to avoid cursor jump in TextField
+            _uiState.value = currentState.copy(searchQuery = query)
+            
             searchJob?.cancel()
             searchJob = viewModelScope.launch(Dispatchers.Default) {
+                // Use a small delay to debounce search and prevent UI flicker
+                delay(100)
+                
                 val filtered = if (query.isBlank()) {
                     currentState.shows
                 } else {
@@ -91,11 +97,14 @@ class ArchiveViewModel(application: Application, private val repository: Archive
                         it.date.contains(query, ignoreCase = true) 
                     }
                 }
+                
                 withContext(Dispatchers.Main) {
-                    _uiState.value = currentState.copy(
-                        searchQuery = query,
-                        filteredShows = filtered
-                    )
+                    val latestState = _uiState.value
+                    if (latestState is ArchiveUiState.Success) {
+                        _uiState.value = latestState.copy(
+                            filteredShows = filtered
+                        )
+                    }
                 }
             }
         }
