@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spazradio.ui.components.ArchiveContent
+import llm.slop.spazradio.ui.components.ChatContent
 import llm.slop.spazradio.ui.components.FooterToolbar
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
@@ -61,7 +62,8 @@ class MainActivity : ComponentActivity() {
 fun RadioApp(
     radioViewModel: RadioViewModel = viewModel(),
     scheduleViewModel: ScheduleViewModel = viewModel(),
-    archiveViewModel: ArchiveViewModel = viewModel()
+    archiveViewModel: ArchiveViewModel = viewModel(),
+    chatViewModel: ChatViewModel = viewModel()
 ) {
     val headerTitle by radioViewModel.headerTitle.collectAsState()
     val trackSubtitle by radioViewModel.trackSubtitle.collectAsState()
@@ -107,6 +109,7 @@ fun RadioApp(
                 InfoDisplay.SETTINGS -> "Settings"
                 InfoDisplay.SCHEDULE -> "Schedule"
                 InfoDisplay.ARCHIVES -> "Archives"
+                InfoDisplay.CHAT -> "Chat"
                 else -> ""
             }
             InfoBox(
@@ -123,6 +126,7 @@ fun RadioApp(
                             radioViewModel = radioViewModel
                         )
                     }
+                    InfoDisplay.CHAT -> ChatContent(chatViewModel)
                     else -> {}
                 }
             }
@@ -130,6 +134,7 @@ fun RadioApp(
         footer = {
             FooterToolbar(
                 onRadioClick = { radioViewModel.showLiveStream() },
+                onChatClick = { radioViewModel.showChat() },
                 onArchivesClick = { radioViewModel.showArchives() },
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp)
             )

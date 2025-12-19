@@ -45,6 +45,9 @@ android {
                 "**/*.baseline.profm",
                 "assets/dexopt/*"
             )
+            excludes += "/META-INF/INDEX.LIST"
+            excludes += "/META-INF/io.netty.versions.properties"
+
         }
     }
 }
@@ -58,6 +61,7 @@ kotlin {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -75,6 +79,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.material)
+    implementation(libs.paho)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
