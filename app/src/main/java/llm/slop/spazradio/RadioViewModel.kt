@@ -54,17 +54,14 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     val playbackDuration: StateFlow<Long> = _playbackDuration.asStateFlow()
 
     // --- UI / Navigation State ---
-    private val _infoDisplay = MutableStateFlow(InfoDisplay.NONE)
-    val infoDisplay: StateFlow<InfoDisplay> = _infoDisplay.asStateFlow()
+    private val _appMode = MutableStateFlow(AppMode.RADIO)
+    val appMode: StateFlow<AppMode> = _appMode.asStateFlow()
 
-    private val _showSchedulePref = MutableStateFlow(prefs.getBoolean("show_schedule", true))
-    val showSchedulePref: StateFlow<Boolean> = _showSchedulePref.asStateFlow()
+    private val _activeUtility = MutableStateFlow(ActiveUtility.NONE)
+    val activeUtility: StateFlow<ActiveUtility> = _activeUtility.asStateFlow()
 
     private val _lissajousMode = MutableStateFlow(prefs.getBoolean("visuals_enabled", true))
     val lissajousMode: StateFlow<Boolean> = _lissajousMode.asStateFlow()
-
-    private val _currentInfoDisplay = MutableStateFlow(InfoDisplay.NONE)
-    val currentInfoDisplay: StateFlow<InfoDisplay> = _currentInfoDisplay.asStateFlow()
 
     private var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -77,12 +74,16 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 val controller = controllerFuture?.get() ?: return@addListener
                 mediaController = controller
                 setupController(controller)
+                
+                // Auto-play radio on launch
+                if (_appMode.value == AppMode.RADIO) {
+                    showLiveStream()
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }, MoreExecutors.directExecutor())
         
-        updateCurrentInfoDisplay()
         startPositionPolling()
     }
 
@@ -217,9 +218,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             controller.prepare()
             controller.play()
         }
-
-        _infoDisplay.value = InfoDisplay.NONE
-        updateCurrentInfoDisplay()
     }
 
     fun seekTo(position: Long) {
@@ -227,7 +225,25 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         _playbackPosition.value = position
     }
 
-    // --- Settings / UI Actions ---
+    // --- Navigation & Utility Actions ---
+
+    fun setAppMode(mode: AppMode) {
+        if (_appMode.value == mode) return
+        _appMode.value = mode
+        
+        // Logical side effects
+        if (mode == AppMode.RADIO) {
+            showLiveStream()
+        }
+    }
+
+    fun setActiveUtility(utility: ActiveUtility) {
+        if (_activeUtility.value == utility) {
+            _activeUtility.value = ActiveUtility.NONE
+        } else {
+            _activeUtility.value = utility
+        }
+    }
 
     fun togglePlayPause() {
         val controller = mediaController ?: return
@@ -238,47 +254,15 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun toggleSettings() {
-        _infoDisplay.value = if (_infoDisplay.value == InfoDisplay.SETTINGS) InfoDisplay.NONE else InfoDisplay.SETTINGS
-        updateCurrentInfoDisplay()
-    }
-
-    fun showArchives() {
-        _infoDisplay.value = InfoDisplay.ARCHIVES
-        updateCurrentInfoDisplay()
-    }
-
-    fun showChat() {
-        _infoDisplay.value = InfoDisplay.CHAT
-        updateCurrentInfoDisplay()
-    }
-
     fun closeInfoBox() {
-        if (_infoDisplay.value != InfoDisplay.NONE) {
-            _infoDisplay.value = InfoDisplay.NONE
-        } else if (_showSchedulePref.value) {
-            setShowSchedule(false)
-        }
-        updateCurrentInfoDisplay()
+        _activeUtility.value = ActiveUtility.NONE
     }
 
-    fun setShowSchedule(enabled: Boolean) {
-        _showSchedulePref.value = enabled
-        prefs.edit().putBoolean("show_schedule", enabled).apply()
-        updateCurrentInfoDisplay()
-    }
+    // --- Prefs ---
 
     fun setLissajousMode(enabled: Boolean) {
         _lissajousMode.value = enabled
         prefs.edit().putBoolean("visuals_enabled", enabled).apply()
-    }
-
-    private fun updateCurrentInfoDisplay() {
-        _currentInfoDisplay.value = when {
-            _infoDisplay.value != InfoDisplay.NONE -> _infoDisplay.value
-            _showSchedulePref.value -> InfoDisplay.SCHEDULE
-            else -> InfoDisplay.NONE
-        }
     }
 
     override fun onCleared() {

@@ -93,6 +93,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
         repository.connect(name)
     }
 
+    fun resetUsername() {
+        _username.value = ""
+        sharedPrefs.edit().remove("username").apply()
+        repository.disconnect()
+        // We don't reconnect here; the Chat UI will handle the prompt when opened
+    }
+
     fun sendMessage(text: String) {
         if (_username.value.isNotEmpty()) {
             repository.sendMessage(_username.value, text)

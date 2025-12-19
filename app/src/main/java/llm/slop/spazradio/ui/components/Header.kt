@@ -13,17 +13,24 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import llm.slop.spazradio.AppMode
 import llm.slop.spazradio.R
 import llm.slop.spazradio.ui.theme.NeonGreen
 import java.util.Locale
@@ -35,11 +42,37 @@ fun PlayerHeader(
     isArchivePlaying: Boolean,
     playbackPosition: Long,
     playbackDuration: Long,
+    appMode: AppMode,
     onPlayPause: () -> Unit,
-    onToggleSettings: () -> Unit,
-    onSeek: (Long) -> Unit
+    onSeek: (Long) -> Unit,
+    onModeChange: (AppMode) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        TabRow(
+            selectedTabIndex = if (appMode == AppMode.RADIO) 0 else 1,
+            // Changed base color to #00007F with 75% opacity (BF in hex)
+            containerColor = Color(0xBF00007F), 
+            contentColor = NeonGreen,
+            indicator = { tabPositions ->
+                TabRowDefaults.PrimaryIndicator(
+                    modifier = Modifier.tabIndicatorOffset(tabPositions[if (appMode == AppMode.RADIO) 0 else 1]),
+                    color = NeonGreen
+                )
+            },
+            divider = {}
+        ) {
+            Tab(
+                selected = appMode == AppMode.RADIO,
+                onClick = { onModeChange(AppMode.RADIO) },
+                text = { Text("RADIO", style = MaterialTheme.typography.labelLarge) }
+            )
+            Tab(
+                selected = appMode == AppMode.ARCHIVES,
+                onClick = { onModeChange(AppMode.ARCHIVES) },
+                text = { Text("ARCHIVES", style = MaterialTheme.typography.labelLarge) }
+            )
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -57,18 +90,19 @@ fun PlayerHeader(
             }
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    shadow = Shadow(
+                        color = Color.Black,
+                        offset = Offset(2f, 2f),
+                        blurRadius = 4f
+                    )
+                ),
                 color = Color(0xFFFFFF00),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onToggleSettings) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_settings),
-                    contentDescription = stringResource(R.string.settings_title),
-                    tint = NeonGreen,
-                    modifier = Modifier.size(48.dp)
-                )
-            }
+            // Spacer to keep title centered since gear icon is gone
+            Box(modifier = Modifier.size(48.dp))
         }
 
         if (isArchivePlaying && playbackDuration > 0) {
@@ -145,7 +179,13 @@ fun TrackTitle(title: String) {
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleLarge.copy(
+                shadow = Shadow(
+                    color = Color.Black,
+                    offset = Offset(2f, 2f),
+                    blurRadius = 4f
+                )
+            ),
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             color = NeonGreen

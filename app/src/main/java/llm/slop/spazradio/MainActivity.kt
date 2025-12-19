@@ -1,6 +1,5 @@
 package llm.slop.spazradio
 
-import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -9,11 +8,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -21,7 +17,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spazradio.ui.components.ArchiveContent
@@ -72,15 +67,12 @@ fun RadioApp(
     val playbackPosition by radioViewModel.playbackPosition.collectAsState()
     val playbackDuration by radioViewModel.playbackDuration.collectAsState()
     val lissajousMode by radioViewModel.lissajousMode.collectAsState()
-    val currentInfoDisplay by radioViewModel.currentInfoDisplay.collectAsState()
+    val appMode by radioViewModel.appMode.collectAsState()
+    val activeUtility by radioViewModel.activeUtility.collectAsState()
 
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    AdaptiveLayout(
-        isLandscape = isLandscape,
+    MainLayout(
         showOscilloscope = lissajousMode,
-        showInfoBox = currentInfoDisplay != InfoDisplay.NONE,
+        showInfoBox = activeUtility != ActiveUtility.NONE,
         header = {
             PlayerHeader(
                 title = headerTitle,
@@ -88,9 +80,10 @@ fun RadioApp(
                 isArchivePlaying = isArchivePlaying,
                 playbackPosition = playbackPosition,
                 playbackDuration = playbackDuration,
+                appMode = appMode,
                 onPlayPause = { radioViewModel.togglePlayPause() },
-                onToggleSettings = { radioViewModel.toggleSettings() },
-                onSeek = { radioViewModel.seekTo(it) }
+                onSeek = { radioViewModel.seekTo(it) },
+                onModeChange = { radioViewModel.setAppMode(it) }
             )
         },
         trackTitle = { TrackTitle(trackSubtitle) },
@@ -105,46 +98,50 @@ fun RadioApp(
             )
         },
         infoBox = { modifier ->
-            val title = when (currentInfoDisplay) {
-                InfoDisplay.SETTINGS -> "Settings"
-                InfoDisplay.SCHEDULE -> "Schedule"
-                InfoDisplay.ARCHIVES -> "Archives"
-                InfoDisplay.CHAT -> "Chat"
+            val title = when (activeUtility) {
+                ActiveUtility.SETTINGS -> "Settings"
+                ActiveUtility.INFO -> if (appMode == AppMode.RADIO) "Schedule" else "Archives"
+                ActiveUtility.CHAT -> "Chat"
                 else -> ""
             }
-            InfoBox(
-                title = title,
-                onClose = { radioViewModel.closeInfoBox() },
-                modifier = modifier
-            ) {
-                when (currentInfoDisplay) {
-                    InfoDisplay.SETTINGS -> SettingsContent(radioViewModel)
-                    InfoDisplay.SCHEDULE -> ScheduleContent(scheduleViewModel)
-                    InfoDisplay.ARCHIVES -> {
-                        ArchiveContent(
-                            archiveViewModel = archiveViewModel,
-                            radioViewModel = radioViewModel
-                        )
+            if (activeUtility != ActiveUtility.NONE) {
+                InfoBox(
+                    title = title,
+                    onClose = { radioViewModel.closeInfoBox() },
+                    modifier = modifier
+                ) {
+                    when (activeUtility) {
+                        ActiveUtility.SETTINGS -> SettingsContent(radioViewModel, chatViewModel)
+                        ActiveUtility.INFO -> {
+                            if (appMode == AppMode.RADIO) {
+                                ScheduleContent(scheduleViewModel)
+                            } else {
+                                ArchiveContent(
+                                    archiveViewModel = archiveViewModel,
+                                    radioViewModel = radioViewModel
+                                )
+                            }
+                        }
+                        ActiveUtility.CHAT -> ChatContent(chatViewModel)
+                        else -> {}
                     }
-                    InfoDisplay.CHAT -> ChatContent(chatViewModel)
-                    else -> {}
                 }
             }
         },
         footer = {
             FooterToolbar(
-                onRadioClick = { radioViewModel.showLiveStream() },
-                onChatClick = { radioViewModel.showChat() },
-                onArchivesClick = { radioViewModel.showArchives() },
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp)
+                appMode = appMode,
+                activeUtility = activeUtility,
+                visualsEnabled = lissajousMode,
+                onUtilityClick = { radioViewModel.setActiveUtility(it) },
+                onToggleVisuals = { radioViewModel.setLissajousMode(!lissajousMode) }
             )
         }
     )
 }
 
 @Composable
-fun AdaptiveLayout(
-    isLandscape: Boolean,
+fun MainLayout(
     showOscilloscope: Boolean,
     showInfoBox: Boolean,
     header: @Composable () -> Unit,
@@ -153,56 +150,39 @@ fun AdaptiveLayout(
     infoBox: @Composable (Modifier) -> Unit,
     footer: @Composable () -> Unit
 ) {
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        bottomBar = footer
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Brush.verticalGradient(listOf(DeepBlue, Magenta, DeepBlue)))
-                .padding(innerPadding)
         ) {
-            if (isLandscape) {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        header()
-                        trackTitle()
-                        // Ensure space is filled even if oscilloscope is hidden
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                            if (showOscilloscope) {
-                                oscilloscope(Modifier.fillMaxSize().padding(16.dp))
-                            }
-                        }
-                        footer()
-                    }
-                    if (showInfoBox) {
-                        infoBox(Modifier.weight(1f).fillMaxHeight().padding(16.dp))
-                    }
-                }
-            } else {
+            // Edge-to-edge Visuals Layer
+            if (showOscilloscope) {
+                oscilloscope(Modifier.fillMaxSize())
+            }
+
+            // Foreground Content Layer
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     header()
                     trackTitle()
-                    // Middle section
-                    Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    // Middle section: HUD style overlay area
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         if (showInfoBox) {
-                            if (showOscilloscope) {
-                                oscilloscope(Modifier.fillMaxWidth().height(300.dp).padding(16.dp))
-                            }
                             infoBox(
                                 Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
-                                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 0.dp)
+                                    .fillMaxSize()
+                                    .padding(16.dp)
                             )
-                        } else {
-                            // If no info box, let oscilloscope take all space if it exists
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                if (showOscilloscope) {
-                                    oscilloscope(Modifier.fillMaxSize().padding(16.dp))
-                                }
-                            }
                         }
                     }
-                    footer()
                 }
             }
         }
