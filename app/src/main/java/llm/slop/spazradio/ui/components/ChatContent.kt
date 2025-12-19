@@ -2,10 +2,12 @@ package llm.slop.spazradio.ui.components
 
 import android.text.util.Linkify
 import android.widget.TextView
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -123,14 +125,14 @@ fun ChatLayout(
             Icon(
                 imageVector = Icons.Default.People,
                 contentDescription = null,
-                tint = NeonGreen,
+                tint = Color(0xFFFFFF00),
                 modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = if (onlineNames.isEmpty()) "..." else onlineNames.joinToString(", "),
                 style = MaterialTheme.typography.labelSmall,
-                color = NeonGreen,
+                color = Color(0xFFFFFF00),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -158,12 +160,20 @@ fun ChatLayout(
             TextField(
                 value = messageText,
                 onValueChange = { messageText = it },
-                placeholder = { Text(stringResource(R.string.chat_hint)) },
-                modifier = Modifier.weight(1f),
+                placeholder = { Text(stringResource(R.string.chat_hint), color = NeonGreen.copy(alpha = 0.6f)) },
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, NeonGreen, RoundedCornerShape(12.dp)),
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.White.copy(alpha = 0.1f),
-                    unfocusedContainerColor = Color.White.copy(alpha = 0.05f)
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
+                    focusedTextColor = NeonGreen,
+                    unfocusedTextColor = NeonGreen,
+                    cursorColor = NeonGreen,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
                 )
             )
             IconButton(
@@ -225,7 +235,7 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
         AndroidView(
             factory = { context ->
                 TextView(context).apply {
-                    setTextColor(android.graphics.Color.WHITE)
+                    setTextColor(android.graphics.Color.parseColor("#39FF14")) // Neon Green
                     setTextSize(14f)
                     autoLinkMask = Linkify.WEB_URLS
                     setLinkTextColor(android.graphics.Color.parseColor("#39FF14"))
