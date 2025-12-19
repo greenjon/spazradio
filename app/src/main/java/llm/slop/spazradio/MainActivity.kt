@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -164,43 +163,48 @@ fun AdaptiveLayout(
         modifier = Modifier.fillMaxSize(),
         bottomBar = footer
     ) { innerPadding ->
+        // Main container with gradient background
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Brush.verticalGradient(listOf(DeepBlue, Magenta, DeepBlue)))
-                .padding(innerPadding)
         ) {
-            if (isLandscape) {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        header()
-                        trackTitle()
-                        // Layer visuals and content in landscape
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                            if (showOscilloscope) {
-                                oscilloscope(Modifier.fillMaxSize().padding(16.dp))
-                            }
-                        }
-                    }
-                    if (showInfoBox) {
-                        infoBox(Modifier.weight(1f).fillMaxHeight().padding(16.dp))
-                    }
-                }
-            } else {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    header()
-                    trackTitle()
-                    // Layer visuals and content in portrait
-                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        if (showOscilloscope) {
-                            oscilloscope(Modifier.fillMaxSize().padding(16.dp))
+            // Edge-to-edge Visuals Layer (drawn behind everything)
+            if (showOscilloscope) {
+                oscilloscope(Modifier.fillMaxSize())
+            }
+
+            // Foreground Content Layer (respects system bars/padding)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                if (isLandscape) {
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            header()
+                            trackTitle()
+                            // Keep empty space for layout consistency if needed
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth())
                         }
                         if (showInfoBox) {
-                            infoBox(
-                                Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp)
-                            )
+                            infoBox(Modifier.weight(1f).fillMaxHeight().padding(16.dp))
+                        }
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        header()
+                        trackTitle()
+                        // Central area for overlays
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                            if (showInfoBox) {
+                                infoBox(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp)
+                                )
+                            }
                         }
                     }
                 }
