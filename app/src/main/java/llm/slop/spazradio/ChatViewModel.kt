@@ -7,18 +7,24 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import llm.slop.spazradio.data.ChatMessage
 import llm.slop.spazradio.data.ChatRepository
+import llm.slop.spazradio.utils.NetworkMonitor
 import okhttp3.OkHttpClient
-import com.google.gson.Gson
 
-class ChatViewModel(application: Application) : AndroidViewModel(application) {
+class ChatViewModel(application: Application) : AndroidViewModel(application), DefaultLifecycleObserver {
     private val sharedPrefs = application.getSharedPreferences("spaz_chat", Context.MODE_PRIVATE)
     private val repository = ChatRepository(OkHttpClient(), Gson())
+    private val networkMonitor = NetworkMonitor(application)
 
     val messages = mutableStateListOf<ChatMessage>()
     
@@ -30,36 +36,49 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         Log.d("ChatViewModel", "Initializing ChatViewModel")
+        
+        // Observe process lifecycle for app resume
+        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+
         viewModelScope.launch {
             try {
                 Log.d("ChatViewModel", "Fetching history...")
                 val history = repository.fetchHistory()
+                messages.clear()
                 messages.addAll(history)
-                Log.d("ChatViewModel", "History loaded: ${history.size} messages")
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "Error loading history", e)
             }
             
             launch {
-                Log.d("ChatViewModel", "Starting message observation...")
                 repository.observeMessages().collect { message ->
-                    Log.d("ChatViewModel", "New message received: ${message.user}")
                     messages.add(message)
                 }
             }
             
             launch {
-                Log.d("ChatViewModel", "Starting presence observation...")
                 repository.observePresence().collect { count ->
-                    Log.d("ChatViewModel", "Online count updated: $count")
                     _onlineCount.value = count
                 }
             }
 
-            if (_username.value.isNotEmpty()) {
-                Log.d("ChatViewModel", "Connecting with existing username: ${_username.value}")
-                repository.connect(_username.value)
+            // Explicit reconnect on network change
+            launch {
+                networkMonitor.isOnline.collectLatest { isOnline ->
+                    if (isOnline && _username.value.isNotEmpty()) {
+                        Log.d("ChatViewModel", "Network restored, reconnecting...")
+                        repository.connect(_username.value)
+                    }
+                }
             }
+        }
+    }
+
+    override fun onResume(owner: LifecycleOwner) {
+        super.onResume(owner)
+        if (_username.value.isNotEmpty()) {
+            Log.d("ChatViewModel", "App resumed, reconnecting...")
+            repository.connect(_username.value)
         }
     }
 
@@ -72,14 +91,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun sendMessage(text: String) {
         if (_username.value.isNotEmpty()) {
-            Log.d("ChatViewModel", "Sending message: $text")
             repository.sendMessage(_username.value, text)
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        Log.d("ChatViewModel", "ChatViewModel cleared, disconnecting repository")
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
         repository.disconnect()
     }
 }
