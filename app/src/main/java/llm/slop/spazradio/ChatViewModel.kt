@@ -30,6 +30,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
     
     private val _onlineCount = MutableStateFlow(0)
     val onlineCount: StateFlow<Int> = _onlineCount
+    
+    private val _onlineNames = MutableStateFlow<List<String>>(emptyList())
+    val onlineNames: StateFlow<List<String>> = _onlineNames
 
     private val _username = mutableStateOf(sharedPrefs.getString("username", "") ?: "")
     val username: State<String> = _username
@@ -37,7 +40,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
     init {
         Log.d("ChatViewModel", "Initializing ChatViewModel")
         
-        // Observe process lifecycle for app resume
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         viewModelScope.launch {
@@ -57,16 +59,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
             }
             
             launch {
-                repository.observePresence().collect { count ->
+                repository.observePresenceCount().collect { count ->
                     _onlineCount.value = count
                 }
             }
+            
+            launch {
+                repository.observeOnlineNames().collect { names ->
+                    _onlineNames.value = names
+                }
+            }
 
-            // Explicit reconnect on network change
             launch {
                 networkMonitor.isOnline.collectLatest { isOnline ->
                     if (isOnline && _username.value.isNotEmpty()) {
-                        Log.d("ChatViewModel", "Network restored, reconnecting...")
                         repository.connect(_username.value)
                     }
                 }
@@ -77,13 +83,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
     override fun onResume(owner: LifecycleOwner) {
         super.onResume(owner)
         if (_username.value.isNotEmpty()) {
-            Log.d("ChatViewModel", "App resumed, reconnecting...")
             repository.connect(_username.value)
         }
     }
 
     fun setUsername(name: String) {
-        Log.d("ChatViewModel", "Setting username: $name")
         _username.value = name
         sharedPrefs.edit().putString("username", name).apply()
         repository.connect(name)

@@ -152,7 +152,9 @@ class ChatRepository(
 
     fun observeMessages(): Flow<ChatMessage> = _incomingMessages.asSharedFlow()
 
-    fun observePresence(): Flow<Int> = _onlineUsers.map { it.values.distinct().size }
+    fun observePresenceCount(): Flow<Int> = _onlineUsers.map { it.values.distinct().size }
+    
+    fun observeOnlineNames(): Flow<List<String>> = _onlineUsers.map { it.values.distinct().sorted() }
 
     fun sendMessage(username: String, text: String) {
         val client = mqttClient ?: return

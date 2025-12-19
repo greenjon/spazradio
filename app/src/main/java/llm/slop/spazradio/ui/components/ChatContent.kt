@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
@@ -33,14 +35,14 @@ fun ChatContent(
 ) {
     val username by viewModel.username
     val messages = viewModel.messages
-    val onlineCount by viewModel.onlineCount.collectAsState()
+    val onlineNames by viewModel.onlineNames.collectAsState()
 
     if (username.isEmpty()) {
         NicknameEntry(onJoin = { viewModel.setUsername(it) })
     } else {
         ChatLayout(
             messages = messages,
-            onlineCount = onlineCount,
+            onlineNames = onlineNames,
             onSendMessage = { viewModel.sendMessage(it) },
             modifier = modifier
         )
@@ -85,7 +87,7 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
 @Composable
 fun ChatLayout(
     messages: List<llm.slop.spazradio.data.ChatMessage>,
-    onlineCount: Int,
+    onlineNames: List<String>,
     onSendMessage: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -97,15 +99,12 @@ fun ChatLayout(
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             if (isInitialLoad) {
-                // Instantly scroll to bottom on first load/history fetch
                 listState.scrollToItem(messages.size - 1)
                 isInitialLoad = false
             } else {
                 val layoutInfo = listState.layoutInfo
                 val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                 val totalItemsCount = layoutInfo.totalItemsCount
-                
-                // Only animate scroll if we're already near the bottom
                 if (lastVisibleItemIndex >= totalItemsCount - 3) {
                     listState.animateScrollToItem(messages.size - 1)
                 }
@@ -114,13 +113,28 @@ fun ChatLayout(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Online count header
-        Text(
-            text = stringResource(R.string.chat_online_count, onlineCount),
-            style = MaterialTheme.typography.labelSmall,
-            color = NeonGreen,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
+        // Online users list header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.People,
+                contentDescription = null,
+                tint = NeonGreen,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (onlineNames.isEmpty()) "..." else onlineNames.joinToString(", "),
+                style = MaterialTheme.typography.labelSmall,
+                color = NeonGreen,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
         SelectionContainer(modifier = Modifier.weight(1f)) {
             LazyColumn(
@@ -176,7 +190,6 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
     val dateTimeStr = remember(msg.timeReceived) {
         if (msg.timeReceived > 0) {
             val date = Date(msg.timeReceived * 1000L)
-            // Use localized DateFormat for both date and time (SHORT style)
             val dateFormat = DateFormat.getDateTimeInstance(
                 DateFormat.SHORT, 
                 DateFormat.SHORT, 
@@ -215,7 +228,6 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
                     setTextColor(android.graphics.Color.WHITE)
                     setTextSize(14f)
                     autoLinkMask = Linkify.WEB_URLS
-                    // Match NeonGreen for links
                     setLinkTextColor(android.graphics.Color.parseColor("#39FF14"))
                 }
             },
