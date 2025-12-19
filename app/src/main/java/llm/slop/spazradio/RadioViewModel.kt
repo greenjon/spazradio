@@ -53,7 +53,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _playbackDuration = MutableStateFlow(0L)
     val playbackDuration: StateFlow<Long> = _playbackDuration.asStateFlow()
 
-    // --- UI / Navigation State (Phase 1 Overhaul) ---
+    // --- UI / Navigation State ---
     private val _appMode = MutableStateFlow(AppMode.RADIO)
     val appMode: StateFlow<AppMode> = _appMode.asStateFlow()
 
@@ -62,10 +62,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _lissajousMode = MutableStateFlow(prefs.getBoolean("visuals_enabled", true))
     val lissajousMode: StateFlow<Boolean> = _lissajousMode.asStateFlow()
-
-    // Deprecated InfoDisplay states (will remove in later phase)
-    private val _currentInfoDisplay = MutableStateFlow(InfoDisplay.NONE)
-    val currentInfoDisplay: StateFlow<InfoDisplay> = _currentInfoDisplay.asStateFlow()
 
     private var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -239,19 +235,14 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         if (mode == AppMode.RADIO) {
             showLiveStream()
         }
-        
-        // When switching modes, we might want to update the active utility 
-        // if it's the dynamic INFO button, but for now we'll just let it stay open.
     }
 
     fun setActiveUtility(utility: ActiveUtility) {
-        // Toggle behavior
         if (_activeUtility.value == utility) {
             _activeUtility.value = ActiveUtility.NONE
         } else {
             _activeUtility.value = utility
         }
-        syncDeprecatedState()
     }
 
     fun togglePlayPause() {
@@ -263,20 +254,8 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Temporary sync for Phase 1 to keep UI working while we refactor components
-    private fun syncDeprecatedState() {
-        _currentInfoDisplay.value = when (_activeUtility.value) {
-            ActiveUtility.SETTINGS -> InfoDisplay.SETTINGS
-            ActiveUtility.CHAT -> InfoDisplay.CHAT
-            ActiveUtility.INFO -> if (_appMode.value == AppMode.RADIO) InfoDisplay.SCHEDULE else InfoDisplay.ARCHIVES
-            ActiveUtility.VISUALS -> InfoDisplay.NONE // Will handle in later phase
-            ActiveUtility.NONE -> InfoDisplay.NONE
-        }
-    }
-
     fun closeInfoBox() {
         _activeUtility.value = ActiveUtility.NONE
-        syncDeprecatedState()
     }
 
     // --- Prefs ---
