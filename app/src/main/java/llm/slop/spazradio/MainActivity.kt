@@ -74,14 +74,15 @@ fun RadioApp(
     val lissajousMode by radioViewModel.lissajousMode.collectAsState()
     val currentInfoDisplay by radioViewModel.currentInfoDisplay.collectAsState()
     val appMode by radioViewModel.appMode.collectAsState()
+    val activeUtility by radioViewModel.activeUtility.collectAsState()
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     AdaptiveLayout(
         isLandscape = isLandscape,
-        showOscilloscope = lissajousMode,
-        showInfoBox = currentInfoDisplay != InfoDisplay.NONE,
+        showOscilloscope = lissajousMode || activeUtility == ActiveUtility.VISUALS,
+        showInfoBox = activeUtility != ActiveUtility.NONE,
         header = {
             PlayerHeader(
                 title = headerTitle,
@@ -107,38 +108,45 @@ fun RadioApp(
             )
         },
         infoBox = { modifier ->
-            val title = when (currentInfoDisplay) {
-                InfoDisplay.SETTINGS -> "Settings"
-                InfoDisplay.SCHEDULE -> "Schedule"
-                InfoDisplay.ARCHIVES -> "Archives"
-                InfoDisplay.CHAT -> "Chat"
+            val title = when (activeUtility) {
+                ActiveUtility.SETTINGS -> "Settings"
+                ActiveUtility.INFO -> if (appMode == AppMode.RADIO) "Schedule" else "Archives"
+                ActiveUtility.CHAT -> "Chat"
+                ActiveUtility.VISUALS -> "Visualizer"
                 else -> ""
             }
-            InfoBox(
-                title = title,
-                onClose = { radioViewModel.closeInfoBox() },
-                modifier = modifier
-            ) {
-                when (currentInfoDisplay) {
-                    InfoDisplay.SETTINGS -> SettingsContent(radioViewModel)
-                    InfoDisplay.SCHEDULE -> ScheduleContent(scheduleViewModel)
-                    InfoDisplay.ARCHIVES -> {
-                        ArchiveContent(
-                            archiveViewModel = archiveViewModel,
-                            radioViewModel = radioViewModel
-                        )
+            if (activeUtility != ActiveUtility.NONE && activeUtility != ActiveUtility.VISUALS) {
+                InfoBox(
+                    title = title,
+                    onClose = { radioViewModel.closeInfoBox() },
+                    modifier = modifier
+                ) {
+                    when (activeUtility) {
+                        ActiveUtility.SETTINGS -> SettingsContent(radioViewModel)
+                        ActiveUtility.INFO -> {
+                            if (appMode == AppMode.RADIO) {
+                                ScheduleContent(scheduleViewModel)
+                            } else {
+                                ArchiveContent(
+                                    archiveViewModel = archiveViewModel,
+                                    radioViewModel = radioViewModel
+                                )
+                            }
+                        }
+                        ActiveUtility.CHAT -> ChatContent(chatViewModel)
+                        else -> {}
                     }
-                    InfoDisplay.CHAT -> ChatContent(chatViewModel)
-                    else -> {}
                 }
+            } else if (activeUtility == ActiveUtility.VISUALS) {
+                // Visuals is just the oscilloscope which is handled by AdaptiveLayout
+                // We might put controls here later, for now we just show the name in a small overlay or nothing
             }
         },
         footer = {
             FooterToolbar(
-                onRadioClick = { radioViewModel.showLiveStream() },
-                onChatClick = { radioViewModel.showChat() },
-                onArchivesClick = { radioViewModel.showArchives() },
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp)
+                appMode = appMode,
+                activeUtility = activeUtility,
+                onUtilityClick = { radioViewModel.setActiveUtility(it) }
             )
         }
     )
@@ -155,7 +163,10 @@ fun AdaptiveLayout(
     infoBox: @Composable (Modifier) -> Unit,
     footer: @Composable () -> Unit
 ) {
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        bottomBar = footer
+    ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -173,7 +184,6 @@ fun AdaptiveLayout(
                                 oscilloscope(Modifier.fillMaxSize().padding(16.dp))
                             }
                         }
-                        footer()
                     }
                     if (showInfoBox) {
                         infoBox(Modifier.weight(1f).fillMaxHeight().padding(16.dp))
@@ -204,7 +214,6 @@ fun AdaptiveLayout(
                             }
                         }
                     }
-                    footer()
                 }
             }
         }
