@@ -23,6 +23,8 @@ import llm.slop.spazradio.ChatViewModel
 import llm.slop.spazradio.R
 import llm.slop.spazradio.ui.theme.NeonGreen
 import llm.slop.spazradio.ui.theme.Magenta
+import java.text.DateFormat
+import java.util.*
 
 @Composable
 fun ChatContent(
@@ -89,17 +91,24 @@ fun ChatLayout(
 ) {
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    var isInitialLoad by remember { mutableStateOf(true) }
 
     // Automatic scrolling logic
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            val layoutInfo = listState.layoutInfo
-            val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val totalItemsCount = layoutInfo.totalItemsCount
-            
-            // Only scroll if we're near the bottom (within 2 items)
-            if (lastVisibleItemIndex >= totalItemsCount - 3) {
-                listState.animateScrollToItem(messages.size - 1)
+            if (isInitialLoad) {
+                // Instantly scroll to bottom on first load/history fetch
+                listState.scrollToItem(messages.size - 1)
+                isInitialLoad = false
+            } else {
+                val layoutInfo = listState.layoutInfo
+                val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                val totalItemsCount = layoutInfo.totalItemsCount
+                
+                // Only animate scroll if we're already near the bottom
+                if (lastVisibleItemIndex >= totalItemsCount - 3) {
+                    listState.animateScrollToItem(messages.size - 1)
+                }
             }
         }
     }
@@ -164,14 +173,42 @@ fun ChatLayout(
 
 @Composable
 fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
-    Column {
-        Text(
-            text = msg.user,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = Magenta
+    val dateTimeStr = remember(msg.timeReceived) {
+        if (msg.timeReceived > 0) {
+            val date = Date(msg.timeReceived * 1000L)
+            // Use localized DateFormat for both date and time (SHORT style)
+            val dateFormat = DateFormat.getDateTimeInstance(
+                DateFormat.SHORT, 
+                DateFormat.SHORT, 
+                Locale.getDefault()
             )
-        )
+            dateFormat.format(date)
+        } else {
+            ""
+        }
+    }
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Text(
+                text = msg.user,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Magenta
+                )
+            )
+            if (dateTimeStr.isNotEmpty()) {
+                Text(
+                    text = dateTimeStr,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.4f)
+                )
+            }
+        }
         AndroidView(
             factory = { context ->
                 TextView(context).apply {

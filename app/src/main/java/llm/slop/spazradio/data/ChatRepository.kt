@@ -33,18 +33,14 @@ class ChatRepository(
             try {
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        var body = response.body?.string() ?: ""
-                        
-                        // Handle potential JSONP wrapping (e.g., callback({...}))
-                        if (body.trim().startsWith("callback", ignoreCase = true) || 
-                            (!body.trim().startsWith("{") && body.contains("("))) {
-                            Log.d("ChatRepo", "Detected JSONP, stripping wrapper")
-                            body = body.substringAfter("(").substringBeforeLast(")")
-                        }
-
+                        val body = response.body?.string() ?: ""
                         val historyResponse = gson.fromJson(body, HistoryResponse::class.java)
-                        result = historyResponse.history
-                        Log.d("ChatRepo", "History loaded on attempt $i")
+                        
+                        result = historyResponse.history.map { msg ->
+                            msg.copy(timeReceived = msg.timeReceived / 1000L)
+                        }
+                        
+                        Log.d("ChatRepo", "History loaded and converted from ms on attempt $i")
                         break
                     } else {
                         Log.e("ChatRepo", "History fetch failed (attempt $i): ${response.code}")
@@ -79,8 +75,8 @@ class ChatRepository(
                 val payload = message?.payload?.let { String(it) } ?: return
                 if (topic == "spazradio") {
                     try {
-                        val chatMsg = gson.fromJson(payload, ChatMessage::class.java)
-                        _incomingMessages.tryEmit(chatMsg)
+                        val rawMsg = gson.fromJson(payload, ChatMessage::class.java)
+                        _incomingMessages.tryEmit(rawMsg.copy(timeReceived = rawMsg.timeReceived / 1000L))
                     } catch (e: Exception) {
                         Log.e("ChatRepo", "JSON parse error: $payload", e)
                     }
@@ -113,10 +109,10 @@ class ChatRepository(
                     Log.d("ChatRepo", "Connecting to MQTT (v3.1.1)...")
                     val options = MqttConnectOptions().apply {
                         isCleanSession = true
-                        isAutomaticReconnect = true // Socket-level auto-reconnect
+                        isAutomaticReconnect = true
                         connectionTimeout = 30
-                        keepAliveInterval = 30 // Matched to JS client
-                        mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1 // Standard 3.1.1
+                        keepAliveInterval = 30
+                        mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1
                         setWill("presence/$clientId", ByteArray(0), 2, true)
                     }
                     
@@ -125,8 +121,6 @@ class ChatRepository(
                     }
                     Log.d("ChatRepo", "MQTT Connected successfully")
                 }
-                
-                // Always ensure presence is published after a connect attempt/check
                 publishPresence(username)
             } catch (e: Exception) {
                 Log.e("ChatRepo", "MQTT Connect Failed", e)
@@ -148,7 +142,6 @@ class ChatRepository(
         val client = mqttClient ?: return
         if (client.isConnected) {
             try {
-                // Only publish if username matches or to ensure we are in the roster
                 client.publish("presence/$clientId", username.toByteArray(), 2, true)
                 Log.d("ChatRepo", "Published presence: $username")
             } catch (e: Exception) {
