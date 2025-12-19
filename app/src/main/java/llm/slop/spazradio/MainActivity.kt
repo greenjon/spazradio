@@ -80,8 +80,8 @@ fun RadioApp(
 
     AdaptiveLayout(
         isLandscape = isLandscape,
-        showOscilloscope = lissajousMode || activeUtility == ActiveUtility.VISUALS,
-        showInfoBox = activeUtility != ActiveUtility.NONE && activeUtility != ActiveUtility.VISUALS,
+        showOscilloscope = lissajousMode,
+        showInfoBox = activeUtility != ActiveUtility.NONE,
         header = {
             PlayerHeader(
                 title = headerTitle,
@@ -111,10 +111,9 @@ fun RadioApp(
                 ActiveUtility.SETTINGS -> "Settings"
                 ActiveUtility.INFO -> if (appMode == AppMode.RADIO) "Schedule" else "Archives"
                 ActiveUtility.CHAT -> "Chat"
-                ActiveUtility.VISUALS -> "Visualizer"
                 else -> ""
             }
-            if (activeUtility != ActiveUtility.NONE && activeUtility != ActiveUtility.VISUALS) {
+            if (activeUtility != ActiveUtility.NONE) {
                 InfoBox(
                     title = title,
                     onClose = { radioViewModel.closeInfoBox() },
@@ -142,7 +141,9 @@ fun RadioApp(
             FooterToolbar(
                 appMode = appMode,
                 activeUtility = activeUtility,
-                onUtilityClick = { radioViewModel.setActiveUtility(it) }
+                visualsEnabled = lissajousMode,
+                onUtilityClick = { radioViewModel.setActiveUtility(it) },
+                onToggleVisuals = { radioViewModel.setLissajousMode(!lissajousMode) }
             )
         }
     )
@@ -174,7 +175,7 @@ fun AdaptiveLayout(
                     Column(modifier = Modifier.weight(1f)) {
                         header()
                         trackTitle()
-                        // Ensure space is filled even if oscilloscope is hidden
+                        // Layer visuals and content in landscape
                         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                             if (showOscilloscope) {
                                 oscilloscope(Modifier.fillMaxSize().padding(16.dp))
@@ -189,25 +190,17 @@ fun AdaptiveLayout(
                 Column(modifier = Modifier.fillMaxSize()) {
                     header()
                     trackTitle()
-                    // Middle section
-                    Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    // Layer visuals and content in portrait
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        if (showOscilloscope) {
+                            oscilloscope(Modifier.fillMaxSize().padding(16.dp))
+                        }
                         if (showInfoBox) {
-                            if (showOscilloscope) {
-                                oscilloscope(Modifier.fillMaxWidth().height(300.dp).padding(16.dp))
-                            }
                             infoBox(
                                 Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
-                                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 0.dp)
+                                    .fillMaxSize()
+                                    .padding(16.dp)
                             )
-                        } else {
-                            // If no info box, let oscilloscope take all space if it exists
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                if (showOscilloscope) {
-                                    oscilloscope(Modifier.fillMaxSize().padding(16.dp))
-                                }
-                            }
                         }
                     }
                 }

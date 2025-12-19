@@ -5,5 +5,5 @@ enum class AppMode {
 }
 
 enum class ActiveUtility {
-    NONE, CHAT, INFO, VISUALS, SETTINGS
+    NONE, CHAT, INFO, SETTINGS
 }

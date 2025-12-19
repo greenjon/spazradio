@@ -3,8 +3,8 @@ package llm.slop.spazradio.ui.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.Icon
@@ -24,7 +24,9 @@ import llm.slop.spazradio.ui.theme.NeonGreen
 fun FooterToolbar(
     appMode: AppMode,
     activeUtility: ActiveUtility,
+    visualsEnabled: Boolean,
     onUtilityClick: (ActiveUtility) -> Unit,
+    onToggleVisuals: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     NavigationBar(
@@ -44,7 +46,7 @@ fun FooterToolbar(
 
         // Info (Dynamic: Schedule or Archive List)
         val infoLabel = if (appMode == AppMode.RADIO) "Schedule" else "List"
-        val infoIcon = if (appMode == AppMode.RADIO) Icons.Default.EventNote else Icons.AutoMirrored.Filled.List
+        val infoIcon = if (appMode == AppMode.RADIO) Icons.AutoMirrored.Filled.EventNote else Icons.AutoMirrored.Filled.List
         
         NavigationBarItem(
             selected = activeUtility == ActiveUtility.INFO,
@@ -54,7 +56,7 @@ fun FooterToolbar(
             colors = navigationBarItemColors()
         )
 
-        // Settings (Swapped with Visuals)
+        // Settings
         NavigationBarItem(
             selected = activeUtility == ActiveUtility.SETTINGS,
             onClick = { onUtilityClick(ActiveUtility.SETTINGS) },
@@ -63,10 +65,10 @@ fun FooterToolbar(
             colors = navigationBarItemColors()
         )
 
-        // Visuals (Swapped with Settings)
+        // Visuals (Independent sticky button)
         NavigationBarItem(
-            selected = activeUtility == ActiveUtility.VISUALS,
-            onClick = { onUtilityClick(ActiveUtility.VISUALS) },
+            selected = visualsEnabled,
+            onClick = onToggleVisuals,
             icon = { Icon(Icons.Default.Waves, contentDescription = "Visuals") },
             label = { Text("Visuals") },
             colors = navigationBarItemColors()
