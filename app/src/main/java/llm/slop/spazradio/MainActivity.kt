@@ -73,6 +73,7 @@ fun RadioApp(
     val playbackDuration by radioViewModel.playbackDuration.collectAsState()
     val lissajousMode by radioViewModel.lissajousMode.collectAsState()
     val currentInfoDisplay by radioViewModel.currentInfoDisplay.collectAsState()
+    val appMode by radioViewModel.appMode.collectAsState()
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -88,9 +89,10 @@ fun RadioApp(
                 isArchivePlaying = isArchivePlaying,
                 playbackPosition = playbackPosition,
                 playbackDuration = playbackDuration,
+                appMode = appMode,
                 onPlayPause = { radioViewModel.togglePlayPause() },
-                onToggleSettings = { radioViewModel.toggleSettings() },
-                onSeek = { radioViewModel.seekTo(it) }
+                onSeek = { radioViewModel.seekTo(it) },
+                onModeChange = { radioViewModel.setAppMode(it) }
             )
         },
         trackTitle = { TrackTitle(trackSubtitle) },
