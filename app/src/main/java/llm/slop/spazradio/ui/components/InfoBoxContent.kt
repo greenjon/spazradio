@@ -37,7 +37,6 @@ fun SettingsContent(
     radioViewModel: RadioViewModel
 ) {
     val lissajousMode by radioViewModel.lissajousMode.collectAsState()
-    val showSchedule by radioViewModel.showSchedulePref.collectAsState()
 
     Column(
         modifier = Modifier
@@ -50,7 +49,7 @@ fun SettingsContent(
         verticalArrangement = Arrangement.Top
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Lissajous Mode Control
+            // Visuals toggle in settings (also available in Visuals utility)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -73,33 +72,52 @@ fun SettingsContent(
                     )
                 )
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Show Schedule Control
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = stringResource(R.string.show_schedule),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = NeonGreen
-                )
-                Checkbox(
-                    checked = showSchedule,
-                    onCheckedChange = { radioViewModel.setShowSchedule(it) },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = NeonGreen,
-                        uncheckedColor = NeonGreen,
-                        checkmarkColor = DeepBlue
-                    )
-                )
-            }
+            
+            Text(
+                text = "Other settings will appear here.",
+                style = MaterialTheme.typography.bodySmall,
+                color = NeonGreen.copy(alpha = 0.5f)
+            )
         }
+    }
+}
+
+@Composable
+fun VisualsContent(
+    radioViewModel: RadioViewModel
+) {
+    val lissajousMode by radioViewModel.lissajousMode.collectAsState()
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Waveform Visualizer",
+                style = MaterialTheme.typography.bodyLarge,
+                color = NeonGreen
+            )
+            Checkbox(
+                checked = lissajousMode,
+                onCheckedChange = { radioViewModel.setLissajousMode(it) },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = NeonGreen,
+                    uncheckedColor = NeonGreen,
+                    checkmarkColor = DeepBlue
+                )
+            )
+        }
+        
+        Text(
+            text = "The audio-responsive waveform is displayed in the main player area.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = NeonGreen.copy(alpha = 0.7f)
+        )
     }
 }
 
