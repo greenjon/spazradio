@@ -32,7 +32,8 @@ fun FooterToolbar(
 ) {
     NavigationBar(
         modifier = modifier.fillMaxWidth(),
-        containerColor = Color.Black.copy(alpha = 0.5f),
+        // Changed base color to #00007F with 75% opacity (BF in hex)
+        containerColor = Color(0xBF00007F), 
         contentColor = NeonGreen,
         tonalElevation = 0.dp,
         // Disable automatic window insets because we handle them in the parent Scaffold/Box

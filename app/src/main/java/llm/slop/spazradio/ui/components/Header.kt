@@ -50,7 +50,8 @@ fun PlayerHeader(
     Column(modifier = Modifier.fillMaxWidth()) {
         TabRow(
             selectedTabIndex = if (appMode == AppMode.RADIO) 0 else 1,
-            containerColor = Color.Black.copy(alpha = 0.5f), // Matching bottom toolbar
+            // Changed base color to #00007F with 75% opacity (BF in hex)
+            containerColor = Color(0xBF00007F), 
             contentColor = NeonGreen,
             indicator = { tabPositions ->
                 TabRowDefaults.PrimaryIndicator(
