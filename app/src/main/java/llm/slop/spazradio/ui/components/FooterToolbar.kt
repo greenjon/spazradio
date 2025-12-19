@@ -54,21 +54,21 @@ fun FooterToolbar(
             colors = navigationBarItemColors()
         )
 
-        // Visuals
-        NavigationBarItem(
-            selected = activeUtility == ActiveUtility.VISUALS,
-            onClick = { onUtilityClick(ActiveUtility.VISUALS) },
-            icon = { Icon(Icons.Default.Waves, contentDescription = "Visuals") },
-            label = { Text("Visuals") },
-            colors = navigationBarItemColors()
-        )
-
-        // Settings
+        // Settings (Swapped with Visuals)
         NavigationBarItem(
             selected = activeUtility == ActiveUtility.SETTINGS,
             onClick = { onUtilityClick(ActiveUtility.SETTINGS) },
             icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
             label = { Text("Settings") },
+            colors = navigationBarItemColors()
+        )
+
+        // Visuals (Swapped with Settings)
+        NavigationBarItem(
+            selected = activeUtility == ActiveUtility.VISUALS,
+            onClick = { onUtilityClick(ActiveUtility.VISUALS) },
+            icon = { Icon(Icons.Default.Waves, contentDescription = "Visuals") },
+            label = { Text("Visuals") },
             colors = navigationBarItemColors()
         )
     }

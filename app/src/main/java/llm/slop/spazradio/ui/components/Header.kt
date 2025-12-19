@@ -1,5 +1,6 @@
 package llm.slop.spazradio.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,7 +49,7 @@ fun PlayerHeader(
     Column(modifier = Modifier.fillMaxWidth()) {
         TabRow(
             selectedTabIndex = if (appMode == AppMode.RADIO) 0 else 1,
-            containerColor = Color.Transparent,
+            containerColor = Color.Black.copy(alpha = 0.5f), // Matching bottom toolbar
             contentColor = NeonGreen,
             indicator = { tabPositions ->
                 TabRowDefaults.PrimaryIndicator(

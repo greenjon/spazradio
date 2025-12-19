@@ -23,9 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import llm.slop.spazradio.R
 import llm.slop.spazradio.RadioViewModel
 import llm.slop.spazradio.ScheduleItem
 import llm.slop.spazradio.ScheduleViewModel
@@ -36,8 +34,6 @@ import llm.slop.spazradio.ui.theme.NeonGreen
 fun SettingsContent(
     radioViewModel: RadioViewModel
 ) {
-    val lissajousMode by radioViewModel.lissajousMode.collectAsState()
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -49,30 +45,12 @@ fun SettingsContent(
         verticalArrangement = Arrangement.Top
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Visuals toggle in settings (also available in Visuals utility)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = stringResource(R.string.show_visuals),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = NeonGreen
-                )
-                Checkbox(
-                    checked = lissajousMode,
-                    onCheckedChange = { radioViewModel.setLissajousMode(it) },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = NeonGreen,
-                        uncheckedColor = NeonGreen,
-                        checkmarkColor = DeepBlue
-                    )
-                )
-            }
-            
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.titleMedium,
+                color = NeonGreen
+            )
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Other settings will appear here.",
                 style = MaterialTheme.typography.bodySmall,
