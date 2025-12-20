@@ -42,8 +42,8 @@
     
     <string name="theme_settings">Thème</string>
     <string name="theme_neon">Néon</string>
-    <string name="theme_light">Solarized Clair</string>
-    <string name="theme_dark">Solarized Sombre</string>
+    <string name="theme_light">Lunarized Clair</string>
+    <string name="theme_dark">Lunarized Sombre</string>
     <string name="theme_auto">Auto Système</string>
 
     <string name="label_archives_count">%d émissions</string>

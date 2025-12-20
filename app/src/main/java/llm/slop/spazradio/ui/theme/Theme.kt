@@ -8,32 +8,34 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import llm.slop.spazradio.AppTheme
 
-private val SolarizedDarkColorScheme = darkColorScheme(
-    primary = SolarizedGreen,
-    secondary = SolarizedBlue,
-    tertiary = SolarizedMagenta,
-    background = SolarizedBase03,
-    surface = SolarizedBase02,
-    onPrimary = SolarizedBase3,
-    onSecondary = SolarizedBase3,
-    onTertiary = SolarizedBase3,
-    onBackground = SolarizedBase0,
-    onSurface = SolarizedYellow,
-    error = SolarizedRed
+private val LunarizedDarkColorScheme = darkColorScheme(
+    primary = LunarizedGreen,
+    secondary = LunarizedBlue,
+    tertiary = LunarizedMagenta,
+    background = LunarizedBase03,
+    surface = LunarizedBase02,
+    onPrimary = LunarizedBase3, // Selected icon
+    onSecondary = LunarizedBase3, // Unselected icon (Base 3 on/off for dark)
+    onTertiary = LunarizedBase3,
+    onBackground = LunarizedBase0,
+    onSurface = LunarizedBase1, // Base color for text
+    onSurfaceVariant = LunarizedBase0,
+    error = LunarizedRed
 )
 
-private val SolarizedLightColorScheme = lightColorScheme(
-    primary = SolarizedGreen,
-    secondary = SolarizedBlue,
-    tertiary = SolarizedMagenta,
-    background = SolarizedBase3,
-    surface = SolarizedBase2,
-    onPrimary = SolarizedBase03,
-    onSecondary = SolarizedBase03,
-    onTertiary = SolarizedBase03,
-    onBackground = SolarizedBase00,
-    onSurface = SolarizedYellow,
-    error = SolarizedRed
+private val LunarizedLightColorScheme = lightColorScheme(
+    primary = LunarizedGreen,
+    secondary = LunarizedBlue,
+    tertiary = LunarizedMagenta,
+    background = LunarizedBase3,
+    surface = LunarizedBase2,
+    onPrimary = LunarizedBase3, // Selected icon (Base 3 when on)
+    onSecondary = LunarizedBase03, // Unselected icon (Base 03 when off)
+    onTertiary = LunarizedBase03,
+    onBackground = LunarizedBase00,
+    onSurface = LunarizedBase01, // Base color for text
+    onSurfaceVariant = LunarizedBase00,
+    error = LunarizedRed
 )
 
 private val NeonColorScheme = darkColorScheme(
@@ -43,7 +45,7 @@ private val NeonColorScheme = darkColorScheme(
     background = Color.Black,
     surface = DeepBlue,
     onPrimary = Color.Black,
-    onSecondary = Color.Black,
+    onSecondary = NeonGreen, // Match old logic where unselected was green
     onTertiary = Color.Black,
     onBackground = NeonGreen,
     onSurface = NeonYellow
@@ -58,9 +60,9 @@ fun SpazRadioTheme(
     
     val colorScheme = when (appTheme) {
         AppTheme.NEON -> NeonColorScheme
-        AppTheme.LIGHT -> SolarizedLightColorScheme
-        AppTheme.DARK -> SolarizedDarkColorScheme
-        AppTheme.AUTO -> if (darkTheme) SolarizedDarkColorScheme else SolarizedLightColorScheme
+        AppTheme.LIGHT -> LunarizedLightColorScheme
+        AppTheme.DARK -> LunarizedDarkColorScheme
+        AppTheme.AUTO -> if (darkTheme) LunarizedDarkColorScheme else LunarizedLightColorScheme
     }
 
     MaterialTheme(

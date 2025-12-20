@@ -16,7 +16,6 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import llm.slop.spazradio.ActiveUtility
 import llm.slop.spazradio.AppMode
@@ -77,8 +76,8 @@ fun FooterToolbar(
 @Composable
 private fun navigationBarItemColors() = NavigationBarItemDefaults.colors(
     selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-    selectedTextColor = MaterialTheme.colorScheme.primary,
-    indicatorColor = MaterialTheme.colorScheme.primary,
-    unselectedIconColor = MaterialTheme.colorScheme.primary,
-    unselectedTextColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+    unselectedIconColor = MaterialTheme.colorScheme.onSecondary,
+    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+    unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+    indicatorColor = MaterialTheme.colorScheme.primary
 )

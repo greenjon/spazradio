@@ -53,7 +53,7 @@ fun PlayerHeader(
         TabRow(
             selectedTabIndex = if (appMode == AppMode.RADIO) 0 else 1,
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
-            contentColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             indicator = { tabPositions ->
                 TabRowDefaults.PrimaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[if (appMode == AppMode.RADIO) 0 else 1]),
@@ -70,7 +70,8 @@ fun PlayerHeader(
                         Text(
                             stringResource(R.string.label_radio).uppercase(), 
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         if (listenerCount.isNotBlank()) {
                             Text(
@@ -98,7 +99,8 @@ fun PlayerHeader(
                         Text(
                             stringResource(R.string.label_archives).uppercase(), 
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         if (archiveCount > 0) {
                             Text(
