@@ -64,12 +64,24 @@ fun PlayerHeader(
             Tab(
                 selected = appMode == AppMode.RADIO,
                 onClick = { onModeChange(AppMode.RADIO) },
-                text = { Text("RADIO", style = MaterialTheme.typography.labelLarge) }
+                text = { 
+                    Text(
+                        "SPAZ.RADIO", 
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    ) 
+                }
             )
             Tab(
                 selected = appMode == AppMode.ARCHIVES,
                 onClick = { onModeChange(AppMode.ARCHIVES) },
-                text = { Text("ARCHIVES", style = MaterialTheme.typography.labelLarge) }
+                text = { 
+                    Text(
+                        "ARCHIVES", 
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    ) 
+                }
             )
         }
 

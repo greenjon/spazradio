@@ -6,7 +6,7 @@
     <string name="show_schedule">Show Schedule</string>
     <string name="show_visuals">Show Visuals</string>
     
-    <string name="status_connecting">Connecting</string>
+    <string name="status_connecting">Connecting…</string>
     <string name="status_reconnecting">Reconnecting</string>
     <string name="status_buffering">Buffering</string>
     <string name="label_archive">Archive</string>
@@ -22,7 +22,7 @@
     <string name="label_retry">Retry</string>
     <string name="label_download">Download</string>
     <string name="label_downloaded">Downloaded</string>
-    <string name="error_archives">No archives found or network error.</string>
+    <string name="error_archives">Connecting…</string>
 
     <string name="label_chat">Chat</string>
     <string name="chat_hint">Type a message…</string>

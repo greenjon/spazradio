@@ -29,7 +29,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val liveStreamId = "spaz_radio_stream"
 
     // --- Playback State ---
-    private val _playbackUiState = MutableStateFlow<PlaybackUiState>(PlaybackUiState.Connecting)
+    private val _playbackUiState = MutableStateFlow<PlaybackUiState>(PlaybackUiState.Idle)
     val playbackUiState: StateFlow<PlaybackUiState> = _playbackUiState.asStateFlow()
 
     private val _trackTitle = MutableStateFlow("SPAZ.Radio")
@@ -136,7 +136,10 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _playbackUiState.value = when (state) {
-            Player.STATE_IDLE -> PlaybackUiState.Connecting
+            Player.STATE_IDLE -> {
+                if (_appMode.value == AppMode.ARCHIVES && !_isArchivePlaying.value) PlaybackUiState.Idle
+                else PlaybackUiState.Connecting
+            }
             Player.STATE_BUFFERING -> PlaybackUiState.Buffering
             Player.STATE_READY -> {
                 if (isPlaying) PlaybackUiState.Playing(_trackTitle.value, _trackListeners.value)
@@ -151,17 +154,28 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateDisplayStrings() {
         val listeners = _trackListeners.value
         val controller = mediaController
-        val isLive = controller?.currentMediaItem?.mediaId == liveStreamId
+        val currentMediaId = controller?.currentMediaItem?.mediaId
+        val isLive = currentMediaId == liveStreamId
+        val isArchive = currentMediaId?.startsWith("archive_") == true
 
-        _headerTitle.value = if (isLive && listeners.isNotBlank()) {
-            "SPAZ.Radio   -   $listeners"
-        } else if (isLive) {
-            "SPAZ.Radio"
-        } else {
-            context.getString(R.string.label_archives)
+        _headerTitle.value = when {
+            _appMode.value == AppMode.ARCHIVES -> {
+                "SPAZ.Radio   -   ${context.getString(R.string.label_archives)}"
+            }
+            isLive && listeners.isNotBlank() -> {
+                "SPAZ.Radio   -   $listeners"
+            }
+            isLive -> {
+                "SPAZ.Radio"
+            }
+            isArchive -> {
+                "SPAZ.Radio   -   ${context.getString(R.string.label_archives)}"
+            }
+            else -> "SPAZ.Radio"
         }
 
         _trackSubtitle.value = when (val state = _playbackUiState.value) {
+            PlaybackUiState.Idle -> ""
             PlaybackUiState.Connecting -> context.getString(R.string.status_connecting)
             PlaybackUiState.Buffering -> context.getString(R.string.status_buffering)
             PlaybackUiState.Reconnecting -> context.getString(R.string.status_reconnecting)
@@ -218,7 +232,13 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             controller.setMediaItem(mediaItem)
             controller.prepare()
             controller.play()
+        } else if (!controller.isPlaying) {
+            controller.play()
         }
+    }
+
+    fun stopPlayback() {
+        mediaController?.stop()
     }
 
     fun seekTo(position: Long) {
@@ -230,20 +250,22 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setAppMode(mode: AppMode) {
         if (_appMode.value == mode) {
-            // Even if already in this mode, if info box is closed, we might want to force it open?
-            // But usually this is called from the Top TabRow which switches the mode.
             _activeUtility.value = ActiveUtility.INFO
             return
         }
-        _appMode.value = mode
         
-        // Force Schedule/List to be active when switching modes
+        _appMode.value = mode
         _activeUtility.value = ActiveUtility.INFO
         
         // Logical side effects
         if (mode == AppMode.RADIO) {
             showLiveStream()
+        } else if (mode == AppMode.ARCHIVES) {
+            // Halt radio stream when switching to browse archives
+            stopPlayback()
         }
+        
+        updateDisplayStrings()
     }
 
     fun setActiveUtility(utility: ActiveUtility) {

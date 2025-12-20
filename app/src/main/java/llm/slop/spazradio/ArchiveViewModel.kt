@@ -37,7 +37,10 @@ sealed class ArchiveUiState {
 
 class ArchiveViewModel(application: Application, private val repository: ArchiveRepository) : AndroidViewModel(application) {
 
-    constructor(application: Application) : this(application, ArchiveRepository(OkHttpClient()))
+    constructor(application: Application) : this(
+        application, 
+        ArchiveRepository(application.applicationContext, OkHttpClient())
+    )
 
     private val _uiState = MutableStateFlow<ArchiveUiState>(ArchiveUiState.Loading)
     val uiState: StateFlow<ArchiveUiState> = _uiState.asStateFlow()
@@ -51,29 +54,59 @@ class ArchiveViewModel(application: Application, private val repository: Archive
             refreshDownloadStatus()
             return
         }
+        
+        // Try loading from cache first
+        val cachedShows = repository.getCachedArchives()
+        if (cachedShows.isNotEmpty()) {
+            viewModelScope.launch {
+                val downloaded = getDownloadedUrls(cachedShows)
+                _uiState.value = ArchiveUiState.Success(
+                    shows = cachedShows,
+                    filteredShows = cachedShows,
+                    downloadedUrls = downloaded,
+                    downloadingUrls = emptySet(),
+                    searchQuery = ""
+                )
+            }
+        }
+        
         fetchArchives()
     }
 
     fun fetchArchives() {
         viewModelScope.launch {
-            _uiState.value = ArchiveUiState.Loading
+            // Only show Loading if we don't already have Success state (from cache)
+            if (_uiState.value !is ArchiveUiState.Success) {
+                _uiState.value = ArchiveUiState.Loading
+            }
+            
             try {
                 val shows = repository.fetchArchiveFeed()
                 if (shows.isNotEmpty()) {
                     val downloaded = getDownloadedUrls(shows)
+                    
+                    // Maintain search query if user is already searching
+                    val currentQuery = (_uiState.value as? ArchiveUiState.Success)?.searchQuery ?: ""
+                    val filtered = if (currentQuery.isBlank()) shows else shows.filter { 
+                        it.title.contains(currentQuery, ignoreCase = true) || 
+                        it.date.contains(currentQuery, ignoreCase = true) 
+                    }
+
                     _uiState.value = ArchiveUiState.Success(
                         shows = shows,
-                        filteredShows = shows,
+                        filteredShows = filtered,
                         downloadedUrls = downloaded,
                         downloadingUrls = emptySet(),
-                        searchQuery = ""
+                        searchQuery = currentQuery
                     )
                     hasFetched = true
-                } else {
+                } else if (_uiState.value !is ArchiveUiState.Success) {
                     _uiState.value = ArchiveUiState.Error("No archives found or network error.")
                 }
             } catch (e: Exception) {
-                _uiState.value = ArchiveUiState.Error(e.message ?: "Unknown error")
+                if (_uiState.value !is ArchiveUiState.Success) {
+                    _uiState.value = ArchiveUiState.Error(e.message ?: "Unknown error")
+                }
             }
         }
     }
@@ -81,12 +114,10 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     fun updateSearchQuery(query: String) {
         val currentState = _uiState.value
         if (currentState is ArchiveUiState.Success) {
-            // Update searchQuery immediately to avoid cursor jump in TextField
             _uiState.value = currentState.copy(searchQuery = query)
             
             searchJob?.cancel()
             searchJob = viewModelScope.launch(Dispatchers.Default) {
-                // Use a small delay to debounce search and prevent UI flicker
                 delay(100)
                 
                 val filtered = if (query.isBlank()) {
@@ -135,7 +166,6 @@ class ArchiveViewModel(application: Application, private val repository: Archive
         
         shows.forEach { show ->
             val fileName = getFileName(show)
-            // It's downloaded if file exists AND we're NOT actively downloading it right now
             if (filesOnDisk.contains(fileName) && !activeDownloadIds.containsKey(show.url)) {
                 downloaded.add(show.url)
             }

@@ -82,7 +82,7 @@ fun ErrorContent(message: String, onRetry: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(message, color = MaterialTheme.colorScheme.error)
+        Text(message, color = Color(0xFFFFFF00))
         Spacer(Modifier.height(8.dp))
         Button(onClick = onRetry) {
             Text("Retry")

@@ -1,9 +1,10 @@
 package llm.slop.spazradio
 
 sealed interface PlaybackUiState {
-    object Connecting : PlaybackUiState
-    object Buffering : PlaybackUiState
-    object Reconnecting : PlaybackUiState
+    data object Idle : PlaybackUiState
+    data object Connecting : PlaybackUiState
+    data object Buffering : PlaybackUiState
+    data object Reconnecting : PlaybackUiState
     data class Playing(val title: String, val listeners: String) : PlaybackUiState
     data class Paused(val title: String, val listeners: String) : PlaybackUiState
 }

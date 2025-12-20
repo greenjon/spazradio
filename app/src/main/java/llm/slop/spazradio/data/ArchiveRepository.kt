@@ -1,18 +1,50 @@
 package llm.slop.spazradio.data
 
+import android.content.Context
 import android.util.Xml
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.xmlpull.v1.XmlPullParser
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class ArchiveRepository(private val client: OkHttpClient) {
-
+class ArchiveRepository(
+    private val context: Context,
+    private val client: OkHttpClient,
+    private val gson: Gson = Gson()
+) {
+    private val cacheFile = File(context.cacheDir, "archives_cache.json")
     private val inputDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US)
     private val outputDateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+
+    fun getCachedArchives(): List<ArchiveShow> {
+        return try {
+            if (cacheFile.exists()) {
+                val json = cacheFile.readText()
+                val type = object : TypeToken<List<ArchiveShow>>() {}.type
+                gson.fromJson(json, type) ?: emptyList()
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    private fun saveArchivesToCache(shows: List<ArchiveShow>) {
+        try {
+            val json = gson.toJson(shows)
+            cacheFile.writeText(json)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     suspend fun fetchArchiveFeed(): List<ArchiveShow> = withContext(Dispatchers.IO) {
         val shows = mutableListOf<ArchiveShow>()
@@ -77,6 +109,10 @@ class ArchiveRepository(private val client: OkHttpClient) {
                     }
                     eventType = parser.next()
                 }
+            }
+            
+            if (shows.isNotEmpty()) {
+                saveArchivesToCache(shows)
             }
         } catch (e: Exception) {
             e.printStackTrace()
