@@ -26,29 +26,29 @@ private val LightColorScheme = lightColorScheme(
 
 private val SolarizedDarkColorScheme = darkColorScheme(
     primary = SolarizedBlue,
-    secondary = SolarizedCyan,
-    tertiary = SolarizedViolet,
+    secondary = SolarizedGreen,
+    tertiary = SolarizedMagenta,
     background = SolarizedBase03,
     surface = SolarizedBase02,
     onPrimary = SolarizedBase3,
     onSecondary = SolarizedBase3,
     onTertiary = SolarizedBase3,
     onBackground = SolarizedBase0,
-    onSurface = SolarizedBase1,
+    onSurface = SolarizedYellow, // Matches Neon Yellow logic
     error = SolarizedRed
 )
 
 private val SolarizedLightColorScheme = lightColorScheme(
     primary = SolarizedBlue,
-    secondary = SolarizedCyan,
-    tertiary = SolarizedViolet,
+    secondary = SolarizedGreen,
+    tertiary = SolarizedMagenta,
     background = SolarizedBase3,
     surface = SolarizedBase2,
     onPrimary = SolarizedBase03,
     onSecondary = SolarizedBase03,
     onTertiary = SolarizedBase03,
     onBackground = SolarizedBase00,
-    onSurface = SolarizedBase01,
+    onSurface = SolarizedYellow, // Matches Neon Yellow logic
     error = SolarizedRed
 )
 
