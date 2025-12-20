@@ -45,6 +45,9 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     private val _uiState = MutableStateFlow<ArchiveUiState>(ArchiveUiState.Loading)
     val uiState: StateFlow<ArchiveUiState> = _uiState.asStateFlow()
 
+    private val _cachedArchiveCount = MutableStateFlow(repository.getCachedArchives().size)
+    val cachedArchiveCount: StateFlow<Int> = _cachedArchiveCount.asStateFlow()
+
     private var hasFetched = false
     private val activeDownloadIds = mutableMapOf<String, Long>()
     private var searchJob: Job? = null
@@ -57,6 +60,7 @@ class ArchiveViewModel(application: Application, private val repository: Archive
         
         // Try loading from cache first
         val cachedShows = repository.getCachedArchives()
+        _cachedArchiveCount.value = cachedShows.size
         if (cachedShows.isNotEmpty()) {
             viewModelScope.launch {
                 val downloaded = getDownloadedUrls(cachedShows)
@@ -83,6 +87,7 @@ class ArchiveViewModel(application: Application, private val repository: Archive
             try {
                 val shows = repository.fetchArchiveFeed()
                 if (shows.isNotEmpty()) {
+                    _cachedArchiveCount.value = shows.size
                     val downloaded = getDownloadedUrls(shows)
                     
                     // Maintain search query if user is already searching

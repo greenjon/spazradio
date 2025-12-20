@@ -29,7 +29,8 @@ fun InfoBox(
 ) {
     Box(
         modifier = modifier
-            .background(Color(0x80000000), RoundedCornerShape(16.dp))
+            // Deep blue base color (#00007F) with 50% transparency (0x80)
+            .background(Color(0x8000007F), RoundedCornerShape(16.dp))
             .border(3.dp, NeonGreen, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
     ) {

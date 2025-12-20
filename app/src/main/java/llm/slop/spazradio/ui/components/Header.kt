@@ -28,6 +28,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import llm.slop.spazradio.AppMode
@@ -37,7 +38,9 @@ import java.util.Locale
 
 @Composable
 fun PlayerHeader(
-    title: String,
+    trackStatus: String,
+    listenerCount: String,
+    archiveCount: Int,
     isPlaying: Boolean,
     isArchivePlaying: Boolean,
     playbackPosition: Long,
@@ -50,7 +53,6 @@ fun PlayerHeader(
     Column(modifier = Modifier.fillMaxWidth()) {
         TabRow(
             selectedTabIndex = if (appMode == AppMode.RADIO) 0 else 1,
-            // Changed base color to #00007F with 75% opacity (BF in hex)
             containerColor = Color(0xBF00007F), 
             contentColor = NeonGreen,
             indicator = { tabPositions ->
@@ -65,22 +67,56 @@ fun PlayerHeader(
                 selected = appMode == AppMode.RADIO,
                 onClick = { onModeChange(AppMode.RADIO) },
                 text = { 
-                    Text(
-                        "SPAZ.RADIO", 
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    ) 
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "SPAZ.RADIO", 
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (listenerCount.isNotBlank()) {
+                            Text(
+                                text = listenerCount,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    shadow = Shadow(
+                                        color = Color.Black,
+                                        offset = Offset(1f, 1f),
+                                        blurRadius = 2f
+                                    )
+                                ),
+                                color = Color(0xFFFFFF00),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
             )
             Tab(
                 selected = appMode == AppMode.ARCHIVES,
                 onClick = { onModeChange(AppMode.ARCHIVES) },
                 text = { 
-                    Text(
-                        "ARCHIVES", 
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    ) 
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "ARCHIVES", 
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (archiveCount > 0) {
+                            Text(
+                                text = "$archiveCount shows",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    shadow = Shadow(
+                                        color = Color.Black,
+                                        offset = Offset(1f, 1f),
+                                        blurRadius = 2f
+                                    )
+                                ),
+                                color = Color(0xFFFFFF00),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
             )
         }
@@ -100,20 +136,34 @@ fun PlayerHeader(
                     modifier = Modifier.size(48.dp)
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    shadow = Shadow(
-                        color = Color.Black,
-                        offset = Offset(2f, 2f),
-                        blurRadius = 4f
+            
+            // Central area now shows the dynamic track status (song name or connection msg)
+            // beside the play/pause button
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (trackStatus.isNotBlank()) {
+                    Text(
+                        text = trackStatus,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            shadow = Shadow(
+                                color = Color.Black,
+                                offset = Offset(2f, 2f),
+                                blurRadius = 4f
+                            )
+                        ),
+                        color = Color(0xFFFFFF00),
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
                     )
-                ),
-                color = Color(0xFFFFFF00),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f)
-            )
-            // Spacer to keep title centered since gear icon is gone
+                }
+            }
+            
+            // Spacer to keep track status centered
             Box(modifier = Modifier.size(48.dp))
         }
 
@@ -183,6 +233,7 @@ private fun formatTime(ms: Long): String {
 
 @Composable
 fun TrackTitle(title: String) {
+    // This is now redundant but kept for reference or until removed from calls
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -200,7 +251,7 @@ fun TrackTitle(title: String) {
             ),
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            color = NeonGreen
+            color = Color(0xFFFFFF00)
         )
     }
 }

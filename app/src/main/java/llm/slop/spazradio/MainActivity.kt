@@ -27,7 +27,6 @@ import llm.slop.spazradio.ui.components.Oscilloscope
 import llm.slop.spazradio.ui.components.PlayerHeader
 import llm.slop.spazradio.ui.components.ScheduleContent
 import llm.slop.spazradio.ui.components.SettingsContent
-import llm.slop.spazradio.ui.components.TrackTitle
 import llm.slop.spazradio.ui.theme.DeepBlue
 import llm.slop.spazradio.ui.theme.Magenta
 import llm.slop.spazradio.ui.theme.SpazRadioTheme
@@ -60,7 +59,6 @@ fun RadioApp(
     archiveViewModel: ArchiveViewModel = viewModel(),
     chatViewModel: ChatViewModel = viewModel()
 ) {
-    val headerTitle by radioViewModel.headerTitle.collectAsState()
     val trackSubtitle by radioViewModel.trackSubtitle.collectAsState()
     val isPlaying by radioViewModel.isPlaying.collectAsState()
     val isArchivePlaying by radioViewModel.isArchivePlaying.collectAsState()
@@ -69,13 +67,17 @@ fun RadioApp(
     val lissajousMode by radioViewModel.lissajousMode.collectAsState()
     val appMode by radioViewModel.appMode.collectAsState()
     val activeUtility by radioViewModel.activeUtility.collectAsState()
+    val listenerCount by radioViewModel.trackListeners.collectAsState()
+    val archiveCount by archiveViewModel.cachedArchiveCount.collectAsState()
 
     MainLayout(
         showOscilloscope = lissajousMode,
         showInfoBox = activeUtility != ActiveUtility.NONE,
         header = {
             PlayerHeader(
-                title = headerTitle,
+                trackStatus = trackSubtitle,
+                listenerCount = listenerCount,
+                archiveCount = archiveCount,
                 isPlaying = isPlaying,
                 isArchivePlaying = isArchivePlaying,
                 playbackPosition = playbackPosition,
@@ -86,7 +88,6 @@ fun RadioApp(
                 onModeChange = { radioViewModel.setAppMode(it) }
             )
         },
-        trackTitle = { TrackTitle(trackSubtitle) },
         oscilloscope = { modifier ->
             // Collect waveform ONLY here to avoid recomposing the whole RadioApp
             val waveform by RadioService.waveformFlow.collectAsState()
@@ -145,7 +146,6 @@ fun MainLayout(
     showOscilloscope: Boolean,
     showInfoBox: Boolean,
     header: @Composable () -> Unit,
-    trackTitle: @Composable () -> Unit,
     oscilloscope: @Composable (Modifier) -> Unit,
     infoBox: @Composable (Modifier) -> Unit,
     footer: @Composable () -> Unit
@@ -172,7 +172,6 @@ fun MainLayout(
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     header()
-                    trackTitle()
                     // Middle section: HUD style overlay area
                     Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         if (showInfoBox) {

@@ -34,9 +34,13 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _trackTitle = MutableStateFlow("SPAZ.Radio")
     private val _trackListeners = MutableStateFlow("")
+    val trackListeners: StateFlow<String> = _trackListeners.asStateFlow()
 
     private val _headerTitle = MutableStateFlow("SPAZ.Radio")
     val headerTitle: StateFlow<String> = _headerTitle.asStateFlow()
+
+    private val _headerSubtitle = MutableStateFlow("")
+    val headerSubtitle: StateFlow<String> = _headerSubtitle.asStateFlow()
 
     private val _trackSubtitle = MutableStateFlow("")
     val trackSubtitle: StateFlow<String> = _trackSubtitle.asStateFlow()
@@ -158,20 +162,22 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         val isLive = currentMediaId == liveStreamId
         val isArchive = currentMediaId?.startsWith("archive_") == true
 
-        _headerTitle.value = when {
+        _headerTitle.value = "SPAZ.Radio"
+        
+        _headerSubtitle.value = when {
             _appMode.value == AppMode.ARCHIVES -> {
-                "SPAZ.Radio   -   ${context.getString(R.string.label_archives)}"
+                context.getString(R.string.label_archives)
             }
             isLive && listeners.isNotBlank() -> {
-                "SPAZ.Radio   -   $listeners"
+                listeners
             }
             isLive -> {
-                "SPAZ.Radio"
+                ""
             }
             isArchive -> {
-                "SPAZ.Radio   -   ${context.getString(R.string.label_archives)}"
+                context.getString(R.string.label_archives)
             }
-            else -> "SPAZ.Radio"
+            else -> ""
         }
 
         _trackSubtitle.value = when (val state = _playbackUiState.value) {
