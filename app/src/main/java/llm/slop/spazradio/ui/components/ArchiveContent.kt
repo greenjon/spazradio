@@ -41,7 +41,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,7 +49,6 @@ import llm.slop.spazradio.ArchiveViewModel
 import llm.slop.spazradio.R
 import llm.slop.spazradio.RadioViewModel
 import llm.slop.spazradio.data.ArchiveShow
-import llm.slop.spazradio.ui.theme.NeonGreen
 
 @Composable
 fun ArchiveContent(
@@ -82,16 +80,16 @@ fun ArchiveContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp),
-                    placeholder = { Text(stringResource(R.string.search_archives), color = Color.Gray, fontSize = 14.sp) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = NeonGreen) },
+                    placeholder = { Text(stringResource(R.string.search_archives), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 14.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = NeonGreen.copy(alpha = 0.5f),
-                        cursorColor = NeonGreen,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
 
@@ -129,10 +127,10 @@ fun ArchiveContent(
         is ArchiveUiState.Error -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = state.message, color = Color.Red, modifier = Modifier.padding(16.dp))
+                    Text(text = state.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
                     Text(
                         text = stringResource(R.string.label_retry),
-                        color = NeonGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .clickable { archiveViewModel.fetchArchives() }
                             .padding(8.dp)
@@ -159,7 +157,7 @@ fun LoadingArchivesText() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
             text = stringResource(R.string.loading_archives),
-            color = NeonGreen.copy(alpha = alpha),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
             style = MaterialTheme.typography.titleLarge
         )
     }
@@ -184,12 +182,12 @@ fun ArchiveShowRow(
                 Text(
                     text = show.date,
                     style = MaterialTheme.typography.labelSmall,
-                    color = NeonGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     text = show.title,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Row(
@@ -203,7 +201,7 @@ fun ArchiveShowRow(
                 ) {
                     if (isDownloading) {
                         CircularProgressIndicator(
-                            color = NeonGreen,
+                            color = MaterialTheme.colorScheme.primary,
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(20.dp)
                         )
@@ -211,7 +209,7 @@ fun ArchiveShowRow(
                         Icon(
                             imageVector = if (isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
                             contentDescription = if (isDownloaded) stringResource(R.string.label_downloaded) else stringResource(R.string.label_download),
-                            tint = if (isDownloaded) NeonGreen else Color.Gray
+                            tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
                     }
                 }
@@ -223,7 +221,7 @@ fun ArchiveShowRow(
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = stringResource(R.string.label_play),
-                        tint = NeonGreen
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }

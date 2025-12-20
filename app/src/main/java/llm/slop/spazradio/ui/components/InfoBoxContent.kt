@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,8 +17,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -30,12 +34,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import llm.slop.spazradio.AppTheme
 import llm.slop.spazradio.ChatViewModel
 import llm.slop.spazradio.R
 import llm.slop.spazradio.RadioViewModel
 import llm.slop.spazradio.ScheduleItem
 import llm.slop.spazradio.ScheduleViewModel
-import llm.slop.spazradio.ui.theme.NeonGreen
 
 @Composable
 fun SettingsContent(
@@ -43,6 +47,7 @@ fun SettingsContent(
     chatViewModel: ChatViewModel
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
+    val currentTheme by radioViewModel.appTheme.collectAsState()
 
     Column(
         modifier = Modifier
@@ -55,17 +60,51 @@ fun SettingsContent(
         verticalArrangement = Arrangement.Top
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            // Theme Section
+            Text(
+                text = stringResource(R.string.theme_settings),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            ThemeOption(
+                label = stringResource(R.string.theme_neon),
+                selected = currentTheme == AppTheme.NEON,
+                onClick = { radioViewModel.setAppTheme(AppTheme.NEON) }
+            )
+            ThemeOption(
+                label = stringResource(R.string.theme_light),
+                selected = currentTheme == AppTheme.LIGHT,
+                onClick = { radioViewModel.setAppTheme(AppTheme.LIGHT) }
+            )
+            ThemeOption(
+                label = stringResource(R.string.theme_dark),
+                selected = currentTheme == AppTheme.DARK,
+                onClick = { radioViewModel.setAppTheme(AppTheme.DARK) }
+            )
+            ThemeOption(
+                label = stringResource(R.string.theme_auto),
+                selected = currentTheme == AppTheme.AUTO,
+                onClick = { radioViewModel.setAppTheme(AppTheme.AUTO) }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Chat Section
             Text(
                 text = stringResource(R.string.chat_settings),
                 style = MaterialTheme.typography.titleMedium,
-                color = NeonGreen
+                color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(16.dp))
             
             Button(
                 onClick = { showResetDialog = true },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red.copy(alpha = 0.6f),
+                    containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                     contentColor = Color.White
                 ),
                 modifier = Modifier.fillMaxWidth()
@@ -86,7 +125,7 @@ fun SettingsContent(
                                 chatViewModel.resetUsername()
                                 showResetDialog = false
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                         ) {
                             Text(stringResource(R.string.action_reset))
                         }
@@ -96,19 +135,42 @@ fun SettingsContent(
                             Text(stringResource(R.string.action_cancel))
                         }
                     },
-                    containerColor = Color(0xFF1A1A1A),
-                    titleContentColor = NeonGreen,
-                    textContentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.primary,
+                    textContentColor = MaterialTheme.colorScheme.onSurface
                 )
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = stringResource(R.string.settings_placeholder),
-                style = MaterialTheme.typography.bodySmall,
-                color = NeonGreen.copy(alpha = 0.5f)
-            )
         }
+    }
+}
+
+@Composable
+fun ThemeOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = MaterialTheme.colorScheme.primary,
+                unselectedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
@@ -142,17 +204,15 @@ fun ScheduleItemRow(item: ScheduleItem) {
             .fillMaxWidth()
             .padding(vertical = 4.dp)
     ) {
-        // Note: item.datePart, startTime, endTime are assumed to be formatted by the ViewModel/Data layer.
-        // If not, they should be localized here.
         Text(
             text = "${item.datePart} • ${item.startTime} - ${item.endTime}",
             style = MaterialTheme.typography.bodyLarge,
-            color = NeonGreen
+            color = MaterialTheme.colorScheme.primary
         )
         Text(
             text = item.showName,
             style = MaterialTheme.typography.bodyLarge,
-            color = Color(0xFFFFFF00)
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }

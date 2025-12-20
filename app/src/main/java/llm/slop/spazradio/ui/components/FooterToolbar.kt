@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -19,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import llm.slop.spazradio.ActiveUtility
 import llm.slop.spazradio.AppMode
-import llm.slop.spazradio.ui.theme.NeonGreen
 
 @Composable
 fun FooterToolbar(
@@ -32,14 +32,11 @@ fun FooterToolbar(
 ) {
     NavigationBar(
         modifier = modifier.fillMaxWidth(),
-        // Changed base color to #00007F with 75% opacity (BF in hex)
-        containerColor = Color(0xBF00007F), 
-        contentColor = NeonGreen,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+        contentColor = MaterialTheme.colorScheme.primary,
         tonalElevation = 0.dp,
-        // Disable automatic window insets because we handle them in the parent Scaffold/Box
         windowInsets = WindowInsets(0, 0, 0, 0)
     ) {
-        // Info (Dynamic: Schedule or Archive List) - Moved to the left
         val infoLabel = if (appMode == AppMode.RADIO) "Schedule" else "List"
         val infoIcon = if (appMode == AppMode.RADIO) Icons.Default.EventNote else Icons.AutoMirrored.Filled.List
         
@@ -51,7 +48,6 @@ fun FooterToolbar(
             colors = navigationBarItemColors()
         )
 
-        // Chat
         NavigationBarItem(
             selected = activeUtility == ActiveUtility.CHAT,
             onClick = { onUtilityClick(ActiveUtility.CHAT) },
@@ -60,7 +56,6 @@ fun FooterToolbar(
             colors = navigationBarItemColors()
         )
 
-        // Settings
         NavigationBarItem(
             selected = activeUtility == ActiveUtility.SETTINGS,
             onClick = { onUtilityClick(ActiveUtility.SETTINGS) },
@@ -69,7 +64,6 @@ fun FooterToolbar(
             colors = navigationBarItemColors()
         )
 
-        // Visuals (Independent sticky button)
         NavigationBarItem(
             selected = visualsEnabled,
             onClick = onToggleVisuals,
@@ -82,9 +76,9 @@ fun FooterToolbar(
 
 @Composable
 private fun navigationBarItemColors() = NavigationBarItemDefaults.colors(
-    selectedIconColor = Color.Black,
-    selectedTextColor = NeonGreen,
-    indicatorColor = NeonGreen,
-    unselectedIconColor = NeonGreen,
-    unselectedTextColor = NeonGreen.copy(alpha = 0.7f)
+    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+    selectedTextColor = MaterialTheme.colorScheme.primary,
+    indicatorColor = MaterialTheme.colorScheme.primary,
+    unselectedIconColor = MaterialTheme.colorScheme.primary,
+    unselectedTextColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
 )

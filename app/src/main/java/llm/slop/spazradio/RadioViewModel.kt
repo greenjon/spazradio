@@ -68,6 +68,11 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _lissajousMode = MutableStateFlow(prefs.getBoolean("visuals_enabled", true))
     val lissajousMode: StateFlow<Boolean> = _lissajousMode.asStateFlow()
 
+    private val _appTheme = MutableStateFlow(
+        AppTheme.valueOf(prefs.getString("app_theme", AppTheme.NEON.name) ?: AppTheme.NEON.name)
+    )
+    val appTheme: StateFlow<AppTheme> = _appTheme.asStateFlow()
+
     private var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
 
@@ -300,6 +305,11 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     fun setLissajousMode(enabled: Boolean) {
         _lissajousMode.value = enabled
         prefs.edit().putBoolean("visuals_enabled", enabled).apply()
+    }
+
+    fun setAppTheme(theme: AppTheme) {
+        _appTheme.value = theme
+        prefs.edit().putString("app_theme", theme.name).apply()
     }
 
     override fun onCleared() {

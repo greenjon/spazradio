@@ -39,4 +39,12 @@
     <string name="settings_placeholder">Weitere Einstellungen werden hier angezeigt.</string>
     <string name="label_visuals">Visuals</string>
     <string name="label_list">Liste</string>
+    
+    <string name="theme_settings">Erscheinungsbild</string>
+    <string name="theme_neon">Neon</string>
+    <string name="theme_light">Solarized Hell</string>
+    <string name="theme_dark">Solarized Dunkel</string>
+    <string name="theme_auto">System-Standard</string>
+    
+    <string name="label_archives_count">%d Sendungen</string>
 </resources>

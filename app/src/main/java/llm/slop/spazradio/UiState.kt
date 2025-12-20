@@ -7,3 +7,7 @@ enum class AppMode {
 enum class ActiveUtility {
     NONE, CHAT, INFO, SETTINGS
 }
+
+enum class AppTheme {
+    NEON, LIGHT, DARK, AUTO
+}

@@ -39,4 +39,12 @@
     <string name="settings_placeholder">Other settings will appear here.</string>
     <string name="label_visuals">Visuals</string>
     <string name="label_list">List</string>
+    
+    <string name="theme_settings">Theme</string>
+    <string name="theme_neon">Neon</string>
+    <string name="theme_light">Solarized Light</string>
+    <string name="theme_dark">Solarized Dark</string>
+    <string name="theme_auto">System Auto</string>
+
+    <string name="label_archives_count">%d shows</string>
 </resources>

@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import llm.slop.spazradio.R
-import llm.slop.spazradio.ui.theme.NeonGreen
 
 @Composable
 fun InfoBox(
@@ -29,9 +28,11 @@ fun InfoBox(
 ) {
     Box(
         modifier = modifier
-            // Deep blue base color (#00007F) with 50% transparency (0x80)
-            .background(Color(0x8000007F), RoundedCornerShape(16.dp))
-            .border(3.dp, NeonGreen, RoundedCornerShape(16.dp))
+            .background(
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                RoundedCornerShape(16.dp)
+            )
+            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
     ) {
         Column(
@@ -47,7 +48,7 @@ fun InfoBox(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = Color(0xFFFFFF00),
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.align(Alignment.CenterStart)
                 )
                 IconButton(
@@ -57,7 +58,7 @@ fun InfoBox(
                     Icon(
                         painter = painterResource(id = R.drawable.ic_close),
                         contentDescription = "Close",
-                        tint = NeonGreen
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -72,7 +73,7 @@ fun InfoBox(
 @Composable
 fun LoadingContent() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = NeonGreen)
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -83,7 +84,7 @@ fun ErrorContent(message: String, onRetry: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(message, color = Color(0xFFFFFF00))
+        Text(message, color = MaterialTheme.colorScheme.error)
         Spacer(Modifier.height(8.dp))
         Button(onClick = onRetry) {
             Text("Retry")

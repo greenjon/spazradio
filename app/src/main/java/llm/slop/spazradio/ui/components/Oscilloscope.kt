@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import androidx.compose.foundation.Canvas
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,7 +19,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.createBitmap
 import kotlinx.coroutines.delay
 import android.graphics.Canvas as AndroidCanvas
-import llm.slop.spazradio.ui.theme.NeonGreen
 
 @Composable
 fun Oscilloscope(
@@ -27,6 +27,8 @@ fun Oscilloscope(
     lissajousMode: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     /* ---------- Frame Clock ---------- */
 
     val frameClock = remember { mutableLongStateOf(0L) }
@@ -54,13 +56,13 @@ fun Oscilloscope(
         }
     }
 
-    val linePaint = remember {
+    val linePaint = remember(primaryColor) {
         android.graphics.Paint().apply {
-            color = NeonGreen.toArgb()
+            color = primaryColor.toArgb()
             style = android.graphics.Paint.Style.STROKE
             strokeWidth = 5f
             isAntiAlias = true
-            setShadowLayer(6f, 0f, 0f, NeonGreen.toArgb())
+            setShadowLayer(6f, 0f, 0f, primaryColor.toArgb())
         }
     }
 

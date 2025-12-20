@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -25,8 +26,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
 import llm.slop.spazradio.ChatViewModel
 import llm.slop.spazradio.R
-import llm.slop.spazradio.ui.theme.NeonGreen
-import llm.slop.spazradio.ui.theme.Magenta
 import java.text.DateFormat
 import java.util.*
 
@@ -65,7 +64,7 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
         Text(
             text = stringResource(R.string.chat_join),
             style = MaterialTheme.typography.headlineSmall,
-            color = Color.White
+            color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(16.dp))
         TextField(
@@ -73,15 +72,22 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
             onValueChange = { text = it },
             placeholder = { Text(stringResource(R.string.chat_name_hint)) },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                unfocusedIndicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            )
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(
             onClick = { if (text.isNotBlank()) onJoin(text) },
             enabled = text.isNotBlank(),
-            colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
         ) {
-            Text(stringResource(R.string.label_chat), color = Color.Black)
+            Text(stringResource(R.string.label_chat))
         }
     }
 }
@@ -97,7 +103,6 @@ fun ChatLayout(
     val listState = rememberLazyListState()
     var isInitialLoad by remember { mutableStateOf(true) }
 
-    // Automatic scrolling logic
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             if (isInitialLoad) {
@@ -115,7 +120,6 @@ fun ChatLayout(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Online users list header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -125,14 +129,14 @@ fun ChatLayout(
             Icon(
                 imageVector = Icons.Default.People,
                 contentDescription = null,
-                tint = Color(0xFFFFFF00),
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = if (onlineNames.isEmpty()) "..." else onlineNames.joinToString(", "),
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFFFFF00),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -160,18 +164,18 @@ fun ChatLayout(
             TextField(
                 value = messageText,
                 onValueChange = { messageText = it },
-                placeholder = { Text(stringResource(R.string.chat_hint), color = NeonGreen.copy(alpha = 0.6f)) },
+                placeholder = { Text(stringResource(R.string.chat_hint), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
                 modifier = Modifier
                     .weight(1f)
-                    .border(1.dp, NeonGreen, RoundedCornerShape(12.dp)),
+                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White.copy(alpha = 0.1f),
-                    unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-                    focusedTextColor = NeonGreen,
-                    unfocusedTextColor = NeonGreen,
-                    cursorColor = NeonGreen,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    cursorColor = MaterialTheme.colorScheme.primary,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent
                 )
@@ -188,7 +192,7 @@ fun ChatLayout(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
-                    tint = NeonGreen
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -211,6 +215,10 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
         }
     }
 
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -221,29 +229,31 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
                 text = msg.user,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    color = Magenta
+                    color = tertiaryColor
                 )
             )
             if (dateTimeStr.isNotEmpty()) {
                 Text(
                     text = dateTimeStr,
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.4f)
+                    color = onSurfaceColor.copy(alpha = 0.4f)
                 )
             }
         }
         AndroidView(
             factory = { context ->
                 TextView(context).apply {
-                    setTextColor(android.graphics.Color.parseColor("#39FF14")) // Neon Green
+                    setTextColor(onSurfaceColor.toArgb())
                     setTextSize(14f)
                     autoLinkMask = Linkify.WEB_URLS
-                    setLinkTextColor(android.graphics.Color.parseColor("#39FF14"))
+                    setLinkTextColor(primaryColor.toArgb())
                 }
             },
             update = { textView ->
                 val decoded = HtmlCompat.fromHtml(msg.message, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 textView.text = decoded
+                textView.setTextColor(onSurfaceColor.toArgb())
+                textView.setLinkTextColor(primaryColor.toArgb())
             },
             modifier = Modifier.fillMaxWidth()
         )

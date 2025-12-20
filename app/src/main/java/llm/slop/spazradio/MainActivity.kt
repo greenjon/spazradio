@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -28,7 +29,7 @@ import llm.slop.spazradio.ui.components.PlayerHeader
 import llm.slop.spazradio.ui.components.ScheduleContent
 import llm.slop.spazradio.ui.components.SettingsContent
 import llm.slop.spazradio.ui.theme.DeepBlue
-import llm.slop.spazradio.ui.theme.Magenta
+import llm.slop.spazradio.ui.theme.NeonMagenta
 import llm.slop.spazradio.ui.theme.SpazRadioTheme
 
 /* ---------- Activity ---------- */
@@ -44,8 +45,11 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            SpazRadioTheme {
-                RadioApp()
+            val radioViewModel: RadioViewModel = viewModel()
+            val appTheme by radioViewModel.appTheme.collectAsState()
+            
+            SpazRadioTheme(appTheme = appTheme) {
+                RadioApp(radioViewModel = radioViewModel)
             }
         }
     }
@@ -69,10 +73,12 @@ fun RadioApp(
     val activeUtility by radioViewModel.activeUtility.collectAsState()
     val listenerCount by radioViewModel.trackListeners.collectAsState()
     val archiveCount by archiveViewModel.cachedArchiveCount.collectAsState()
+    val appTheme by radioViewModel.appTheme.collectAsState()
 
     MainLayout(
         showOscilloscope = lissajousMode,
         showInfoBox = activeUtility != ActiveUtility.NONE,
+        appTheme = appTheme,
         header = {
             PlayerHeader(
                 trackStatus = trackSubtitle,
@@ -145,6 +151,7 @@ fun RadioApp(
 fun MainLayout(
     showOscilloscope: Boolean,
     showInfoBox: Boolean,
+    appTheme: AppTheme,
     header: @Composable () -> Unit,
     oscilloscope: @Composable (Modifier) -> Unit,
     infoBox: @Composable (Modifier) -> Unit,
@@ -154,10 +161,16 @@ fun MainLayout(
         modifier = Modifier.fillMaxSize(),
         bottomBar = footer
     ) { innerPadding ->
+        val backgroundModifier = if (appTheme == AppTheme.NEON) {
+            Modifier.background(Brush.verticalGradient(listOf(DeepBlue, NeonMagenta, DeepBlue)))
+        } else {
+            Modifier.background(MaterialTheme.colorScheme.background)
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(DeepBlue, Magenta, DeepBlue)))
+                .then(backgroundModifier)
         ) {
             // Edge-to-edge Visuals Layer
             if (showOscilloscope) {

@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import llm.slop.spazradio.AppMode
 import llm.slop.spazradio.R
-import llm.slop.spazradio.ui.theme.NeonGreen
 import java.util.Locale
 
 @Composable
@@ -53,12 +52,12 @@ fun PlayerHeader(
     Column(modifier = Modifier.fillMaxWidth()) {
         TabRow(
             selectedTabIndex = if (appMode == AppMode.RADIO) 0 else 1,
-            containerColor = Color(0xBF00007F), 
-            contentColor = NeonGreen,
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+            contentColor = MaterialTheme.colorScheme.primary,
             indicator = { tabPositions ->
                 TabRowDefaults.PrimaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[if (appMode == AppMode.RADIO) 0 else 1]),
-                    color = NeonGreen
+                    color = MaterialTheme.colorScheme.primary
                 )
             },
             divider = {}
@@ -69,7 +68,7 @@ fun PlayerHeader(
                 text = { 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            "SPAZ.RADIO", 
+                            stringResource(R.string.label_radio).uppercase(), 
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -79,12 +78,12 @@ fun PlayerHeader(
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 10.sp,
                                     shadow = Shadow(
-                                        color = Color.Black,
+                                        color = Color.Black.copy(alpha = 0.5f),
                                         offset = Offset(1f, 1f),
                                         blurRadius = 2f
                                     )
                                 ),
-                                color = Color(0xFFFFFF00),
+                                color = MaterialTheme.colorScheme.onSurface,
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -97,22 +96,22 @@ fun PlayerHeader(
                 text = { 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            "ARCHIVES", 
+                            stringResource(R.string.label_archives).uppercase(), 
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         if (archiveCount > 0) {
                             Text(
-                                text = "$archiveCount shows",
+                                text = stringResource(R.string.label_archives_count, archiveCount),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 10.sp,
                                     shadow = Shadow(
-                                        color = Color.Black,
+                                        color = Color.Black.copy(alpha = 0.5f),
                                         offset = Offset(1f, 1f),
                                         blurRadius = 2f
                                     )
                                 ),
-                                color = Color(0xFFFFFF00),
+                                color = MaterialTheme.colorScheme.onSurface,
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -132,13 +131,11 @@ fun PlayerHeader(
                 Icon(
                     painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
                     contentDescription = if (isPlaying) stringResource(R.string.label_pause) else stringResource(R.string.label_play),
-                    tint = NeonGreen,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(48.dp)
                 )
             }
             
-            // Central area now shows the dynamic track status (song name or connection msg)
-            // beside the play/pause button
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -150,12 +147,12 @@ fun PlayerHeader(
                         text = trackStatus,
                         style = MaterialTheme.typography.titleMedium.copy(
                             shadow = Shadow(
-                                color = Color.Black,
+                                color = Color.Black.copy(alpha = 0.3f),
                                 offset = Offset(2f, 2f),
                                 blurRadius = 4f
                             )
                         ),
-                        color = Color(0xFFFFFF00),
+                        color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
@@ -163,7 +160,6 @@ fun PlayerHeader(
                 }
             }
             
-            // Spacer to keep track status centered
             Box(modifier = Modifier.size(48.dp))
         }
 
@@ -193,7 +189,7 @@ fun PlaybackControls(
         Text(
             text = formatTime(position),
             style = MaterialTheme.typography.labelSmall,
-            color = NeonGreen,
+            color = MaterialTheme.colorScheme.primary,
             fontSize = 12.sp,
             modifier = Modifier.widthIn(min = 45.dp)
         )
@@ -202,16 +198,16 @@ fun PlaybackControls(
             onValueChange = { onSeek(it.toLong()) },
             valueRange = 0f..duration.toFloat(),
             colors = SliderDefaults.colors(
-                thumbColor = NeonGreen,
-                activeTrackColor = NeonGreen,
-                inactiveTrackColor = NeonGreen.copy(alpha = 0.24f)
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
             ),
             modifier = Modifier.weight(1f)
         )
         Text(
             text = formatTime(duration),
             style = MaterialTheme.typography.labelSmall,
-            color = NeonGreen,
+            color = MaterialTheme.colorScheme.primary,
             fontSize = 12.sp,
             modifier = Modifier.widthIn(min = 45.dp),
             textAlign = TextAlign.End
@@ -228,30 +224,5 @@ private fun formatTime(ms: Long): String {
         String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
     } else {
         String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
-    }
-}
-
-@Composable
-fun TrackTitle(title: String) {
-    // This is now redundant but kept for reference or until removed from calls
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge.copy(
-                shadow = Shadow(
-                    color = Color.Black,
-                    offset = Offset(2f, 2f),
-                    blurRadius = 4f
-                )
-            ),
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            color = Color(0xFFFFFF00)
-        )
     }
 }

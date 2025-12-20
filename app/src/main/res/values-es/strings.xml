@@ -39,4 +39,12 @@
     <string name="settings_placeholder">Otros ajustes aparecerán aquí.</string>
     <string name="label_visuals">Visuales</string>
     <string name="label_list">Lista</string>
+    
+    <string name="theme_settings">Tema</string>
+    <string name="theme_neon">Neón</string>
+    <string name="theme_light">Solarized Claro</string>
+    <string name="theme_dark">Solarized Oscuro</string>
+    <string name="theme_auto">Automático del Sistema</string>
+    
+    <string name="label_archives_count">%d programas</string>
 </resources>
