@@ -1,8 +1,10 @@
 package llm.slop.spazradio
 
+import android.app.Application
+import android.content.Context
 import android.text.format.DateFormat
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -32,10 +35,11 @@ data class RawShow(
     val url: String
 )
 
+class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
 
-
-class ScheduleViewModel : ViewModel() {
-
+    private val context = application.applicationContext
+    private val cacheFile = File(context.cacheDir, "schedule_cache.json")
+    
     private val _schedule = MutableStateFlow<List<ScheduleItem>>(emptyList())
     val schedule: StateFlow<List<ScheduleItem>> = _schedule
 
@@ -55,12 +59,49 @@ class ScheduleViewModel : ViewModel() {
     private val gson = Gson()
 
     init {
+        loadFromCache()
         loadSchedule()
+    }
+
+    private fun loadFromCache() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (cacheFile.exists()) {
+                    val json = cacheFile.readText()
+                    val type = object : TypeToken<List<RawShow>>() {}.type
+                    val rawShows: List<RawShow> = gson.fromJson(json, type)
+                    
+                    val now = System.currentTimeMillis()
+                    val validShows = rawShows
+                        .filter { it.end_timestamp > now }
+                        .map { formatShowItem(it) }
+                    
+                    if (validShows.isNotEmpty()) {
+                        _schedule.value = validShows
+                        // If we have valid cached data, we can stop the initial loading spinner
+                        _loading.value = false
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ScheduleViewModel", "Error loading cache", e)
+            }
+        }
+    }
+
+    private fun saveToCache(rawShows: List<RawShow>) {
+        try {
+            val json = gson.toJson(rawShows)
+            cacheFile.writeText(json)
+        } catch (e: Exception) {
+            Log.e("ScheduleViewModel", "Error saving cache", e)
+        }
     }
 
     fun loadSchedule() {
         viewModelScope.launch(Dispatchers.IO) {
-            _loading.value = true
+            if (_schedule.value.isEmpty()) {
+                _loading.value = true
+            }
             _error.value = null
 
             var attempt = 0
@@ -82,9 +123,15 @@ class ScheduleViewModel : ViewModel() {
                         val rawShows: List<RawShow> = gson.fromJson(responseData, type)
 
                         val now = System.currentTimeMillis()
-                        _schedule.value = rawShows
+                        
+                        // Prune and format
+                        val validShows = rawShows
                             .filter { it.end_timestamp > now }
-                            .map { formatShowItem(it) }
+                        
+                        _schedule.value = validShows.map { formatShowItem(it) }
+                        
+                        // Persist the full raw list for future launches
+                        saveToCache(rawShows)
                     }
 
                     // Success → exit retry loop
@@ -94,7 +141,9 @@ class ScheduleViewModel : ViewModel() {
                     attempt++
                     if (attempt >= maxAttempts) {
                         Log.e("ScheduleViewModel", "Error fetching schedule", e)
-                        _error.value = "Schedule unavailable"
+                        if (_schedule.value.isEmpty()) {
+                            _error.value = "Schedule unavailable"
+                        }
                     } else {
                         kotlinx.coroutines.delay(1_000)
                     }
