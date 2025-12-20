@@ -47,4 +47,7 @@
     <string name="theme_auto">Auto Système</string>
 
     <string name="label_archives_count">%d émissions</string>
+
+    <string name="privacy_info_text">Nous ne collectons aucune donnée. Ce projet est open source. Le projet et notre politique de confidentialité sont %s.</string>
+    <string name="privacy_link_text">ici</string>
 </resources>

@@ -47,4 +47,7 @@
     <string name="theme_auto">System Auto</string>
 
     <string name="label_archives_count">%d shows</string>
+
+    <string name="privacy_info_text">We don\'t collect any data. This project is open source. The project and our privacy policy are %s.</string>
+    <string name="privacy_link_text">here</string>
 </resources>

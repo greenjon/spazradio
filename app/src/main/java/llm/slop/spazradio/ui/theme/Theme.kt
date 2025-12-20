@@ -1,32 +1,16 @@
 package llm.slop.spazradio.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import llm.slop.spazradio.AppTheme
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-)
-
 private val SolarizedDarkColorScheme = darkColorScheme(
-    primary = SolarizedBlue,
-    secondary = SolarizedGreen,
+    primary = SolarizedGreen,
+    secondary = SolarizedBlue,
     tertiary = SolarizedMagenta,
     background = SolarizedBase03,
     surface = SolarizedBase02,
@@ -34,13 +18,13 @@ private val SolarizedDarkColorScheme = darkColorScheme(
     onSecondary = SolarizedBase3,
     onTertiary = SolarizedBase3,
     onBackground = SolarizedBase0,
-    onSurface = SolarizedYellow, // Matches Neon Yellow logic
+    onSurface = SolarizedYellow,
     error = SolarizedRed
 )
 
 private val SolarizedLightColorScheme = lightColorScheme(
-    primary = SolarizedBlue,
-    secondary = SolarizedGreen,
+    primary = SolarizedGreen,
+    secondary = SolarizedBlue,
     tertiary = SolarizedMagenta,
     background = SolarizedBase3,
     surface = SolarizedBase2,
@@ -48,11 +32,10 @@ private val SolarizedLightColorScheme = lightColorScheme(
     onSecondary = SolarizedBase03,
     onTertiary = SolarizedBase03,
     onBackground = SolarizedBase00,
-    onSurface = SolarizedYellow, // Matches Neon Yellow logic
+    onSurface = SolarizedYellow,
     error = SolarizedRed
 )
 
-// Neon theme is the custom "Spaz" look
 private val NeonColorScheme = darkColorScheme(
     primary = NeonGreen,
     secondary = NeonCyan,
@@ -69,7 +52,6 @@ private val NeonColorScheme = darkColorScheme(
 @Composable
 fun SpazRadioTheme(
     appTheme: AppTheme = AppTheme.NEON,
-    dynamicColor: Boolean = false, // Disable dynamic color by default to favor custom themes
     content: @Composable () -> Unit
 ) {
     val darkTheme = isSystemInDarkTheme()

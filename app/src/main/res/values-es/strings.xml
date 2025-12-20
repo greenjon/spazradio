@@ -47,4 +47,7 @@
     <string name="theme_auto">Automático del Sistema</string>
     
     <string name="label_archives_count">%d programas</string>
+
+    <string name="privacy_info_text">No recopilamos ningún dato. Este proyecto es de código abierto. El proyecto y nuestra política de privacidad están %s.</string>
+    <string name="privacy_link_text">aquí</string>
 </resources>

@@ -47,4 +47,7 @@
     <string name="theme_auto">System-Standard</string>
     
     <string name="label_archives_count">%d Sendungen</string>
+
+    <string name="privacy_info_text">Wir sammeln keine Daten. Dieses Projekt ist Open Source. Das Projekt und unsere Datenschutzbestimmungen finden Sie %s.</string>
+    <string name="privacy_link_text">hier</string>
 </resources>

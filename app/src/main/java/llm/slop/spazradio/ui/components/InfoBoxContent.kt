@@ -1,5 +1,7 @@
 package llm.slop.spazradio.ui.components
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material3.Button
@@ -32,8 +35,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import llm.slop.spazradio.AppTheme
 import llm.slop.spazradio.ChatViewModel
 import llm.slop.spazradio.R
@@ -48,6 +57,7 @@ fun SettingsContent(
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
     val currentTheme by radioViewModel.appTheme.collectAsState()
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -59,7 +69,7 @@ fun SettingsContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
             // Theme Section
             Text(
                 text = stringResource(R.string.theme_settings),
@@ -141,6 +151,41 @@ fun SettingsContent(
                 )
             }
         }
+
+        // Privacy & Info Section
+        val privacyInfo = stringResource(R.string.privacy_info_text, "")
+        val linkText = stringResource(R.string.privacy_link_text)
+        val annotatedString = buildAnnotatedString {
+            val parts = privacyInfo.split("%s")
+            append(parts[0])
+            pushStringAnnotation(tag = "URL", annotation = "https://github.com/greenjon/spazradio")
+            withStyle(style = SpanStyle(
+                color = MaterialTheme.colorScheme.primary,
+                textDecoration = TextDecoration.Underline
+            )) {
+                append(linkText)
+            }
+            pop()
+            if (parts.size > 1) {
+                append(parts[1])
+            }
+        }
+
+        ClickableText(
+            text = annotatedString,
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                fontSize = 10.sp
+            ),
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+            onClick = { offset ->
+                annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                    .firstOrNull()?.let { annotation ->
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item))
+                        context.startActivity(intent)
+                    }
+            }
+        )
     }
 }
 
