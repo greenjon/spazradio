@@ -114,8 +114,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             override fun onMediaMetadataChanged(metadata: MediaMetadata) {
-                _trackTitle.value = metadata.title?.toString() ?: "SPAZ.Radio"
-                _trackListeners.value = metadata.artist?.toString() ?: ""
                 updateState(controller)
             }
 
@@ -132,9 +130,16 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         
         val metadata = controller.mediaMetadata
         _trackTitle.value = metadata.title?.toString() ?: _trackTitle.value
-        _trackListeners.value = metadata.artist?.toString() ?: _trackListeners.value
-
+        
+        val artist = metadata.artist?.toString() ?: ""
         val mediaId = controller.currentMediaItem?.mediaId
+        val isLive = mediaId == liveStreamId
+
+        // Only update trackListeners if we are actually listening to the live stream
+        if (isLive && artist.contains(context.getString(R.string.listening_template).split("%d").first())) {
+            _trackListeners.value = artist
+        }
+
         _isArchivePlaying.value = mediaId?.startsWith("archive_") == true || (mediaId != liveStreamId && mediaId != null)
         
         if (_isArchivePlaying.value) {
@@ -161,11 +166,9 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateDisplayStrings() {
-        val listeners = _trackListeners.value
         val controller = mediaController
         val currentMediaId = controller?.currentMediaItem?.mediaId
         val isLive = currentMediaId == liveStreamId
-        val isArchive = currentMediaId?.startsWith("archive_") == true
 
         _headerTitle.value = "SPAZ.Radio"
         
@@ -173,14 +176,8 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             _appMode.value == AppMode.ARCHIVES -> {
                 context.getString(R.string.label_archives)
             }
-            isLive && listeners.isNotBlank() -> {
-                listeners
-            }
             isLive -> {
-                ""
-            }
-            isArchive -> {
-                context.getString(R.string.label_archives)
+                _trackListeners.value
             }
             else -> ""
         }
