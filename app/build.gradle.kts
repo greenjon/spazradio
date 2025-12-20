@@ -9,19 +9,22 @@ plugins {
 
 android {
     namespace = "llm.slop.spazradio"
-    compileSdk = 36
+    compileSdk = 35
 
     buildTypes {
         release {
-            isShrinkResources = false
             isMinifyEnabled = true
+            isShrinkResources = false // Keep false for now as per your file
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),"proguard-rules.pro"
+            )
         }
     }
 
     defaultConfig {
         applicationId = "llm.slop.spazradio"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 131
         versionName = "1.3.1"
     }
@@ -49,6 +52,15 @@ android {
             excludes += "/META-INF/io.netty.versions.properties"
 
         }
+    }
+}
+
+configurations.all {
+    resolutionStrategy {
+        // Force an older version that only requires API 34 or 35
+        force("androidx.core:core:1.13.1")
+        force("androidx.core:core-ktx:1.13.1")
+
     }
 }
 
