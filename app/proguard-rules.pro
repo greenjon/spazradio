@@ -30,3 +30,13 @@
 
 # Optional: If you see Media3/ExoPlayer specific R8 warnings
 -dontwarn androidx.media3.**
+
+# Gson
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class com.google.gson.** { *; }
+-keep class llm.slop.spazradio.data.** { *; }
+
+# Paho MQTT
+-keep class org.eclipse.paho.client.mqttv3.** { *; }
+-dontwarn org.eclipse.paho.client.mqttv3.**

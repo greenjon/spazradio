@@ -14,7 +14,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            isShrinkResources = false // Keep false for now as per your file
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),"proguard-rules.pro"
             )
@@ -50,20 +50,23 @@ android {
             )
             excludes += "/META-INF/INDEX.LIST"
             excludes += "/META-INF/io.netty.versions.properties"
-
         }
     }
 }
 
 configurations.all {
     resolutionStrategy {
-        // Force an older version that only requires API 34 or 35
+        // Force stable versions that do NOT require SDK 36 / XR
         force("androidx.core:core:1.13.1")
         force("androidx.core:core-ktx:1.13.1")
+        force("androidx.activity:activity:1.9.3")
+        force("androidx.activity:activity-compose:1.9.3")
+        force("androidx.activity:activity-ktx:1.9.3")
+        force("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+        force("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
         
-        // Block transitive inclusion of androidx.xr
-        exclude(group = "androidx.xr", module = "xr")
-        exclude(group = "androidx.xr.compose", module = "xr-compose")
+        // Block androidx.tracing from mismatched versions
+        force("androidx.tracing:tracing:1.2.0")
     }
 }
 
@@ -105,32 +108,26 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
-// Add this to the very bottom of /app/build.gradle.kts
-androidComponents {onVariants { variant ->
-    val capName = variant.name.replaceFirstChar { it.uppercase() }
-
-    // 1. Disable the task that compiles the profiles into binary
-    tasks.matching { it.name.contains("ArtProfile") }.configureEach {
-        enabled = false
-    }
-
-    // 2. Brutally delete the dexopt directory from all possible intermediate outputs
-    tasks.matching {
-        it.name.contains("merge${capName}Assets") ||
-                it.name.contains("package${capName}Resources") ||
-                it.name.contains("process${capName}JavaRes")
-    }.configureEach {
-        doLast {
-            outputs.files.forEach { root ->
-                // Recursively look for any file named baseline.prof or any directory named dexopt
-                root.walkBottomUp().forEach { file ->
-                    if (file.name == "baseline.prof" || file.name == "baseline.profm" || file.name == "dexopt") {
-                        println("F-Droid: Deleting non-deterministic file: ${file.absolutePath}")
-                        file.deleteRecursively()
+androidComponents {
+    onVariants { variant ->
+        val capName = variant.name.replaceFirstChar { it.uppercase() }
+        tasks.matching { it.name.contains("ArtProfile") }.configureEach {
+            enabled = false
+        }
+        tasks.matching {
+            it.name.contains("merge${capName}Assets") ||
+                    it.name.contains("package${capName}Resources") ||
+                    it.name.contains("process${capName}JavaRes")
+        }.configureEach {
+            doLast {
+                outputs.files.forEach { root ->
+                    root.walkBottomUp().forEach { file ->
+                        if (file.name == "baseline.prof" || file.name == "baseline.profm" || file.name == "dexopt") {
+                            file.deleteRecursively()
+                        }
                     }
                 }
             }
         }
     }
-}
 }
