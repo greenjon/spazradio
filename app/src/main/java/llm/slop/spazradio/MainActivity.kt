@@ -23,11 +23,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import llm.slop.spazradio.ui.components.ArchiveContent
 import llm.slop.spazradio.ui.components.ChatContent
 import llm.slop.spazradio.ui.components.FooterToolbar
@@ -83,7 +85,9 @@ fun RadioApp(
     val archiveCount by archiveViewModel.cachedArchiveCount.collectAsState()
     val appTheme by radioViewModel.appTheme.collectAsState()
 
-    // 100 * 3 pages to simulate infinite loop. Start at index 150 (INFO)
+    val coroutineScope = rememberCoroutineScope()
+
+    // Use a large page count for circular swiping
     val pageCount = 300
     val pagerState = rememberPagerState(
         initialPage = 150 + when (activeUtility) {
@@ -94,38 +98,32 @@ fun RadioApp(
         pageCount = { pageCount }
     )
 
-    // Sync activeUtility -> pagerState (Only trigger when NOT swiping)
-    LaunchedEffect(activeUtility) {
-        if (activeUtility == ActiveUtility.NONE || pagerState.isScrollInProgress) return@LaunchedEffect
-        
-        val baseIndex = (pagerState.currentPage / 3) * 3
-        val targetPage = baseIndex + when (activeUtility) {
-            ActiveUtility.INFO -> 0
-            ActiveUtility.CHAT -> 1
-            ActiveUtility.SETTINGS -> 2
-            else -> 0
-        }
-        
-        if (pagerState.currentPage != targetPage) {
-            // Snap to target page instead of animating to avoid race conditions with swiping
-            pagerState.animateScrollToPage(targetPage, animationSpec = tween(durationMillis = 150))
-        }
-    }
-
-    // Sync pagerState -> activeUtility (Only trigger when user IS swiping)
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }.collect { page ->
-            if (activeUtility == ActiveUtility.NONE || !pagerState.isScrollInProgress) return@collect
-            
-            val normalizedPage = page % 3
-            val targetUtility = when (normalizedPage) {
+    // Source of truth for toolbar highlight: current page of the pager
+    val highlightedUtility by remember(pagerState, activeUtility) {
+        derivedStateOf {
+            if (activeUtility == ActiveUtility.NONE) ActiveUtility.NONE
+            else when (pagerState.currentPage % 3) {
                 0 -> ActiveUtility.INFO
                 1 -> ActiveUtility.CHAT
                 2 -> ActiveUtility.SETTINGS
                 else -> ActiveUtility.INFO
             }
-            if (activeUtility != targetUtility) {
-                radioViewModel.setActiveUtility(targetUtility)
+        }
+    }
+
+    // Sync pager -> ViewModel: Only update when the page settles to avoid race conditions
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            if (activeUtility != ActiveUtility.NONE) {
+                val settledUtility = when (page % 3) {
+                    0 -> ActiveUtility.INFO
+                    1 -> ActiveUtility.CHAT
+                    2 -> ActiveUtility.SETTINGS
+                    else -> ActiveUtility.INFO
+                }
+                if (activeUtility != settledUtility) {
+                    radioViewModel.setActiveUtility(settledUtility)
+                }
             }
         }
     }
@@ -203,9 +201,39 @@ fun RadioApp(
         footer = {
             FooterToolbar(
                 appMode = appMode,
-                activeUtility = activeUtility,
+                activeUtility = highlightedUtility,
                 visualsEnabled = lissajousMode,
-                onUtilityClick = { radioViewModel.setActiveUtility(it) },
+                onUtilityClick = { utility ->
+                    if (activeUtility == utility) {
+                        radioViewModel.setActiveUtility(ActiveUtility.NONE)
+                    } else {
+                        val wasClosed = activeUtility == ActiveUtility.NONE
+                        // If closed, open the box first
+                        if (wasClosed) {
+                            radioViewModel.setActiveUtility(utility)
+                        }
+                        
+                        coroutineScope.launch {
+                            val baseIndex = (pagerState.currentPage / 3) * 3
+                            val targetPage = baseIndex + when (utility) {
+                                ActiveUtility.INFO -> 0
+                                ActiveUtility.CHAT -> 1
+                                ActiveUtility.SETTINGS -> 2
+                                else -> 0
+                            }
+                            
+                            if (wasClosed) {
+                                pagerState.scrollToPage(targetPage)
+                            } else {
+                                // Fast transition (200ms)
+                                pagerState.animateScrollToPage(
+                                    page = targetPage,
+                                    animationSpec = tween(durationMillis = 200)
+                                )
+                            }
+                        }
+                    }
+                },
                 onToggleVisuals = { radioViewModel.setLissajousMode(!lissajousMode) }
             )
         }
