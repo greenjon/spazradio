@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "llm.slop.spazradio"
-    compileSdk = 35
+    compileSdk = 36
 
     buildTypes {
         release {
