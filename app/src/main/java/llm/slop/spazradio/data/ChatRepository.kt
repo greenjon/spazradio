@@ -28,7 +28,6 @@ class ChatRepository(
             .header("User-Agent", "Mozilla/5.0 (Android)")
             .build()
 
-        var result: List<ChatMessage>? = null
         for (i in 1..3) {
             try {
                 client.newCall(request).execute().use { response ->
@@ -36,12 +35,10 @@ class ChatRepository(
                         val body = response.body?.string() ?: ""
                         val historyResponse = gson.fromJson(body, HistoryResponse::class.java)
                         
-                        result = historyResponse.history.map { msg ->
+                        Log.d("ChatRepo", "History loaded and converted from ms on attempt $i")
+                        return@withContext historyResponse.history.map { msg ->
                             msg.copy(timeReceived = msg.timeReceived / 1000L)
                         }
-                        
-                        Log.d("ChatRepo", "History loaded and converted from ms on attempt $i")
-                        break
                     } else {
                         Log.e("ChatRepo", "History fetch failed (attempt $i): ${response.code}")
                     }
@@ -51,7 +48,7 @@ class ChatRepository(
                 if (i < 3) delay(1000)
             }
         }
-        result ?: emptyList()
+        emptyList()
     }
 
     private fun getOrCreateMqttClient(): MqttClient {
