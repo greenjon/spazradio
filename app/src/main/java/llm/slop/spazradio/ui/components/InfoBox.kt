@@ -26,10 +26,18 @@ fun InfoBox(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    // If the surface color is exactly DeepBlue (which is our Neon theme surface color),
+    // use the requested 50% transparent black. Otherwise, fall back to the standard surface behavior.
+    val backgroundColor = if (MaterialTheme.colorScheme.surface == Color(0xFF120A8F)) {
+        Color.Black.copy(alpha = 0.5f)
+    } else {
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+    }
+
     Box(
         modifier = modifier
             .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                backgroundColor,
                 RoundedCornerShape(16.dp)
             )
             .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
