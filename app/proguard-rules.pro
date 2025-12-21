@@ -18,6 +18,7 @@
 
 # Protect models in the data package
 -keep class llm.slop.spazradio.data.** { *; }
+-keep class llm.slop.spazradio.models.** { *; }
 
 # Protect models defined in the main package (like RawShow, ScheduleItem, TrackInfo)
 -keep class llm.slop.spazradio.RawShow { *; }
