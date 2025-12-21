@@ -94,9 +94,10 @@ fun RadioApp(
         pageCount = { pageCount }
     )
 
-    // Sync activeUtility -> pagerState (when user clicks toolbar)
+    // Sync activeUtility -> pagerState (Only trigger when NOT swiping)
     LaunchedEffect(activeUtility) {
-        if (activeUtility == ActiveUtility.NONE) return@LaunchedEffect
+        if (activeUtility == ActiveUtility.NONE || pagerState.isScrollInProgress) return@LaunchedEffect
+        
         val baseIndex = (pagerState.currentPage / 3) * 3
         val targetPage = baseIndex + when (activeUtility) {
             ActiveUtility.INFO -> 0
@@ -104,15 +105,18 @@ fun RadioApp(
             ActiveUtility.SETTINGS -> 2
             else -> 0
         }
+        
         if (pagerState.currentPage != targetPage) {
-            pagerState.animateScrollToPage(targetPage, animationSpec = tween(durationMillis = 200))
+            // Snap to target page instead of animating to avoid race conditions with swiping
+            pagerState.animateScrollToPage(targetPage, animationSpec = tween(durationMillis = 150))
         }
     }
 
-    // Sync pagerState -> activeUtility (when user swipes)
+    // Sync pagerState -> activeUtility (Only trigger when user IS swiping)
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
-            if (activeUtility == ActiveUtility.NONE) return@collect
+            if (activeUtility == ActiveUtility.NONE || !pagerState.isScrollInProgress) return@collect
+            
             val normalizedPage = page % 3
             val targetUtility = when (normalizedPage) {
                 0 -> ActiveUtility.INFO

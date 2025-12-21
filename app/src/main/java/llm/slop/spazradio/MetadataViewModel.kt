@@ -74,7 +74,7 @@ class MetadataViewModel : ViewModel() {
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return TrackInfo(title = "Radio Spaz")
-                val jsonStr = response.body?.string() ?: return TrackInfo(title = "Radio Spaz")
+                val jsonStr = response.body.string()
                 
                 val jsonObject = JsonParser.parseString(jsonStr).asJsonObject
                 

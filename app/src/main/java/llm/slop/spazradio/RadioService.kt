@@ -100,7 +100,6 @@ class RadioService : MediaSessionService() {
             ): AudioSink {
                 return DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
-                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                     .setAudioProcessors(arrayOf(TeeAudioProcessor(audioBufferSink)))
                     .build()
             }
@@ -198,10 +197,9 @@ class RadioService : MediaSessionService() {
                 return
             }
 
-            val jsonStr = response.body?.string()
+            val body = response.body
+            val jsonStr = body.string()
             response.close()
-
-            if (jsonStr == null) return
 
             val jsonObject = JsonParser.parseString(jsonStr).asJsonObject
 

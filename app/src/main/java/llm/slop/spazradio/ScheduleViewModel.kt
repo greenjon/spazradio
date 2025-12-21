@@ -118,7 +118,8 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                             throw IOException("Unexpected code $response")
                         }
 
-                        val responseData = response.body?.string()
+                        val body = response.body ?: throw IOException("Empty body")
+                        val responseData = body.string()
                         val type = object : TypeToken<List<RawShow>>() {}.type
                         val rawShows: List<RawShow> = gson.fromJson(responseData, type)
 

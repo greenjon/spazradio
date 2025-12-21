@@ -32,8 +32,9 @@ class ChatRepository(
             try {
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        val body = response.body?.string() ?: ""
-                        val historyResponse = gson.fromJson(body, HistoryResponse::class.java)
+                        val body = response.body ?: return@withContext emptyList()
+                        val json = body.string()
+                        val historyResponse = gson.fromJson(json, HistoryResponse::class.java)
                         
                         Log.d("ChatRepo", "History loaded and converted from ms on attempt $i")
                         return@withContext historyResponse.history.map { msg ->
