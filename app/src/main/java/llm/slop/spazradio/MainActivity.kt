@@ -5,17 +5,25 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
@@ -75,6 +83,49 @@ fun RadioApp(
     val archiveCount by archiveViewModel.cachedArchiveCount.collectAsState()
     val appTheme by radioViewModel.appTheme.collectAsState()
 
+    // 100 * 3 pages to simulate infinite loop. Start at index 150 (INFO)
+    val pageCount = 300
+    val pagerState = rememberPagerState(
+        initialPage = 150 + when (activeUtility) {
+            ActiveUtility.CHAT -> 1
+            ActiveUtility.SETTINGS -> 2
+            else -> 0
+        },
+        pageCount = { pageCount }
+    )
+
+    // Sync activeUtility -> pagerState (when user clicks toolbar)
+    LaunchedEffect(activeUtility) {
+        if (activeUtility == ActiveUtility.NONE) return@LaunchedEffect
+        val baseIndex = (pagerState.currentPage / 3) * 3
+        val targetPage = baseIndex + when (activeUtility) {
+            ActiveUtility.INFO -> 0
+            ActiveUtility.CHAT -> 1
+            ActiveUtility.SETTINGS -> 2
+            else -> 0
+        }
+        if (pagerState.currentPage != targetPage) {
+            pagerState.animateScrollToPage(targetPage, animationSpec = tween(durationMillis = 200))
+        }
+    }
+
+    // Sync pagerState -> activeUtility (when user swipes)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { page ->
+            if (activeUtility == ActiveUtility.NONE) return@collect
+            val normalizedPage = page % 3
+            val targetUtility = when (normalizedPage) {
+                0 -> ActiveUtility.INFO
+                1 -> ActiveUtility.CHAT
+                2 -> ActiveUtility.SETTINGS
+                else -> ActiveUtility.INFO
+            }
+            if (activeUtility != targetUtility) {
+                radioViewModel.setActiveUtility(targetUtility)
+            }
+        }
+    }
+
     MainLayout(
         showOscilloscope = lissajousMode,
         showInfoBox = activeUtility != ActiveUtility.NONE,
@@ -95,7 +146,6 @@ fun RadioApp(
             )
         },
         oscilloscope = { modifier ->
-            // Collect waveform ONLY here to avoid recomposing the whole RadioApp
             val waveform by RadioService.waveformFlow.collectAsState()
             Oscilloscope(
                 waveform = waveform,
@@ -105,32 +155,43 @@ fun RadioApp(
             )
         },
         infoBox = { modifier ->
-            val title = when (activeUtility) {
-                ActiveUtility.SETTINGS -> "Settings"
-                ActiveUtility.INFO -> if (appMode == AppMode.RADIO) "Schedule" else "Archives"
-                ActiveUtility.CHAT -> "Chat"
-                else -> ""
-            }
             if (activeUtility != ActiveUtility.NONE) {
+                val title by remember(pagerState, appMode) {
+                    derivedStateOf {
+                        when (pagerState.currentPage % 3) {
+                            0 -> if (appMode == AppMode.RADIO) "Schedule" else "Archives"
+                            1 -> "Chat"
+                            2 -> "Settings"
+                            else -> ""
+                        }
+                    }
+                }
+
                 InfoBox(
                     title = title,
                     onClose = { radioViewModel.closeInfoBox() },
                     modifier = modifier
                 ) {
-                    when (activeUtility) {
-                        ActiveUtility.SETTINGS -> SettingsContent(radioViewModel, chatViewModel)
-                        ActiveUtility.INFO -> {
-                            if (appMode == AppMode.RADIO) {
-                                ScheduleContent(scheduleViewModel)
-                            } else {
-                                ArchiveContent(
-                                    archiveViewModel = archiveViewModel,
-                                    radioViewModel = radioViewModel
-                                )
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        beyondViewportPageCount = 1,
+                        flingBehavior = PagerDefaults.flingBehavior(state = pagerState)
+                    ) { page ->
+                        when (page % 3) {
+                            0 -> {
+                                if (appMode == AppMode.RADIO) {
+                                    ScheduleContent(scheduleViewModel)
+                                } else {
+                                    ArchiveContent(
+                                        archiveViewModel = archiveViewModel,
+                                        radioViewModel = radioViewModel
+                                    )
+                                }
                             }
+                            1 -> ChatContent(chatViewModel)
+                            2 -> SettingsContent(radioViewModel, chatViewModel)
                         }
-                        ActiveUtility.CHAT -> ChatContent(chatViewModel)
-                        else -> {}
                     }
                 }
             }
@@ -172,12 +233,10 @@ fun MainLayout(
                 .fillMaxSize()
                 .then(backgroundModifier)
         ) {
-            // Edge-to-edge Visuals Layer
             if (showOscilloscope) {
                 oscilloscope(Modifier.fillMaxSize())
             }
 
-            // Foreground Content Layer
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -185,7 +244,6 @@ fun MainLayout(
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     header()
-                    // Middle section: HUD style overlay area
                     Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         if (showInfoBox) {
                             infoBox(
