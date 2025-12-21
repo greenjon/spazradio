@@ -19,9 +19,14 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
 # Ignore Android XR classes that are not present on most devices
 -dontwarn android.xr.**
+-dontwarn androidx.xr.**
 -dontwarn com.google.android.gles_jecon.**
+
+# Keep library classes that might be missing at runtime
+-keep class androidx.xr.** { *; }
 
 # Optional: If you see Media3/ExoPlayer specific R8 warnings
 -dontwarn androidx.media3.**
