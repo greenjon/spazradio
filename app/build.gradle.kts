@@ -13,8 +13,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),"proguard-rules.pro"
             )
@@ -54,25 +54,10 @@ android {
     }
 }
 
-configurations.all {
-    resolutionStrategy {
-        // Force stable versions that do NOT require SDK 36 / XR
-        force("androidx.core:core:1.13.1")
-        force("androidx.core:core-ktx:1.13.1")
-        force("androidx.activity:activity:1.9.3")
-        force("androidx.activity:activity-compose:1.9.3")
-        force("androidx.activity:activity-ktx:1.9.3")
-        force("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
-        force("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
-        
-        // Block androidx.tracing from mismatched versions
-        force("androidx.tracing:tracing:1.2.0")
-    }
-}
-
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_11)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
     }
 }
 
