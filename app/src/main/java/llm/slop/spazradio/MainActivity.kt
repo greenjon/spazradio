@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -113,9 +115,8 @@ fun RadioApp(
     val coroutineScope = rememberCoroutineScope()
 
     // BACKGROUND DATA LOADING
-    // Pre-populate archives after a delay to avoid interfering with initial stream buffering
     LaunchedEffect(Unit) {
-        delay(5000) // Wait 5 seconds after launch
+        delay(5000)
         archiveViewModel.fetchArchivesIfNeeded()
     }
 
@@ -269,6 +270,9 @@ fun MainLayout(
     infoBox: @Composable (Modifier) -> Unit,
     footer: @Composable () -> Unit
 ) {
+    // Detect if the keyboard is open to conditionally hide the bottom spacer
+    val isKeyboardOpen = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
@@ -293,6 +297,7 @@ fun MainLayout(
                     .fillMaxSize()
                     .padding(innerPadding)
                     .statusBarsPadding()
+                    .imePadding() // Lift the entire content column when keyboard appears
             ) {
                 header()
                 
@@ -300,7 +305,6 @@ fun MainLayout(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .imePadding()
                 ) {
                     if (showInfoBox) {
                         infoBox(
@@ -311,9 +315,13 @@ fun MainLayout(
                     }
                 }
                 
-                Spacer(modifier = Modifier.navigationBarsPadding().height(80.dp))
+                // Hide the spacer when the keyboard is open to eliminate the gap
+                if (!isKeyboardOpen) {
+                    Spacer(modifier = Modifier.navigationBarsPadding().height(80.dp))
+                }
             }
             
+            // Footer is naturally covered by keyboard as it's an overlay
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
