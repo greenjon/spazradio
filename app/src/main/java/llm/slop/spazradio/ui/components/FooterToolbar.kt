@@ -37,7 +37,7 @@ fun FooterToolbar(
     // use the default to ensure it "checks" if the user is using a nav bar.
     NavigationBar(
         modifier = modifier.fillMaxWidth(),
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.25f),
         contentColor = MaterialTheme.colorScheme.primary,
         tonalElevation = 0.dp,
         windowInsets = NavigationBarDefaults.windowInsets

@@ -50,7 +50,7 @@ fun PlayerHeader(
     onSeek: (Long) -> Unit,
     onModeChange: (AppMode) -> Unit
 ) {
-    val tabRowBackgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+    val tabRowBackgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.25f)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // Full-width background covering status bar and tab row
@@ -79,7 +79,7 @@ fun PlayerHeader(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 stringResource(R.string.label_radio).uppercase(), 
-                                style = MaterialTheme.typography.titleLarge, // Changed from titleMedium
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -87,7 +87,7 @@ fun PlayerHeader(
                                 Text(
                                     text = listenerCount,
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp, // Slightly bigger
+                                        fontSize = 11.sp,
                                         shadow = Shadow(
                                             color = Color.Black.copy(alpha = 0.5f),
                                             offset = Offset(1f, 1f),
@@ -108,7 +108,7 @@ fun PlayerHeader(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 stringResource(R.string.label_archives).uppercase(), 
-                                style = MaterialTheme.typography.titleLarge, // Changed from titleMedium
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -116,7 +116,7 @@ fun PlayerHeader(
                                 Text(
                                     text = stringResource(R.string.label_archives_count, archiveCount),
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp, // Slightly bigger
+                                        fontSize = 11.sp,
                                         shadow = Shadow(
                                             color = Color.Black.copy(alpha = 0.5f),
                                             offset = Offset(1f, 1f),

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
@@ -130,6 +129,23 @@ fun RadioApp(
         pageCount = { pageCount }
     )
 
+    // Sync activeUtility (ViewModel) -> Pager
+    // This handles cases like setAppMode() which reset the utility to INFO
+    LaunchedEffect(activeUtility) {
+        if (activeUtility != ActiveUtility.NONE) {
+            val targetModulo = when (activeUtility) {
+                ActiveUtility.INFO -> 0
+                ActiveUtility.CHAT -> 1
+                ActiveUtility.SETTINGS -> 2
+                else -> 0
+            }
+            if (pagerState.currentPage % 3 != targetModulo) {
+                val baseIndex = (pagerState.currentPage / 3) * 3
+                pagerState.scrollToPage(baseIndex + targetModulo)
+            }
+        }
+    }
+
     val highlightedUtility by remember(pagerState, activeUtility) {
         derivedStateOf {
             if (activeUtility == ActiveUtility.NONE) ActiveUtility.NONE
@@ -142,6 +158,7 @@ fun RadioApp(
         }
     }
 
+    // Sync Pager -> activeUtility (ViewModel)
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { page ->
             if (activeUtility != ActiveUtility.NONE) {
@@ -321,8 +338,6 @@ fun MainLayout(
             }
             
             // Footer is naturally covered by keyboard as it's an overlay.
-            // Removed navigationBarsPadding() from the Box so the NavigationBar 
-            // internal insets can handle extending the background to the edge.
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
