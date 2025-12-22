@@ -55,15 +55,36 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-        )
+        // Initial setup for the edge-to-edge experience.
+        // The real style update happens inside setContent based on the theme.
+        enableEdgeToEdge()
 
         setContent {
             val radioViewModel: RadioViewModel = viewModel()
             val appTheme by radioViewModel.appTheme.collectAsState()
             
+            // Dynamically update status and navigation bar icons based on theme
+            val isDarkTheme = appTheme == AppTheme.DARK || appTheme == AppTheme.NEON
+            LaunchedEffect(appTheme) {
+                if (isDarkTheme) {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+                        navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    )
+                } else {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        ),
+                        navigationBarStyle = SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    )
+                }
+            }
+
             SpazRadioTheme(appTheme = appTheme) {
                 RadioApp(radioViewModel = radioViewModel)
             }
@@ -223,8 +244,6 @@ fun RadioApp(
                                 ActiveUtility.SETTINGS -> 2
                                 else -> 0
                             }
-                            
-                            // Minimal/No animation for snappier utility switching
                             pagerState.scrollToPage(targetPage)
                         }
                     }
@@ -276,7 +295,7 @@ fun MainLayout(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .imePadding() // High-performance keyboard reaction
+                        .imePadding()
                 ) {
                     if (showInfoBox) {
                         infoBox(
@@ -287,8 +306,6 @@ fun MainLayout(
                     }
                 }
                 
-                // Static spacer for toolbar area. 
-                // Does not change height, so no jerky layout shifts.
                 Spacer(modifier = Modifier.navigationBarsPadding().height(80.dp))
             }
             

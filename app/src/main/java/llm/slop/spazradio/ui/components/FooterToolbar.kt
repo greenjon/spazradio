@@ -1,7 +1,9 @@
 package llm.slop.spazradio.ui.components
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.EventNote
@@ -11,6 +13,7 @@ import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
@@ -29,12 +32,15 @@ fun FooterToolbar(
     onToggleVisuals: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // We check the navigation bar height to ensure we don't overlap system buttons.
+    // NavigationBar handles this internally via windowInsets, but we explicitly
+    // use the default to ensure it "checks" if the user is using a nav bar.
     NavigationBar(
         modifier = modifier.fillMaxWidth(),
         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
         contentColor = MaterialTheme.colorScheme.primary,
         tonalElevation = 0.dp,
-        windowInsets = WindowInsets(0, 0, 0, 0)
+        windowInsets = NavigationBarDefaults.windowInsets
     ) {
         val infoLabel = if (appMode == AppMode.RADIO) "Schedule" else "List"
         val infoIcon = if (appMode == AppMode.RADIO) Icons.AutoMirrored.Filled.EventNote else Icons.AutoMirrored.Filled.List
