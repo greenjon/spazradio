@@ -8,6 +8,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.eclipse.paho.client.mqttv3.*
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.Socket
+import javax.net.SocketFactory
+import javax.net.ssl.SSLSocketFactory
 import kotlin.random.Random
 
 class ChatRepository(
@@ -24,6 +29,30 @@ class ChatRepository(
     val connectionError: StateFlow<String?> = _connectionError.asStateFlow()
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // DIRTY HACK: A SocketFactory that forces IPv4 by filtering out IPv6 addresses.
+    // This solves the ECONNREFUSED issue on networks that prefer IPv6 when the 
+    // server is only listening on IPv4.
+    private class ForceIpv4SocketFactory(private val delegate: SocketFactory) : SocketFactory() {
+        override fun createSocket(): Socket = delegate.createSocket()
+        
+        override fun createSocket(host: String?, port: Int): Socket {
+            val ipv4Address = InetAddress.getAllByName(host)
+                .firstOrNull { it is Inet4Address }
+                ?: throw java.net.UnknownHostException("No IPv4 address found for $host")
+            return delegate.createSocket(ipv4Address, port)
+        }
+
+        override fun createSocket(host: String?, port: Int, localHost: InetAddress?, localPort: Int): Socket {
+            return delegate.createSocket(host, port, localHost, localPort)
+        }
+
+        override fun createSocket(host: InetAddress?, port: Int): Socket = delegate.createSocket(host, port)
+
+        override fun createSocket(address: InetAddress?, port: Int, localAddress: InetAddress?, localPort: Int): Socket {
+            return delegate.createSocket(address, port, localAddress, localPort)
+        }
+    }
 
     suspend fun fetchHistory(): List<ChatMessage> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
@@ -118,6 +147,9 @@ class ChatRepository(
                         keepAliveInterval = 30
                         mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1
                         setWill("presence/$clientId", ByteArray(0), 2, true)
+                        
+                        // Apply the IPv4 hack
+                        socketFactory = ForceIpv4SocketFactory(SSLSocketFactory.getDefault())
                     }
                     
                     withContext(Dispatchers.IO) {

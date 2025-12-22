@@ -5,16 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
@@ -92,7 +93,6 @@ fun RadioApp(
 
     val coroutineScope = rememberCoroutineScope()
 
-    // Use a large page count for circular swiping
     val pageCount = 300
     val pagerState = rememberPagerState(
         initialPage = 150 + when (activeUtility) {
@@ -103,7 +103,6 @@ fun RadioApp(
         pageCount = { pageCount }
     )
 
-    // Source of truth for toolbar highlight: current page of the pager
     val highlightedUtility by remember(pagerState, activeUtility) {
         derivedStateOf {
             if (activeUtility == ActiveUtility.NONE) ActiveUtility.NONE
@@ -116,7 +115,6 @@ fun RadioApp(
         }
     }
 
-    // Sync pager -> ViewModel: Only update when the page settles to avoid race conditions
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { page ->
             if (activeUtility != ActiveUtility.NONE) {
@@ -213,7 +211,6 @@ fun RadioApp(
                         radioViewModel.setActiveUtility(ActiveUtility.NONE)
                     } else {
                         val wasClosed = activeUtility == ActiveUtility.NONE
-                        // If closed, open the box first
                         if (wasClosed) {
                             radioViewModel.setActiveUtility(utility)
                         }
@@ -227,15 +224,8 @@ fun RadioApp(
                                 else -> 0
                             }
                             
-                            if (wasClosed) {
-                                pagerState.scrollToPage(targetPage)
-                            } else {
-                                // Fast transition (200ms)
-                                pagerState.animateScrollToPage(
-                                    page = targetPage,
-                                    animationSpec = tween(durationMillis = 200)
-                                )
-                            }
+                            // Minimal/No animation for snappier utility switching
+                            pagerState.scrollToPage(targetPage)
                         }
                     }
                 },
@@ -255,16 +245,8 @@ fun MainLayout(
     infoBox: @Composable (Modifier) -> Unit,
     footer: @Composable () -> Unit
 ) {
-    val isKeyboardOpen = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
-
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        bottomBar = {
-            // Hide the toolbar when the keyboard is open to save space
-            if (!isKeyboardOpen) {
-                footer()
-            }
-        },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         val backgroundModifier = if (appTheme == AppTheme.NEON) {
@@ -282,33 +264,40 @@ fun MainLayout(
                 oscilloscope(Modifier.fillMaxSize())
             }
 
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .statusBarsPadding()
             ) {
-                Column(
+                header()
+                
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding() // This ensures the header is below the status bar
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .imePadding() // High-performance keyboard reaction
                 ) {
-                    header()
-                    // Middle section: HUD style overlay area
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .imePadding() // Lift ONLY the InfoBox area
-                    ) {
-                        if (showInfoBox) {
-                            infoBox(
-                                Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp)
-                            )
-                        }
+                    if (showInfoBox) {
+                        infoBox(
+                            Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                        )
                     }
                 }
+                
+                // Static spacer for toolbar area. 
+                // Does not change height, so no jerky layout shifts.
+                Spacer(modifier = Modifier.navigationBarsPadding().height(80.dp))
+            }
+            
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+            ) {
+                footer()
             }
         }
     }
