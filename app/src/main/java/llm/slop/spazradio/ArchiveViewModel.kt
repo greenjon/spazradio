@@ -16,12 +16,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import llm.slop.spazradio.data.ArchiveRepository
 import llm.slop.spazradio.data.ArchiveShow
 import okhttp3.OkHttpClient
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 sealed class ArchiveUiState {
     data object Loading : ArchiveUiState()
@@ -53,19 +55,32 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     private var searchJob: Job? = null
     private var isFetching = false
 
+    init {
+        startPolling()
+    }
+
+    private fun startPolling() {
+        viewModelScope.launch {
+            while (isActive) {
+                fetchArchivesIfNeeded()
+                // Poll every hour
+                delay(TimeUnit.HOURS.toMillis(1))
+            }
+        }
+    }
+
     fun fetchArchivesIfNeeded() {
-        if (hasFetched || isFetching) {
+        if (isFetching) {
             refreshDownloadStatus()
             return
         }
         
-        // Try loading from cache first
+        // Try loading from cache first if we have nothing
         val cachedShows = repository.getCachedArchives()
         _cachedArchiveCount.value = cachedShows.size
-        if (cachedShows.isNotEmpty()) {
+        if (cachedShows.isNotEmpty() && _uiState.value !is ArchiveUiState.Success) {
             viewModelScope.launch {
                 val downloaded = getDownloadedUrls(cachedShows)
-                // If we don't already have aSuccess state from a previous (maybe ongoing) network fetch
                 if (_uiState.value !is ArchiveUiState.Success) {
                     _uiState.value = ArchiveUiState.Success(
                         shows = cachedShows,
@@ -86,7 +101,6 @@ class ArchiveViewModel(application: Application, private val repository: Archive
         isFetching = true
         
         viewModelScope.launch {
-            // Only show Loading if we don't already have Success state (from cache)
             if (_uiState.value !is ArchiveUiState.Success) {
                 _uiState.value = ArchiveUiState.Loading
             }
@@ -97,7 +111,6 @@ class ArchiveViewModel(application: Application, private val repository: Archive
                     _cachedArchiveCount.value = shows.size
                     val downloaded = getDownloadedUrls(shows)
                     
-                    // Maintain search query if user is already searching
                     val currentQuery = (_uiState.value as? ArchiveUiState.Success)?.searchQuery ?: ""
                     val filtered = if (currentQuery.isBlank()) shows else shows.filter { 
                         it.title.contains(currentQuery, ignoreCase = true) || 

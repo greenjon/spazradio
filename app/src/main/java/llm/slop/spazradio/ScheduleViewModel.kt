@@ -9,8 +9,10 @@ import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -60,7 +62,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
     init {
         loadFromCache()
-        loadSchedule()
+        startPolling()
     }
 
     private fun loadFromCache() {
@@ -78,12 +80,21 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                     
                     if (validShows.isNotEmpty()) {
                         _schedule.value = validShows
-                        // If we have valid cached data, we can stop the initial loading spinner
                         _loading.value = false
                     }
                 }
             } catch (e: Exception) {
                 Log.e("ScheduleViewModel", "Error loading cache", e)
+            }
+        }
+    }
+
+    private fun startPolling() {
+        viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                loadScheduleSync()
+                // Poll every hour
+                delay(TimeUnit.HOURS.toMillis(1))
             }
         }
     }
@@ -97,62 +108,58 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // Public alias for manual refresh if ever needed
     fun loadSchedule() {
         viewModelScope.launch(Dispatchers.IO) {
-            if (_schedule.value.isEmpty()) {
-                _loading.value = true
-            }
-            _error.value = null
+            loadScheduleSync()
+        }
+    }
 
-            var attempt = 0
-            val maxAttempts = 2
+    private suspend fun loadScheduleSync() {
+        if (_schedule.value.isEmpty()) {
+            _loading.value = true
+        }
+        _error.value = null
 
-            while (attempt < maxAttempts) {
-                try {
-                    val request = Request.Builder()
-                        .url("https://radio.spaz.org/djdash/droid")
-                        .build()
+        var attempt = 0
+        val maxAttempts = 2
 
-                    client.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) {
-                            throw IOException("Unexpected code $response")
-                        }
+        while (attempt < maxAttempts) {
+            try {
+                val request = Request.Builder()
+                    .url("https://radio.spaz.org/djdash/droid")
+                    .build()
 
-                        val body = response.body ?: throw IOException("Empty body")
-                        val responseData = body.string()
-                        val type = object : TypeToken<List<RawShow>>() {}.type
-                        val rawShows: List<RawShow> = gson.fromJson(responseData, type)
-
-                        val now = System.currentTimeMillis()
-                        
-                        // Prune and format
-                        val validShows = rawShows
-                            .filter { it.end_timestamp > now }
-                        
-                        _schedule.value = validShows.map { formatShowItem(it) }
-                        
-                        // Persist the full raw list for future launches
-                        saveToCache(rawShows)
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        throw IOException("Unexpected code $response")
                     }
 
-                    // Success → exit retry loop
-                    break
+                    val body = response.body ?: throw IOException("Empty body")
+                    val responseData = body.string()
+                    val type = object : TypeToken<List<RawShow>>() {}.type
+                    val rawShows: List<RawShow> = gson.fromJson(responseData, type)
 
-                } catch (e: IOException) {
-                    attempt++
-                    if (attempt >= maxAttempts) {
-                        Log.e("ScheduleViewModel", "Error fetching schedule", e)
-                        if (_schedule.value.isEmpty()) {
-                            _error.value = "Schedule unavailable"
-                        }
-                    } else {
-                        kotlinx.coroutines.delay(1_000)
+                    val now = System.currentTimeMillis()
+                    val validShows = rawShows.filter { it.end_timestamp > now }
+                    
+                    _schedule.value = validShows.map { formatShowItem(it) }
+                    saveToCache(rawShows)
+                }
+                break
+            } catch (e: Exception) {
+                attempt++
+                if (attempt >= maxAttempts) {
+                    Log.e("ScheduleViewModel", "Error fetching schedule", e)
+                    if (_schedule.value.isEmpty()) {
+                        _error.value = "Schedule unavailable"
                     }
+                } else {
+                    delay(2_000)
                 }
             }
-
-            _loading.value = false
         }
+        _loading.value = false
     }
 
     private fun formatShowItem(show: RawShow): ScheduleItem {
@@ -160,15 +167,13 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         val end = Date(show.end_timestamp)
 
         val weekdayFormat = SimpleDateFormat("EEE", Locale.getDefault())
-        val monthDayPattern =
-            DateFormat.getBestDateTimePattern(Locale.getDefault(), "MMdd")
+        val monthDayPattern = DateFormat.getBestDateTimePattern(Locale.getDefault(), "MMdd")
         val monthDayFormat = SimpleDateFormat(monthDayPattern, Locale.getDefault())
 
-        val timeFormat =
-            java.text.DateFormat.getTimeInstance(
-                java.text.DateFormat.SHORT,
-                Locale.getDefault()
-            )
+        val timeFormat = java.text.DateFormat.getTimeInstance(
+            java.text.DateFormat.SHORT,
+            Locale.getDefault()
+        )
 
         val cleanName = android.text.Html
             .fromHtml(show.name, android.text.Html.FROM_HTML_MODE_LEGACY)
