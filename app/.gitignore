@@ -1,1 +1,12 @@
-/build
+# Build artifacts
+**/build/
+/app/release/*
+/app/debug/*
+
+# Signed binaries
+*.apk
+*.aab
+
+# Key management
+*.jks
+*.keystore
