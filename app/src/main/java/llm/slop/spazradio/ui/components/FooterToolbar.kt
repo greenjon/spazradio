@@ -84,6 +84,6 @@ private fun navigationBarItemColors() = NavigationBarItemDefaults.colors(
     selectedIconColor = MaterialTheme.colorScheme.onPrimary,
     unselectedIconColor = MaterialTheme.colorScheme.onSecondary,
     selectedTextColor = MaterialTheme.colorScheme.onSurface,
-    unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+    unselectedTextColor = MaterialTheme.colorScheme.onSurface,
     indicatorColor = MaterialTheme.colorScheme.primary
 )

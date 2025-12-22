@@ -296,8 +296,7 @@ fun MainLayout(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .statusBarsPadding()
-                    .imePadding() // Lift the entire content column when keyboard appears
+                    .imePadding() 
             ) {
                 header()
                 
@@ -321,11 +320,13 @@ fun MainLayout(
                 }
             }
             
-            // Footer is naturally covered by keyboard as it's an overlay
+            // Footer is naturally covered by keyboard as it's an overlay.
+            // Removed navigationBarsPadding() from the Box so the NavigationBar 
+            // internal insets can handle extending the background to the edge.
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
+                    .fillMaxWidth()
             ) {
                 footer()
             }

@@ -1,5 +1,6 @@
 package llm.slop.spazradio.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,77 +50,87 @@ fun PlayerHeader(
     onSeek: (Long) -> Unit,
     onModeChange: (AppMode) -> Unit
 ) {
+    val tabRowBackgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        PrimaryTabRow(
-            selectedTabIndex = if (appMode == AppMode.RADIO) 0 else 1,
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            indicator = {
-                TabRowDefaults.PrimaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(if (appMode == AppMode.RADIO) 0 else 1),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            },
-            divider = {}
+        // Full-width background covering status bar and tab row
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(tabRowBackgroundColor)
+                .statusBarsPadding()
         ) {
-            Tab(
-                selected = appMode == AppMode.RADIO,
-                onClick = { onModeChange(AppMode.RADIO) },
-                text = { 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            stringResource(R.string.label_radio).uppercase(), 
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        if (listenerCount.isNotBlank()) {
+            PrimaryTabRow(
+                selectedTabIndex = if (appMode == AppMode.RADIO) 0 else 1,
+                containerColor = Color.Transparent, // Color handled by the outer Box
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                indicator = {
+                    TabRowDefaults.PrimaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(if (appMode == AppMode.RADIO) 0 else 1),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                },
+                divider = {}
+            ) {
+                Tab(
+                    selected = appMode == AppMode.RADIO,
+                    onClick = { onModeChange(AppMode.RADIO) },
+                    text = { 
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = listenerCount,
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.sp,
-                                    shadow = Shadow(
-                                        color = Color.Black.copy(alpha = 0.5f),
-                                        offset = Offset(1f, 1f),
-                                        blurRadius = 2f
-                                    )
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center
+                                stringResource(R.string.label_radio).uppercase(), 
+                                style = MaterialTheme.typography.titleLarge, // Changed from titleMedium
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                            if (listenerCount.isNotBlank()) {
+                                Text(
+                                    text = listenerCount,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp, // Slightly bigger
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.5f),
+                                            offset = Offset(1f, 1f),
+                                            blurRadius = 2f
+                                        )
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
-                }
-            )
-            Tab(
-                selected = appMode == AppMode.ARCHIVES,
-                onClick = { onModeChange(AppMode.ARCHIVES) },
-                text = { 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            stringResource(R.string.label_archives).uppercase(), 
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        if (archiveCount > 0) {
+                )
+                Tab(
+                    selected = appMode == AppMode.ARCHIVES,
+                    onClick = { onModeChange(AppMode.ARCHIVES) },
+                    text = { 
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = stringResource(R.string.label_archives_count, archiveCount),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.sp,
-                                    shadow = Shadow(
-                                        color = Color.Black.copy(alpha = 0.5f),
-                                        offset = Offset(1f, 1f),
-                                        blurRadius = 2f
-                                    )
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center
+                                stringResource(R.string.label_archives).uppercase(), 
+                                style = MaterialTheme.typography.titleLarge, // Changed from titleMedium
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                            if (archiveCount > 0) {
+                                Text(
+                                    text = stringResource(R.string.label_archives_count, archiveCount),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 11.sp, // Slightly bigger
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.5f),
+                                            offset = Offset(1f, 1f),
+                                            blurRadius = 2f
+                                        )
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
         }
 
         Row(
