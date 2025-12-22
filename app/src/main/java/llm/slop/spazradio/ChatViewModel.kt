@@ -19,11 +19,13 @@ import kotlinx.coroutines.launch
 import llm.slop.spazradio.data.ChatMessage
 import llm.slop.spazradio.data.ChatRepository
 import llm.slop.spazradio.utils.NetworkMonitor
-import okhttp3.OkHttpClient
+import llm.slop.spazradio.utils.SpazNetwork
 
 class ChatViewModel(application: Application) : AndroidViewModel(application), DefaultLifecycleObserver {
     private val sharedPrefs = application.getSharedPreferences("spaz_chat", Context.MODE_PRIVATE)
-    private val repository = ChatRepository(OkHttpClient(), Gson())
+    
+    // Updated to use shared OkHttpClient
+    private val repository = ChatRepository(SpazNetwork.client, Gson())
     private val networkMonitor = NetworkMonitor(application)
 
     val messages = mutableStateListOf<ChatMessage>()
@@ -41,12 +43,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
 
     init {
         Log.d("ChatViewModel", "Initializing ChatViewModel")
-        
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         viewModelScope.launch {
+            // Load history once on start
             try {
-                Log.d("ChatViewModel", "Fetching history...")
                 val history = repository.fetchHistory()
                 messages.clear()
                 messages.addAll(history)
@@ -72,6 +73,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
                 }
             }
 
+            // Centralized connection trigger: Network Online
             launch {
                 networkMonitor.isOnline.collectLatest { isOnline ->
                     if (isOnline && _username.value.isNotEmpty()) {
@@ -84,6 +86,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
 
     override fun onResume(owner: LifecycleOwner) {
         super.onResume(owner)
+        // Secondary trigger: App foregrounded
         if (_username.value.isNotEmpty()) {
             repository.connect(_username.value)
         }
@@ -99,7 +102,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
         _username.value = ""
         sharedPrefs.edit().remove("username").apply()
         repository.disconnect()
-        // We don't reconnect here; the Chat UI will handle the prompt when opened
     }
 
     fun sendMessage(text: String) {
