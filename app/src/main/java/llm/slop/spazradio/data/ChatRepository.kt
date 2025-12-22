@@ -30,10 +30,12 @@ class ChatRepository(
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // DIRTY HACK: A SocketFactory that forces IPv4 by filtering out IPv6 addresses.
-    // This solves the ECONNREFUSED issue on networks that prefer IPv6 when the 
-    // server is only listening on IPv4.
-    private class ForceIpv4SocketFactory(private val delegate: SocketFactory) : SocketFactory() {
+    // DIRTY HACK: An SSLSocketFactory that forces IPv4 by filtering out IPv6 addresses.
+    // For wss:// connections, Paho requires the factory to be an instance of SSLSocketFactory.
+    private class ForceIpv4SSLSocketFactory(private val delegate: SSLSocketFactory) : SSLSocketFactory() {
+        override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
+        override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
+
         override fun createSocket(): Socket = delegate.createSocket()
         
         override fun createSocket(host: String?, port: Int): Socket {
@@ -51,6 +53,10 @@ class ChatRepository(
 
         override fun createSocket(address: InetAddress?, port: Int, localAddress: InetAddress?, localPort: Int): Socket {
             return delegate.createSocket(address, port, localAddress, localPort)
+        }
+
+        override fun createSocket(s: Socket?, host: String?, port: Int, autoClose: Boolean): Socket {
+            return delegate.createSocket(s, host, port, autoClose)
         }
     }
 
@@ -148,8 +154,8 @@ class ChatRepository(
                         mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1
                         setWill("presence/$clientId", ByteArray(0), 2, true)
                         
-                        // Apply the IPv4 hack
-                        socketFactory = ForceIpv4SocketFactory(SSLSocketFactory.getDefault())
+                        // Apply the IPv4 hack using a proper SSLSocketFactory subclass
+                        socketFactory = ForceIpv4SSLSocketFactory(SSLSocketFactory.getDefault() as SSLSocketFactory)
                     }
                     
                     withContext(Dispatchers.IO) {
