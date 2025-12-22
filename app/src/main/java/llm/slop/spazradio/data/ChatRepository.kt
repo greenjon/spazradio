@@ -20,6 +20,9 @@ class ChatRepository(
     private val _onlineUsers = MutableStateFlow<Map<String, String>>(emptyMap())
     private val _incomingMessages = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 64)
     
+    private val _connectionError = MutableStateFlow<String?>(null)
+    val connectionError: StateFlow<String?> = _connectionError.asStateFlow()
+
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     suspend fun fetchHistory(): List<ChatMessage> = withContext(Dispatchers.IO) {
@@ -32,7 +35,7 @@ class ChatRepository(
             try {
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        val body = response.body ?: return@withContext emptyList()
+                        val body = response.body
                         val json = body.string()
                         val historyResponse = gson.fromJson(json, HistoryResponse::class.java)
                         
@@ -62,11 +65,13 @@ class ChatRepository(
         client.setCallback(object : MqttCallbackExtended {
             override fun connectComplete(reconnect: Boolean, serverURI: String?) {
                 Log.d("ChatRepo", "MQTT Connect Complete. Reconnect: $reconnect")
+                _connectionError.value = null
                 subscribeAll()
             }
 
             override fun connectionLost(cause: Throwable?) {
                 Log.w("ChatRepo", "MQTT Connection Lost: ${cause?.message}")
+                _connectionError.value = cause?.message ?: "Connection lost"
             }
 
             override fun messageArrived(topic: String?, message: MqttMessage?) {
@@ -104,6 +109,7 @@ class ChatRepository(
         repositoryScope.launch {
             try {
                 if (!client.isConnected) {
+                    _connectionError.value = null
                     Log.d("ChatRepo", "Connecting to MQTT (v3.1.1)...")
                     val options = MqttConnectOptions().apply {
                         isCleanSession = true
@@ -122,6 +128,7 @@ class ChatRepository(
                 publishPresence(username)
             } catch (e: Exception) {
                 Log.e("ChatRepo", "MQTT Connect Failed", e)
+                _connectionError.value = e.cause?.message ?: e.message ?: "Connect failed"
             }
         }
     }
@@ -131,8 +138,10 @@ class ChatRepository(
             mqttClient?.subscribe("spazradio", 2)
             mqttClient?.subscribe("presence/#", 2)
             Log.d("ChatRepo", "Subscribed to topics (QoS 2)")
+            _connectionError.value = null
         } catch (e: Exception) {
             Log.e("ChatRepo", "Subscribe failed", e)
+            _connectionError.value = "Subscribe failed: ${e.message}"
         }
     }
 
@@ -158,6 +167,7 @@ class ChatRepository(
         val client = mqttClient ?: return
         if (!client.isConnected) {
             Log.w("ChatRepo", "Cannot send: Not connected")
+            _connectionError.value = "Not connected"
             return
         }
 
@@ -168,6 +178,7 @@ class ChatRepository(
                 Log.d("ChatRepo", "Message sent: $text")
             } catch (e: Exception) {
                 Log.e("ChatRepo", "Send failed", e)
+                _connectionError.value = "Send failed: ${e.message}"
             }
         }
     }
@@ -179,6 +190,7 @@ class ChatRepository(
                 mqttClient?.disconnect()
             }
             mqttClient = null
+            _connectionError.value = null
         } catch (e: Exception) {
             Log.e("ChatRepo", "Error during disconnect", e)
         }

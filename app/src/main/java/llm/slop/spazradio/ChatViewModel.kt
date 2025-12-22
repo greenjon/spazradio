@@ -37,6 +37,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
     private val _username = mutableStateOf(sharedPrefs.getString("username", "") ?: "")
     val username: State<String> = _username
 
+    val connectionError: StateFlow<String?> = repository.connectionError
+
     init {
         Log.d("ChatViewModel", "Initializing ChatViewModel")
         

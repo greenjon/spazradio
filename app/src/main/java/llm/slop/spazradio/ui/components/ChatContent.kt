@@ -38,16 +38,32 @@ fun ChatContent(
     val username by viewModel.username
     val messages = viewModel.messages
     val onlineNames by viewModel.onlineNames.collectAsState()
+    val error by viewModel.connectionError.collectAsState()
 
-    if (username.isEmpty()) {
-        NicknameEntry(onJoin = { viewModel.setUsername(it) })
-    } else {
-        ChatLayout(
-            messages = messages,
-            onlineNames = onlineNames,
-            onSendMessage = { viewModel.sendMessage(it) },
-            modifier = modifier
-        )
+    Column(modifier = modifier.fillMaxSize()) {
+        if (error != null) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Connection Error: $error",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(8.dp),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        if (username.isEmpty()) {
+            NicknameEntry(onJoin = { viewModel.setUsername(it) })
+        } else {
+            ChatLayout(
+                messages = messages,
+                onlineNames = onlineNames,
+                onSendMessage = { viewModel.sendMessage(it) }
+            )
+        }
     }
 }
 
