@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.annotation.OptIn
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
@@ -107,11 +109,18 @@ class RadioService : MediaSessionService() {
             }
         }
 
+        // Configure Audio Attributes for Radio (Music + handleAudioFocus)
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
         player = ExoPlayer.Builder(this, renderersFactory)
             .setMediaSourceFactory(
                 DefaultMediaSourceFactory(this).setDataSourceFactory(okHttpDataSourceFactory)
             )
             .setLoadControl(loadControl)
+            .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
             .build()
         
         player?.playWhenReady = true
@@ -124,8 +133,6 @@ class RadioService : MediaSessionService() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-        // FIX: Set a stable ID for the MediaSession. This helps the system reuse existing
-        // notifications and resumption slots instead of creating new ones.
         mediaSession = MediaSession.Builder(this, player!!)
             .setId("spaz_radio_session")
             .setSessionActivity(sessionActivityPendingIntent)
@@ -220,7 +227,6 @@ class RadioService : MediaSessionService() {
                 } catch (_: Exception) { 0 }
             } else { 0 }
 
-            // Only update if something actually changed to avoid notification flickers or redundant work
             if (playing == lastPlayingTitle && listeners == lastListenerCount) {
                 return
             }
@@ -237,16 +243,11 @@ class RadioService : MediaSessionService() {
                 player?.let { exoPlayer ->
                     val currentItem = exoPlayer.currentMediaItem
                     if (currentItem != null && currentItem.mediaId == liveMediaID) {
-                        // FIX: Use replaceMediaItem with resetPosition = false.
-                        // This updates the item in the playlist without interrupting playback
-                        // or triggering a "new track" notification logic in many system versions.
                         val newItem = currentItem.buildUpon()
                             .setMediaMetadata(newMetadata)
                             .build()
                         
                         exoPlayer.replaceMediaItem(exoPlayer.currentMediaItemIndex, newItem)
-                        // Note: Media3 handles notification updates automatically when the player's 
-                        // current item metadata changes.
                     }
                 }
             }
