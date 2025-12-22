@@ -83,6 +83,7 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.material)
     implementation(libs.paho)
+    implementation("androidx.work:work-runtime-ktx:2.11.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
