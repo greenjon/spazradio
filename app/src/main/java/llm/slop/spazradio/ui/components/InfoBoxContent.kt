@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -49,6 +50,7 @@ import llm.slop.spazradio.R
 import llm.slop.spazradio.RadioViewModel
 import llm.slop.spazradio.ScheduleItem
 import llm.slop.spazradio.ScheduleViewModel
+import llm.slop.spazradio.utils.LogCollector
 
 @Composable
 fun SettingsContent(
@@ -98,6 +100,31 @@ fun SettingsContent(
                 selected = currentTheme == AppTheme.AUTO,
                 onClick = { radioViewModel.setAppTheme(AppTheme.AUTO) }
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Debug & Logs Section
+            Text(
+                text = "Debug & Support",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Button(
+                onClick = { LogCollector.shareLogs(context) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f),
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.BugReport, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Send Debug Logs")
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
