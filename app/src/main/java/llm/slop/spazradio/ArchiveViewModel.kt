@@ -51,9 +51,10 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     private var hasFetched = false
     private val activeDownloadIds = mutableMapOf<String, Long>()
     private var searchJob: Job? = null
+    private var isFetching = false
 
     fun fetchArchivesIfNeeded() {
-        if (hasFetched) {
+        if (hasFetched || isFetching) {
             refreshDownloadStatus()
             return
         }
@@ -64,13 +65,16 @@ class ArchiveViewModel(application: Application, private val repository: Archive
         if (cachedShows.isNotEmpty()) {
             viewModelScope.launch {
                 val downloaded = getDownloadedUrls(cachedShows)
-                _uiState.value = ArchiveUiState.Success(
-                    shows = cachedShows,
-                    filteredShows = cachedShows,
-                    downloadedUrls = downloaded,
-                    downloadingUrls = emptySet(),
-                    searchQuery = ""
-                )
+                // If we don't already have aSuccess state from a previous (maybe ongoing) network fetch
+                if (_uiState.value !is ArchiveUiState.Success) {
+                    _uiState.value = ArchiveUiState.Success(
+                        shows = cachedShows,
+                        filteredShows = cachedShows,
+                        downloadedUrls = downloaded,
+                        downloadingUrls = emptySet(),
+                        searchQuery = ""
+                    )
+                }
             }
         }
         
@@ -78,6 +82,9 @@ class ArchiveViewModel(application: Application, private val repository: Archive
     }
 
     fun fetchArchives() {
+        if (isFetching) return
+        isFetching = true
+        
         viewModelScope.launch {
             // Only show Loading if we don't already have Success state (from cache)
             if (_uiState.value !is ArchiveUiState.Success) {
@@ -109,9 +116,12 @@ class ArchiveViewModel(application: Application, private val repository: Archive
                     _uiState.value = ArchiveUiState.Error("No archives found or network error.")
                 }
             } catch (e: Exception) {
+                Log.e("ArchiveViewModel", "Fetch failed", e)
                 if (_uiState.value !is ArchiveUiState.Success) {
                     _uiState.value = ArchiveUiState.Error(e.message ?: "Unknown error")
                 }
+            } finally {
+                isFetching = false
             }
         }
     }

@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import llm.slop.spazradio.ui.components.ArchiveContent
 import llm.slop.spazradio.ui.components.ChatContent
@@ -55,15 +56,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initial setup for the edge-to-edge experience.
-        // The real style update happens inside setContent based on the theme.
         enableEdgeToEdge()
 
         setContent {
             val radioViewModel: RadioViewModel = viewModel()
             val appTheme by radioViewModel.appTheme.collectAsState()
             
-            // Dynamically update status and navigation bar icons based on theme
             val isDarkTheme = appTheme == AppTheme.DARK || appTheme == AppTheme.NEON
             LaunchedEffect(appTheme) {
                 if (isDarkTheme) {
@@ -113,6 +111,13 @@ fun RadioApp(
     val appTheme by radioViewModel.appTheme.collectAsState()
 
     val coroutineScope = rememberCoroutineScope()
+
+    // BACKGROUND DATA LOADING
+    // Pre-populate archives after a delay to avoid interfering with initial stream buffering
+    LaunchedEffect(Unit) {
+        delay(5000) // Wait 5 seconds after launch
+        archiveViewModel.fetchArchivesIfNeeded()
+    }
 
     val pageCount = 300
     val pagerState = rememberPagerState(
