@@ -11,12 +11,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -50,13 +49,13 @@ fun PlayerHeader(
     onModeChange: (AppMode) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        TabRow(
+        PrimaryTabRow(
             selectedTabIndex = if (appMode == AppMode.RADIO) 0 else 1,
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            indicator = { tabPositions ->
+            indicator = {
                 TabRowDefaults.PrimaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[if (appMode == AppMode.RADIO) 0 else 1]),
+                    modifier = Modifier.tabIndicatorOffset(if (appMode == AppMode.RADIO) 0 else 1),
                     color = MaterialTheme.colorScheme.primary
                 )
             },

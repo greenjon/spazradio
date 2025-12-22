@@ -104,6 +104,14 @@ fun ChatLayout(
     val listState = rememberLazyListState()
     var isInitialLoad by remember { mutableStateOf(true) }
 
+    // Scroll to bottom when keyboard appears/disappears
+    val isImeVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+    LaunchedEffect(isImeVisible) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             if (isInitialLoad) {
@@ -121,9 +129,7 @@ fun ChatLayout(
     }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .imePadding()
+        modifier = modifier.fillMaxSize()
     ) {
         // Online Users Row
         Row(

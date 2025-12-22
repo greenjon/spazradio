@@ -9,8 +9,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
@@ -27,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
@@ -250,9 +256,17 @@ fun MainLayout(
     infoBox: @Composable (Modifier) -> Unit,
     footer: @Composable () -> Unit
 ) {
+    val isKeyboardOpen = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        bottomBar = footer
+        bottomBar = {
+            // Hide the toolbar when the keyboard is open to save space
+            if (!isKeyboardOpen) {
+                footer()
+            }
+        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         val backgroundModifier = if (appTheme == AppTheme.NEON) {
             Modifier.background(Brush.verticalGradient(listOf(DeepBlue, NeonMagenta, DeepBlue)))
@@ -276,7 +290,13 @@ fun MainLayout(
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     header()
-                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    // Middle section: HUD style overlay area
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .imePadding() // Lift ONLY the InfoBox area
+                    ) {
                         if (showInfoBox) {
                             infoBox(
                                 Modifier
