@@ -15,15 +15,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
@@ -58,12 +62,15 @@ fun SettingsContent(
     chatViewModel: ChatViewModel
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
+    var showThemeMenu by remember { mutableStateOf(false) }
     val currentTheme by radioViewModel.appTheme.collectAsState()
     val context = LocalContext.current
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -71,39 +78,70 @@ fun SettingsContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            // Theme Section
-            Text(
-                text = stringResource(R.string.theme_settings),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Theme Section (Collapsible)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showThemeMenu = !showThemeMenu }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.theme_settings),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = when(currentTheme) {
+                                AppTheme.NEON -> stringResource(R.string.theme_neon)
+                                AppTheme.LIGHT -> stringResource(R.string.theme_light)
+                                AppTheme.DARK -> stringResource(R.string.theme_dark)
+                                AppTheme.AUTO -> stringResource(R.string.theme_auto)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Text(
+                    text = if (showThemeMenu) "CLOSE" else "CHANGE",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
 
-            ThemeOption(
-                label = stringResource(R.string.theme_neon),
-                selected = currentTheme == AppTheme.NEON,
-                onClick = { radioViewModel.setAppTheme(AppTheme.NEON) }
-            )
-            ThemeOption(
-                label = stringResource(R.string.theme_light),
-                selected = currentTheme == AppTheme.LIGHT,
-                onClick = { radioViewModel.setAppTheme(AppTheme.LIGHT) }
-            )
-            ThemeOption(
-                label = stringResource(R.string.theme_dark),
-                selected = currentTheme == AppTheme.DARK,
-                onClick = { radioViewModel.setAppTheme(AppTheme.DARK) }
-            )
-            ThemeOption(
-                label = stringResource(R.string.theme_auto),
-                selected = currentTheme == AppTheme.AUTO,
-                onClick = { radioViewModel.setAppTheme(AppTheme.AUTO) }
-            )
+            if (showThemeMenu) {
+                Column(modifier = Modifier.padding(start = 36.dp, top = 8.dp, bottom = 16.dp)) {
+                    ThemeOption(
+                        label = stringResource(R.string.theme_neon),
+                        selected = currentTheme == AppTheme.NEON,
+                        onClick = { radioViewModel.setAppTheme(AppTheme.NEON) }
+                    )
+                    ThemeOption(
+                        label = stringResource(R.string.theme_light),
+                        selected = currentTheme == AppTheme.LIGHT,
+                        onClick = { radioViewModel.setAppTheme(AppTheme.LIGHT) }
+                    )
+                    ThemeOption(
+                        label = stringResource(R.string.theme_dark),
+                        selected = currentTheme == AppTheme.DARK,
+                        onClick = { radioViewModel.setAppTheme(AppTheme.DARK) }
+                    )
+                    ThemeOption(
+                        label = stringResource(R.string.theme_auto),
+                        selected = currentTheme == AppTheme.AUTO,
+                        onClick = { radioViewModel.setAppTheme(AppTheme.AUTO) }
+                    )
+                }
+            }
 
-            Spacer(modifier = Modifier.height(24.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
-            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
             // Debug & Logs Section
             Text(
@@ -111,14 +149,10 @@ fun SettingsContent(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
-            Button(
+            OutlinedButton(
                 onClick = { LogCollector.shareLogs(context) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f),
-                    contentColor = MaterialTheme.colorScheme.onSecondary
-                ),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.BugReport, contentDescription = null)
@@ -126,9 +160,7 @@ fun SettingsContent(
                 Text("Send Debug Logs")
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
-            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
             // Chat Section
             Text(
@@ -136,13 +168,13 @@ fun SettingsContent(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
             Button(
                 onClick = { showResetDialog = true },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                    contentColor = MaterialTheme.colorScheme.error
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -171,13 +203,12 @@ fun SettingsContent(
                         Button(onClick = { showResetDialog = false }) {
                             Text(stringResource(R.string.action_cancel))
                         }
-                    },
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.primary,
-                    textContentColor = MaterialTheme.colorScheme.onSurface
+                    }
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
 
         // Privacy & Info Section
         val privacyInfo = stringResource(R.string.privacy_info_text, "")
@@ -204,7 +235,7 @@ fun SettingsContent(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 fontSize = 10.sp
             ),
-            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+            modifier = Modifier.padding(top = 16.dp, bottom = 16.dp),
             onClick = { offset ->
                 annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
                     .firstOrNull()?.let { annotation ->
