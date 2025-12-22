@@ -135,8 +135,12 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         val mediaId = controller.currentMediaItem?.mediaId
         val isLive = mediaId == liveStreamId
 
-        // Only update trackListeners if we are actually listening to the live stream
-        if (isLive && artist.contains(context.getString(R.string.listening_template).split("%d").first())) {
+        // FIX: Only update trackListeners if the metadata artist actually looks like a listener count string.
+        // We check if it contains the localized prefix (e.g., "Listeners: ").
+        // This prevents show titles (which might be in the artist field temporarily during transitions) 
+        // from leaking into the tab bar.
+        val listenerPrefix = context.getString(R.string.listening_template).split("%d").first()
+        if (isLive && artist.startsWith(listenerPrefix)) {
             _trackListeners.value = artist
         }
 
