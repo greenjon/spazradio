@@ -4,6 +4,8 @@ import android.util.Log
 import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.eclipse.paho.client.mqttv3.*
@@ -30,7 +32,8 @@ class ChatRepository(
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
-    // GUARD: Prevents multiple concurrent connection attempts
+    // ATOMIC GUARD: Ensures only one thread can evaluate/change connection state at a time
+    private val connectionMutex = Mutex()
     private var isConnecting = false
 
     private class ForceIpv4SSLSocketFactory(private val delegate: SSLSocketFactory) : SSLSocketFactory() {
@@ -83,14 +86,15 @@ class ChatRepository(
         client.setCallback(object : MqttCallbackExtended {
             override fun connectComplete(reconnect: Boolean, serverURI: String?) {
                 Log.d("ChatRepo", "MQTT Connect Complete. Reconnect: $reconnect")
-                isConnecting = false // Reset guard on success
+                repositoryScope.launch {
+                    connectionMutex.withLock { isConnecting = false }
+                }
                 _connectionError.value = null
                 subscribeAll()
             }
 
             override fun connectionLost(cause: Throwable?) {
                 Log.w("ChatRepo", "MQTT Connection Lost: ${cause?.message}")
-                // Don't reset guard here; Paho might be auto-reconnecting
                 _connectionError.value = cause?.message ?: "Connection lost"
             }
 
@@ -101,7 +105,7 @@ class ChatRepository(
                         val rawMsg = gson.fromJson(payload, ChatMessage::class.java)
                         _incomingMessages.tryEmit(rawMsg.copy(timeReceived = rawMsg.timeReceived / 1000L))
                     } catch (e: Exception) {
-                        Log.e("ChatRepo", "JSON parse error", e)
+                        Log.e("ChatRepo", "JSON parse error")
                     }
                 } else if (topic?.startsWith("presence/") == true) {
                     val id = topic.substringAfter("presence/")
@@ -123,16 +127,16 @@ class ChatRepository(
         val client = getOrCreateMqttClient()
         
         repositoryScope.launch {
-            // Check connectivity AND the guard flag
-            if (client.isConnected || isConnecting) {
-                Log.d("ChatRepo", "Connect skipped: Connected=${client.isConnected}, Connecting=$isConnecting")
-                // If we are already connected, we still want to ensure presence is published
-                if (client.isConnected) publishPresence(username)
-                return@launch
+            connectionMutex.withLock {
+                if (client.isConnected || isConnecting) {
+                    Log.d("ChatRepo", "Connect attempt blocked: Busy or already connected")
+                    if (client.isConnected) publishPresence(username)
+                    return@launch
+                }
+                isConnecting = true
             }
 
             try {
-                isConnecting = true
                 _connectionError.value = null
                 
                 val options = MqttConnectOptions().apply {
@@ -145,14 +149,13 @@ class ChatRepository(
                     socketFactory = ForceIpv4SSLSocketFactory(SSLSocketFactory.getDefault() as SSLSocketFactory)
                 }
                 
-                Log.d("ChatRepo", "Initiating MQTT connection...")
+                Log.d("ChatRepo", "Starting MQTT connection sequence...")
                 withContext(Dispatchers.IO) {
                     client.connect(options)
                 }
-                // publishPresence will be handled by connectComplete callback if successful
             } catch (e: Exception) {
-                isConnecting = false // Reset guard so we can try again
-                Log.e("ChatRepo", "MQTT Connect Failed", e)
+                connectionMutex.withLock { isConnecting = false }
+                Log.e("ChatRepo", "MQTT Connect Failed: ${e.message}")
                 _connectionError.value = e.cause?.message ?: e.message ?: "Connect failed"
             }
         }
@@ -164,7 +167,7 @@ class ChatRepository(
             mqttClient?.subscribe("presence/#", 2)
             _connectionError.value = null
         } catch (e: Exception) {
-            Log.e("ChatRepo", "Subscribe failed", e)
+            Log.e("ChatRepo", "Subscribe failed")
         }
     }
 
@@ -174,7 +177,7 @@ class ChatRepository(
             try {
                 client.publish("presence/$clientId", username.toByteArray(), 2, true)
             } catch (e: Exception) {
-                Log.e("ChatRepo", "Publish presence failed", e)
+                Log.e("ChatRepo", "Publish presence failed")
             }
         }
     }
@@ -202,14 +205,16 @@ class ChatRepository(
 
     fun disconnect() {
         try {
-            isConnecting = false
+            repositoryScope.launch {
+                connectionMutex.withLock { isConnecting = false }
+            }
             if (mqttClient?.isConnected == true) {
                 mqttClient?.disconnect()
             }
             mqttClient = null
             _connectionError.value = null
         } catch (e: Exception) {
-            Log.e("ChatRepo", "Error during disconnect", e)
+            Log.e("ChatRepo", "Error during disconnect")
         }
     }
 }
