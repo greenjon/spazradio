@@ -14,7 +14,10 @@ import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.Socket
 import javax.net.SocketFactory
+import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 import kotlin.random.Random
 
 class ChatRepository(
@@ -32,11 +35,11 @@ class ChatRepository(
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
-    // ATOMIC GUARD: Ensures only one thread can evaluate/change connection state at a time
     private val connectionMutex = Mutex()
     private var isConnecting = false
 
-    private class ForceIpv4SSLSocketFactory(private val delegate: SSLSocketFactory) : SSLSocketFactory() {
+    // ATOMIC FIX: Force TLS 1.2 and IPv4 simultaneously
+    private class ForceCompatibilitySSLSocketFactory(private val delegate: SSLSocketFactory) : SSLSocketFactory() {
         override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
         override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
         override fun createSocket(): Socket = delegate.createSocket()
@@ -139,6 +142,11 @@ class ChatRepository(
             try {
                 _connectionError.value = null
                 
+                // Set up TLS 1.2 explicitly to fix handshake closures on some devices
+                val sslContext = SSLContext.getInstance("TLSv1.2")
+                sslContext.init(null, null, null)
+                val compatibilityFactory = ForceCompatibilitySSLSocketFactory(sslContext.socketFactory)
+
                 val options = MqttConnectOptions().apply {
                     isCleanSession = true
                     isAutomaticReconnect = true
@@ -146,10 +154,10 @@ class ChatRepository(
                     keepAliveInterval = 30
                     mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1
                     setWill("presence/$clientId", ByteArray(0), 2, true)
-                    socketFactory = ForceIpv4SSLSocketFactory(SSLSocketFactory.getDefault() as SSLSocketFactory)
+                    socketFactory = compatibilityFactory
                 }
                 
-                Log.d("ChatRepo", "Starting MQTT connection sequence...")
+                Log.d("ChatRepo", "Starting MQTT connection sequence (Forced TLS 1.2)...")
                 withContext(Dispatchers.IO) {
                     client.connect(options)
                 }
