@@ -244,19 +244,21 @@ fun ArchiveShowRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onPlay() }
-            .padding(vertical = 8.dp, horizontal = 4.dp)
+            .padding(vertical = 4.dp, horizontal = 4.dp)
     ) {
-        Row(
+        Box(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            contentAlignment = Alignment.CenterStart
         ) {
             Text(
                 text = show.date,
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(
                     onClick = onDownload,
                     modifier = Modifier.size(40.dp),
@@ -289,6 +291,7 @@ fun ArchiveShowRow(
                 }
             }
         }
+        // Removed padding here to pull the title closer to the date/icon row
         Text(
             text = show.title,
             style = MaterialTheme.typography.bodyLarge,
