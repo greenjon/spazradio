@@ -1,7 +1,7 @@
 package llm.slop.spazradio
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -52,7 +52,8 @@ import llm.slop.spazradio.ui.theme.SpazRadioTheme
 
 /* ---------- Activity ---------- */
 
-class MainActivity : ComponentActivity() {
+// Changed from ComponentActivity to AppCompatActivity to support AppCompatDelegate locale changes
+class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -130,7 +131,6 @@ fun RadioApp(
     )
 
     // Sync activeUtility (ViewModel) -> Pager
-    // This handles cases like setAppMode() which reset the utility to INFO
     LaunchedEffect(activeUtility) {
         if (activeUtility != ActiveUtility.NONE) {
             val targetModulo = when (activeUtility) {
@@ -287,7 +287,6 @@ fun MainLayout(
     infoBox: @Composable (Modifier) -> Unit,
     footer: @Composable () -> Unit
 ) {
-    // Detect if the keyboard is open to conditionally hide the bottom spacer
     val isKeyboardOpen = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
 
     Scaffold(
@@ -331,13 +330,11 @@ fun MainLayout(
                     }
                 }
                 
-                // Hide the spacer when the keyboard is open to eliminate the gap
                 if (!isKeyboardOpen) {
                     Spacer(modifier = Modifier.navigationBarsPadding().height(80.dp))
                 }
             }
             
-            // Footer is naturally covered by keyboard as it's an overlay.
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

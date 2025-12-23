@@ -92,7 +92,7 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
             singleLine = true,
             colors = TextFieldDefaults.colors(
                 focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                unfocusedIndicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                unfocusedIndicatorColor = MaterialTheme.colorScheme.primary
             )
         )
         Spacer(modifier = Modifier.height(16.dp))
@@ -101,7 +101,10 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
             enabled = text.isNotBlank(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                // Using solid colors for disabled state to avoid transparency issues
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         ) {
             Text(stringResource(R.string.label_chat))
@@ -218,7 +221,7 @@ fun ChatLayout(
                 shape = RoundedCornerShape(12.dp),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     focusedTextColor = MaterialTheme.colorScheme.onSurface,
                     unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                     cursorColor = MaterialTheme.colorScheme.primary,

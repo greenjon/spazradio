@@ -11,3 +11,7 @@ enum class ActiveUtility {
 enum class AppTheme {
     NEON, LIGHT, DARK, AUTO
 }
+
+enum class AppLanguage {
+    SYSTEM, EN, ES, DE, FR
+}
