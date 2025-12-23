@@ -3,8 +3,6 @@ package llm.slop.spazradio
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -22,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import llm.slop.spazradio.data.ArchiveShow
-import java.util.Locale
 
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -76,18 +73,10 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     )
     val appTheme: StateFlow<AppTheme> = _appTheme.asStateFlow()
 
-    private val _appLanguage = MutableStateFlow(
-        AppLanguage.valueOf(prefs.getString("app_language", AppLanguage.SYSTEM.name) ?: AppLanguage.SYSTEM.name)
-    )
-    val appLanguage: StateFlow<AppLanguage> = _appLanguage.asStateFlow()
-
     private var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
 
     init {
-        // Apply saved language on startup
-        applyLanguage(_appLanguage.value)
-
         val token = SessionToken(context, ComponentName(context, RadioService::class.java))
         controllerFuture = MediaController.Builder(context, token).buildAsync()
         controllerFuture?.addListener({
@@ -318,23 +307,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     fun setAppTheme(theme: AppTheme) {
         _appTheme.value = theme
         prefs.edit().putString("app_theme", theme.name).apply()
-    }
-
-    fun setAppLanguage(language: AppLanguage) {
-        _appLanguage.value = language
-        prefs.edit().putString("app_language", language.name).apply()
-        applyLanguage(language)
-    }
-
-    private fun applyLanguage(language: AppLanguage) {
-        val appLocales: LocaleListCompat = when (language) {
-            AppLanguage.SYSTEM -> LocaleListCompat.getEmptyLocaleList()
-            AppLanguage.EN -> LocaleListCompat.forLanguageTags("en")
-            AppLanguage.ES -> LocaleListCompat.forLanguageTags("es")
-            AppLanguage.DE -> LocaleListCompat.forLanguageTags("de")
-            AppLanguage.FR -> LocaleListCompat.forLanguageTags("fr")
-        }
-        AppCompatDelegate.setApplicationLocales(appLocales)
     }
 
     override fun onCleared() {

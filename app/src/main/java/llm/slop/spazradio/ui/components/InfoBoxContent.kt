@@ -20,7 +20,6 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material3.Button
@@ -49,7 +48,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import llm.slop.spazradio.AppLanguage
 import llm.slop.spazradio.AppTheme
 import llm.slop.spazradio.ChatViewModel
 import llm.slop.spazradio.R
@@ -65,11 +63,8 @@ fun SettingsContent(
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
     var showThemeMenu by remember { mutableStateOf(false) }
-    var showLanguageMenu by remember { mutableStateOf(false) }
     
     val currentTheme by radioViewModel.appTheme.collectAsState()
-    val currentLanguage by radioViewModel.appLanguage.collectAsState()
-    
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
@@ -148,56 +143,6 @@ fun SettingsContent(
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-
-            // Language Section (Collapsible)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showLanguageMenu = !showLanguageMenu }
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "Language",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = when(currentLanguage) {
-                                AppLanguage.SYSTEM -> "System Default"
-                                AppLanguage.EN -> "English"
-                                AppLanguage.ES -> "Español"
-                                AppLanguage.DE -> "Deutsch"
-                                AppLanguage.FR -> "Français"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                Text(
-                    text = if (showLanguageMenu) "CLOSE" else "CHANGE",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            if (showLanguageMenu) {
-                Column(modifier = Modifier.padding(start = 36.dp, top = 8.dp, bottom = 16.dp)) {
-                    LanguageOption("System Default", currentLanguage == AppLanguage.SYSTEM) { radioViewModel.setAppLanguage(AppLanguage.SYSTEM) }
-                    LanguageOption("English", currentLanguage == AppLanguage.EN) { radioViewModel.setAppLanguage(AppLanguage.EN) }
-                    LanguageOption("Español", currentLanguage == AppLanguage.ES) { radioViewModel.setAppLanguage(AppLanguage.ES) }
-                    LanguageOption("Deutsch", currentLanguage == AppLanguage.DE) { radioViewModel.setAppLanguage(AppLanguage.DE) }
-                    LanguageOption("Français", currentLanguage == AppLanguage.FR) { radioViewModel.setAppLanguage(AppLanguage.FR) }
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
             // Debug & Logs Section
             Text(
@@ -303,36 +248,6 @@ fun SettingsContent(
                         context.startActivity(intent)
                     }
             }
-        )
-    }
-}
-
-@Composable
-fun LanguageOption(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = onClick,
-            colors = RadioButtonDefaults.colors(
-                selectedColor = MaterialTheme.colorScheme.primary,
-                unselectedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
