@@ -1,12 +1,11 @@
 <resources>
-    <string name="app_name">SPAZ Radio</string>
-    <string name="listening_template">%d oyentes</string>
-    <string name="schedule_title">Horario</string>
+    <string name="listening_template">%d escuchando</string>
+    <string name="schedule_title">Calendario</string>
     <string name="settings_title">Ajustes</string>
-    <string name="show_schedule">Mostrar horario</string>
-    <string name="show_visuals">Mostrar visualizaciones</string>
-
-    <string name="status_connecting">Conectando</string>
+    <string name="show_schedule">Ver Calendario</string>
+    <string name="show_visuals">Ver Visuales</string>
+    
+    <string name="status_connecting">Conectando…</string>
     <string name="status_reconnecting">Reconectando</string>
     <string name="status_buffering">Almacenando</string>
     <string name="label_archive">Archivo</string>
@@ -22,32 +21,46 @@
     <string name="label_retry">Reintentar</string>
     <string name="label_download">Descargar</string>
     <string name="label_downloaded">Descargado</string>
-    <string name="error_archives">No se encontraron archivos o hay un error de red.</string>
+    <string name="error_archives">Conectando…</string>
 
     <string name="label_chat">Chat</string>
     <string name="chat_hint">Escribe un mensaje…</string>
-    <string name="chat_join">Entrar al Chat</string>
-    <string name="chat_name_hint">Nombre de usuario</string>
+    <string name="chat_join">Unirse al Chat</string>
+    <string name="chat_name_hint">Apodo</string>
     <string name="chat_online_count">%d en línea</string>
 
-    <string name="chat_settings">Ajustes de chat</string>
-    <string name="reset_username">Restablecer nombre de usuario</string>
-    <string name="reset_dialog_title">¿Restablecer nombre?</string>
-    <string name="reset_dialog_text">Esto te desconectará del chat y borrará tu nombre actual. Se te pedirá uno nuevo la próxima vez que abras el Chat.</string>
-    <string name="action_reset">Restablecer</string>
+    <string name="chat_settings">Ajustes del Chat</string>
+    <string name="reset_username">Reiniciar nombre de usuario</string>
+    <string name="reset_dialog_title">¿Reiniciar nombre?</string>
+    <string name="reset_dialog_text">Esto te desconectará del chat. Se te pedirá uno nuevo la próxima vez que abras el Chat.</string>
+    <string name="action_reset">Reiniciar</string>
     <string name="action_cancel">Cancelar</string>
-    <string name="settings_placeholder">Otros ajustes aparecerán aquí.</string>
     <string name="label_visuals">Visuales</string>
     <string name="label_list">Lista</string>
     
     <string name="theme_settings">Tema</string>
     <string name="theme_neon">Neón</string>
-    <string name="theme_light">Lunarized Claro</string>
-    <string name="theme_dark">Lunarized Oscuro</string>
-    <string name="theme_auto">Automático del Sistema</string>
-    
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="theme_auto">Sistema Automático</string>
+
     <string name="label_archives_count">%d programas</string>
 
-    <string name="privacy_info_text">No recopilamos ningún dato. Este proyecto es de código abierto. El proyecto y nuestra política de privacidad están %s.</string>
-    <string name="privacy_link_text">aquí</string>
+    <string name="privacy_info_text">No recopilamos datos. Este proyecto es de código abierto. El proyecto y nuestra política de privacidad están %s</string>
+    <string name="privacy_link_text">aquí.</string>
+
+    <string name="debug_settings">Depuración y Soporte</string>
+    <string name="send_debug_logs">Enviar Registros de Depuración</string>
+    <string name="label_language">Idioma</string>
+    <string name="lang_system">Predeterminado del Sistema</string>
+    <string name="lang_en">Inglés</string>
+    <string name="lang_es">Español</string>
+    <string name="lang_de">Alemán</string>
+    <string name="lang_fr">Francés</string>
+    <string name="action_change">CAMBIAR</string>
+    <string name="action_close_caps">CERRAR</string>
+    <string name="search_no_results">No se encontraron archivos para \"%s\"</string>
+    <string name="action_clear_search">Borrar búsqueda</string>
+    <string name="chat_error_template">Error de conexión: %s</string>
+    <string name="chat_no_messages">Aún no hay mensajes...</string>
 </resources>

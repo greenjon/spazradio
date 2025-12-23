@@ -1,53 +1,63 @@
 <resources>
-    <string name="app_name">SPAZ Radio</string>
     <string name="listening_template">%d auditeurs</string>
     <string name="schedule_title">Programme</string>
     <string name="settings_title">Paramètres</string>
     <string name="show_schedule">Afficher le programme</string>
     <string name="show_visuals">Afficher les visuels</string>
-
-    <string name="status_connecting">Connexion</string>
+    
+    <string name="status_connecting">Connexion…</string>
     <string name="status_reconnecting">Reconnexion</string>
-    <string name="status_buffering">Mise en mémoire</string>
+    <string name="status_buffering">Mise en mémoire tampon</string>
     <string name="label_archive">Archive</string>
     <string name="label_archives">Archives</string>
-    <string name="search_archives">Rechercher…</string>
+    <string name="search_archives">Rechercher dans les archives…</string>
     <string name="action_close">Fermer</string>
     <string name="label_live">En direct</string>
-    <string name="toast_download_started">Téléchargement lancé: %s</string>
+    <string name="toast_download_started">Téléchargement commencé : %s</string>
     <string name="loading_archives">Chargement des archives…</string>
     <string name="label_radio">Radio</string>
-    <string name="label_play">Jouer</string>
+    <string name="label_play">Lire</string>
     <string name="label_pause">Pause</string>
     <string name="label_retry">Réessayer</string>
     <string name="label_download">Télécharger</string>
     <string name="label_downloaded">Téléchargé</string>
-    <string name="error_archives">Aucune archive trouvée ou erreur réseau.</string>
+    <string name="error_archives">Connexion…</string>
 
     <string name="label_chat">Chat</string>
-    <string name="chat_hint">Tapez un message…</string>
+    <string name="chat_hint">Écrivez un message…</string>
     <string name="chat_join">Rejoindre le chat</string>
-    <string name="chat_name_hint">Entrez un pseudonyme</string>
+    <string name="chat_name_hint">Pseudo</string>
     <string name="chat_online_count">%d en ligne</string>
 
     <string name="chat_settings">Paramètres du chat</string>
     <string name="reset_username">Réinitialiser le pseudo</string>
     <string name="reset_dialog_title">Réinitialiser le pseudo ?</string>
-    <string name="reset_dialog_text">Cela vous déconnectera du chat et effacera votre pseudo actuel. Un nouveau pseudo vous sera demandé lors de votre prochaine connexion.</string>
+    <string name="reset_dialog_text">Cela vous déconnectera du chat. Un nouveau pseudo vous sera demandé lors de votre prochaine connexion.</string>
     <string name="action_reset">Réinitialiser</string>
     <string name="action_cancel">Annuler</string>
-    <string name="settings_placeholder">D\'autres paramètres apparaîtront ici.</string>
     <string name="label_visuals">Visuels</string>
     <string name="label_list">Liste</string>
     
     <string name="theme_settings">Thème</string>
     <string name="theme_neon">Néon</string>
-    <string name="theme_light">Lunarized Clair</string>
-    <string name="theme_dark">Lunarized Sombre</string>
-    <string name="theme_auto">Auto Système</string>
+    <string name="theme_light">Clair</string>
+    <string name="theme_dark">Sombre</string>
+    <string name="theme_auto">Auto (Système)</string>
 
     <string name="label_archives_count">%d émissions</string>
 
-    <string name="privacy_info_text">Nous ne collectons aucune donnée. Ce projet est open source. Le projet et notre politique de confidentialité sont %s.</string>
-    <string name="privacy_link_text">ici</string>
+    <string name="privacy_info_text">Nous ne collectons aucune donnée. Ce projet est open source. Le projet et notre politique de confidentialité sont %s</string>
+    <string name="privacy_link_text">ici.</string>
+
+    <string name="debug_settings">Débogage et Support</string>
+    <string name="send_debug_logs">Envoyer les logs de débogage</string>
+    <string name="label_language">Langue</string>
+    <string name="lang_system">Par défaut</string>
+    <string name="lang_en">English</string>
+    <string name="lang_es">Español</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_fr">Français</string>
+    <string name="action_change">CHANGER</string>
+    <string name="search_no_results">Aucune archive trouvée pour \"%s\"</string>
+    <string name="action_clear_search">Effacer la recherche</string>
 </resources>

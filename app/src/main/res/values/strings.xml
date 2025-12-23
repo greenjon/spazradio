@@ -50,4 +50,19 @@
 
     <string name="privacy_info_text">We don\'t collect any data. This project is open source. The project and our privacy policy are %s</string>
     <string name="privacy_link_text">here.</string>
+
+    <string name="debug_settings">Debug &amp; Support</string>
+    <string name="send_debug_logs">Send Debug Logs</string>
+    <string name="label_language">Language</string>
+    <string name="lang_system">System Default</string>
+    <string name="lang_en">English</string>
+    <string name="lang_es">Español</string>
+    <string name="lang_de">Deutsch</string>
+    <string name="lang_fr">Français</string>
+    <string name="action_change">CHANGE</string>
+    <string name="action_close_caps">CLOSE</string>
+    <string name="search_no_results">No archives found for \"%s\"</string>
+    <string name="action_clear_search">Clear Search</string>
+    <string name="chat_error_template">Connection Error: %s</string>
+    <string name="chat_no_messages">No messages yet&#8230;</string>
 </resources>
