@@ -38,7 +38,10 @@ class ChatRepository(
     private val connectionMutex = Mutex()
     private var isConnecting = false
 
-    // ATOMIC FIX: Force TLS 1.2 and IPv4 simultaneously
+    // Topics for HiveMQ Cloud testing
+    private val CHAT_TOPIC = "spazradio/chat"
+    private val PRESENCE_TOPIC_PREFIX = "spazradio/presence/"
+
     private class ForceCompatibilitySSLSocketFactory(private val delegate: SSLSocketFactory) : SSLSocketFactory() {
         override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
         override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
@@ -56,34 +59,15 @@ class ChatRepository(
     }
 
     suspend fun fetchHistory(): List<ChatMessage> = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url("https://radio.spaz.org/djdash/chatlog")
-            .header("User-Agent", "Mozilla/5.0 (Android)")
-            .build()
-
-        for (i in 1..3) {
-            try {
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val body = response.body
-                        val json = body.string()
-                        val historyResponse = gson.fromJson(json, HistoryResponse::class.java)
-                        return@withContext historyResponse.history.map { msg ->
-                            msg.copy(timeReceived = msg.timeReceived / 1000L)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                if (i < 3) delay(1000)
-            }
-        }
-        emptyList()
+        // Old history endpoint is incompatible with HiveMQ broker. 
+        // Returning empty list for testing phase.
+        emptyList<ChatMessage>()
     }
 
     private fun getOrCreateMqttClient(): MqttClient {
         mqttClient?.let { return it }
 
-        val serverUri = "wss://radio.spaz.org:1885/mqtt"
+        val serverUri = "wss://e127037ebb0d4595bf76f7aedcdc16d0.s1.eu.hivemq.cloud:8884/mqtt"
         val client = MqttClient(serverUri, clientId, MemoryPersistence())
         
         client.setCallback(object : MqttCallbackExtended {
@@ -103,15 +87,15 @@ class ChatRepository(
 
             override fun messageArrived(topic: String?, message: MqttMessage?) {
                 val payload = message?.payload?.let { String(it) } ?: return
-                if (topic == "spazradio") {
+                if (topic == CHAT_TOPIC) {
                     try {
                         val rawMsg = gson.fromJson(payload, ChatMessage::class.java)
                         _incomingMessages.tryEmit(rawMsg.copy(timeReceived = rawMsg.timeReceived / 1000L))
                     } catch (e: Exception) {
                         Log.e("ChatRepo", "JSON parse error")
                     }
-                } else if (topic?.startsWith("presence/") == true) {
-                    val id = topic.substringAfter("presence/")
+                } else if (topic?.startsWith(PRESENCE_TOPIC_PREFIX) == true) {
+                    val id = topic.substringAfter(PRESENCE_TOPIC_PREFIX)
                     val name = payload
                     val current = _onlineUsers.value.toMutableMap()
                     if (name.isEmpty()) current.remove(id) else current[id] = name
@@ -142,7 +126,6 @@ class ChatRepository(
             try {
                 _connectionError.value = null
                 
-                // Set up TLS 1.2 explicitly to fix handshake closures on some devices
                 val sslContext = SSLContext.getInstance("TLSv1.2")
                 sslContext.init(null, null, null)
                 val compatibilityFactory = ForceCompatibilitySSLSocketFactory(sslContext.socketFactory)
@@ -153,11 +136,13 @@ class ChatRepository(
                     connectionTimeout = 30
                     keepAliveInterval = 30
                     mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1
-                    setWill("presence/$clientId", ByteArray(0), 2, true)
+                    userName = "spazradio"
+                    password = "SPAZRadio23".toCharArray()
+                    setWill(PRESENCE_TOPIC_PREFIX + clientId, ByteArray(0), 2, true)
                     socketFactory = compatibilityFactory
                 }
                 
-                Log.d("ChatRepo", "Starting MQTT connection sequence (Forced TLS 1.2)...")
+                Log.d("ChatRepo", "Connecting to HiveMQ Cloud...")
                 withContext(Dispatchers.IO) {
                     client.connect(options)
                 }
@@ -171,8 +156,8 @@ class ChatRepository(
 
     private fun subscribeAll() {
         try {
-            mqttClient?.subscribe("spazradio", 2)
-            mqttClient?.subscribe("presence/#", 2)
+            mqttClient?.subscribe(CHAT_TOPIC, 2)
+            mqttClient?.subscribe(PRESENCE_TOPIC_PREFIX + "#", 2)
             _connectionError.value = null
         } catch (e: Exception) {
             Log.e("ChatRepo", "Subscribe failed")
@@ -183,7 +168,7 @@ class ChatRepository(
         val client = mqttClient ?: return
         if (client.isConnected) {
             try {
-                client.publish("presence/$clientId", username.toByteArray(), 2, true)
+                client.publish(PRESENCE_TOPIC_PREFIX + clientId, username.toByteArray(), 2, true)
             } catch (e: Exception) {
                 Log.e("ChatRepo", "Publish presence failed")
             }
@@ -204,7 +189,7 @@ class ChatRepository(
         repositoryScope.launch(Dispatchers.IO) {
             try {
                 val payload = gson.toJson(mapOf("user" to username, "message" to text))
-                client.publish("spazradio", payload.toByteArray(), 2, false)
+                client.publish(CHAT_TOPIC, payload.toByteArray(), 2, false)
             } catch (e: Exception) {
                 _connectionError.value = "Send failed: ${e.message}"
             }
