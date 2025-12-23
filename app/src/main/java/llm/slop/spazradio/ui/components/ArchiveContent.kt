@@ -48,6 +48,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -66,6 +68,7 @@ fun ArchiveContent(
 ) {
     val uiState by archiveViewModel.uiState.collectAsState()
     val isRefreshing by archiveViewModel.isRefreshing.collectAsState()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -98,7 +101,10 @@ fun ArchiveContent(
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 trailingIcon = {
                     if (currentQuery.isNotEmpty()) {
-                        IconButton(onClick = { archiveViewModel.updateSearchQuery("") }) {
+                        IconButton(onClick = { 
+                            archiveViewModel.updateSearchQuery("")
+                            keyboardController?.hide()
+                        }) {
                             Icon(Icons.Default.Close, contentDescription = "Clear Search", tint = MaterialTheme.colorScheme.primary)
                         }
                     }
@@ -152,6 +158,7 @@ fun ArchiveContent(
                 is ArchiveUiState.EmptySearch -> {
                     EmptySearchState(query = state.query) {
                         archiveViewModel.updateSearchQuery("")
+                        keyboardController?.hide()
                     }
                 }
                 is ArchiveUiState.Error -> {
@@ -210,8 +217,9 @@ fun LoadingArchivesText() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
             text = stringResource(R.string.loading_archives),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
-            style = MaterialTheme.typography.titleLarge
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.graphicsLayer { this.alpha = alpha }
         )
     }
 }
