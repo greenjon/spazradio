@@ -102,7 +102,6 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                // Using solid colors for disabled state to avoid transparency issues
                 disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -123,7 +122,6 @@ fun ChatLayout(
     val listState = rememberLazyListState()
     var isInitialLoad by remember { mutableStateOf(true) }
 
-    // Scroll to bottom when keyboard appears/disappears
     val isImeVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
     LaunchedEffect(isImeVisible) {
         if (messages.isNotEmpty()) {
@@ -147,10 +145,7 @@ fun ChatLayout(
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize()
-    ) {
-        // Online Users Row
+    Column(modifier = modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -173,12 +168,7 @@ fun ChatLayout(
             )
         }
 
-        // Messages Area
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        ) {
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (messages.isEmpty()) {
                 Text(
                     text = "No messages yet...",
@@ -203,11 +193,8 @@ fun ChatLayout(
             }
         }
 
-        // Input Area
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
@@ -264,45 +251,52 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
         }
     }
 
-    val primaryColor = MaterialTheme.colorScheme.primary
+    // Capture theme colors into primitive integers inside the Composable context.
+    // This is necessary because factory/update lambdas in AndroidView are NOT composable contexts.
+    val primaryColorInt = MaterialTheme.colorScheme.primary.toArgb()
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val onSurfaceColorInt = onSurfaceColor.toArgb()
 
     Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = msg.user,
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = tertiaryColor
-                )
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 75.dp)
+                    .align(Alignment.BottomStart)
             )
+            
             if (dateTimeStr.isNotEmpty()) {
                 Text(
                     text = dateTimeStr,
                     style = MaterialTheme.typography.labelSmall,
-                    color = onSurfaceColor.copy(alpha = 0.4f)
+                    color = onSurfaceColor.copy(alpha = 0.4f),
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                    textAlign = TextAlign.End
                 )
             }
         }
+        
         AndroidView(
             factory = { context ->
                 TextView(context).apply {
-                    setTextColor(onSurfaceColor.toArgb())
+                    setTextColor(onSurfaceColorInt)
                     setTextSize(14f)
                     autoLinkMask = Linkify.WEB_URLS
-                    setLinkTextColor(primaryColor.toArgb())
+                    setLinkTextColor(primaryColorInt)
                 }
             },
             update = { textView ->
                 val decoded = HtmlCompat.fromHtml(msg.message, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 textView.text = decoded
-                textView.setTextColor(onSurfaceColor.toArgb())
-                textView.setLinkTextColor(primaryColor.toArgb())
+                textView.setTextColor(onSurfaceColorInt)
+                textView.setLinkTextColor(primaryColorInt)
             },
             modifier = Modifier.fillMaxWidth()
         )
