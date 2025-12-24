@@ -138,9 +138,18 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         val mediaId = controller.currentMediaItem?.mediaId
         val isLive = mediaId == liveStreamId
 
+        // STRICT CHECK: Only update listeners if it matches the "X listening" template.
+        // This prevents the show title (which often leaks into the artist field)
+        // from appearing in the small sub-header of the RADIO tab.
         val listenerPrefix = context.getString(R.string.listening_template).split("%d").first()
-        if (isLive && artist.startsWith(listenerPrefix)) {
-            _trackListeners.value = artist
+        if (isLive) {
+            if (artist.startsWith(listenerPrefix) && artist.any { it.isDigit() }) {
+                _trackListeners.value = artist
+            } else {
+                // If it's live but the metadata is just a title/name, clear the listener field
+                // so we don't show the title twice in the header.
+                _trackListeners.value = ""
+            }
         }
 
         _isArchivePlaying.value = mediaId?.startsWith("archive_") == true || (mediaId != liveStreamId && mediaId != null)
