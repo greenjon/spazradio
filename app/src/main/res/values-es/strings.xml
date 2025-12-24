@@ -1,5 +1,6 @@
 <resources>
-    <string name="listening_template">%d escuchando</string>
+    <string name="app_name">SPAZ Radio</string>
+    <string name="listening_template">%d oyentes</string>
     <string name="schedule_title">Calendario</string>
     <string name="settings_title">Ajustes</string>
     <string name="show_schedule">Ver Calendario</string>
@@ -35,6 +36,7 @@
     <string name="reset_dialog_text">Esto te desconectará del chat. Se te pedirá uno nuevo la próxima vez que abras el Chat.</string>
     <string name="action_reset">Reiniciar</string>
     <string name="action_cancel">Cancelar</string>
+    <string name="settings_placeholder">Otros ajustes aparecerán aquí.</string>
     <string name="label_visuals">Visuales</string>
     <string name="label_list">Lista</string>
     
@@ -63,4 +65,7 @@
     <string name="action_clear_search">Borrar búsqueda</string>
     <string name="chat_error_template">Error de conexión: %s</string>
     <string name="chat_no_messages">Aún no hay mensajes...</string>
+
+    <string name="playback_settings">Reproducción</string>
+    <string name="autoplay_radio">Iniciar radio automáticamente</string>
 </resources>

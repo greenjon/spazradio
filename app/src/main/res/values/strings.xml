@@ -65,4 +65,7 @@
     <string name="action_clear_search">Clear Search</string>
     <string name="chat_error_template">Connection Error: %s</string>
     <string name="chat_no_messages">No messages yet&#8230;</string>
+
+    <string name="playback_settings">Playback</string>
+    <string name="autoplay_radio">Auto-start radio stream</string>
 </resources>

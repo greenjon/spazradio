@@ -1,4 +1,5 @@
 <resources>
+    <string name="app_name">SPAZ Radio</string>
     <string name="listening_template">%d auditeurs</string>
     <string name="schedule_title">Programme</string>
     <string name="settings_title">Paramètres</string>
@@ -35,6 +36,7 @@
     <string name="reset_dialog_text">Cela vous déconnectera du chat. Un nouveau pseudo vous sera demandé lors de votre prochaine connexion.</string>
     <string name="action_reset">Réinitialiser</string>
     <string name="action_cancel">Annuler</string>
+    <string name="settings_placeholder">D\'autres paramètres apparaîtront ici.</string>
     <string name="label_visuals">Visuels</string>
     <string name="label_list">Liste</string>
     
@@ -58,6 +60,12 @@
     <string name="lang_de">Deutsch</string>
     <string name="lang_fr">Français</string>
     <string name="action_change">CHANGER</string>
+    <string name="action_close_caps">FERMER</string>
     <string name="search_no_results">Aucune archive trouvée pour \"%s\"</string>
     <string name="action_clear_search">Effacer la recherche</string>
+    <string name="chat_error_template">Erreur de connexion : %s</string>
+    <string name="chat_no_messages">Pas encore de messages&#8230;</string>
+
+    <string name="playback_settings">Lecture</string>
+    <string name="autoplay_radio">Lancer la radio automatiquement</string>
 </resources>

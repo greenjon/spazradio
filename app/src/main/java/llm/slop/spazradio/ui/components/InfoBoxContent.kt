@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -30,6 +31,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -42,9 +45,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,6 +71,7 @@ fun SettingsContent(
     var showThemeMenu by remember { mutableStateOf(false) }
     
     val currentTheme by radioViewModel.appTheme.collectAsState()
+    val autoPlayEnabled by radioViewModel.autoPlayEnabled.collectAsState()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
@@ -144,11 +151,48 @@ fun SettingsContent(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
+            // Playback Section
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.PlayCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.playback_settings),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.autoplay_radio),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+                Switch(
+                    checked = autoPlayEnabled,
+                    onCheckedChange = { radioViewModel.setAutoPlayEnabled(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    )
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+
             // Debug & Logs Section
             Text(
                 text = "Debug & Support",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
             
@@ -215,39 +259,37 @@ fun SettingsContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Privacy & Info Section
+        // Privacy & Info Section - Updated to avoid deprecated ClickableText
         val privacyInfo = stringResource(R.string.privacy_info_text, "")
         val linkText = stringResource(R.string.privacy_link_text)
         val annotatedString = buildAnnotatedString {
             val parts = privacyInfo.split("%s")
             append(parts[0])
-            pushStringAnnotation(tag = "URL", annotation = "https://github.com/greenjon/spazradio")
-            withStyle(style = SpanStyle(
-                color = MaterialTheme.colorScheme.primary,
-                textDecoration = TextDecoration.Underline
-            )) {
+            withLink(
+                LinkAnnotation.Url(
+                    url = "https://github.com/greenjon/spazradio",
+                    styles = TextLinkStyles(
+                        style = SpanStyle(
+                            color = MaterialTheme.colorScheme.primary,
+                            textDecoration = TextDecoration.Underline
+                        )
+                    )
+                )
+            ) {
                 append(linkText)
             }
-            pop()
             if (parts.size > 1) {
                 append(parts[1])
             }
         }
 
-        ClickableText(
+        Text(
             text = annotatedString,
             style = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 fontSize = 10.sp
             ),
-            modifier = Modifier.padding(top = 16.dp, bottom = 16.dp),
-            onClick = { offset ->
-                annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                    .firstOrNull()?.let { annotation ->
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item))
-                        context.startActivity(intent)
-                    }
-            }
+            modifier = Modifier.padding(top = 16.dp, bottom = 16.dp)
         )
     }
 }

@@ -39,4 +39,7 @@
     <string name="settings_placeholder">Otros ajustes aparecerán aquí.</string>
     <string name="label_visuals">Visuales</string>
     <string name="label_list">Lista</string>
+
+    <string name="playback_settings">Reproducción</string>
+    <string name="autoplay_radio">Iniciar radio automáticamente</string>
 </resources>

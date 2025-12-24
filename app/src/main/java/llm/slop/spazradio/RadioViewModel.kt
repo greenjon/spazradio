@@ -68,6 +68,9 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _lissajousMode = MutableStateFlow(prefs.getBoolean("visuals_enabled", true))
     val lissajousMode: StateFlow<Boolean> = _lissajousMode.asStateFlow()
 
+    private val _autoPlayEnabled = MutableStateFlow(prefs.getBoolean("autoplay_enabled", true))
+    val autoPlayEnabled: StateFlow<Boolean> = _autoPlayEnabled.asStateFlow()
+
     private val _appTheme = MutableStateFlow(
         AppTheme.valueOf(prefs.getString("app_theme", AppTheme.NEON.name) ?: AppTheme.NEON.name)
     )
@@ -85,8 +88,8 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 mediaController = controller
                 setupController(controller)
                 
-                // Auto-play radio on launch
-                if (_appMode.value == AppMode.RADIO) {
+                // Auto-play radio on launch if enabled
+                if (_appMode.value == AppMode.RADIO && _autoPlayEnabled.value) {
                     showLiveStream()
                 }
             } catch (e: Exception) {
@@ -267,7 +270,9 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         
         // Logical side effects
         if (mode == AppMode.RADIO) {
-            showLiveStream()
+            if (_autoPlayEnabled.value) {
+                showLiveStream()
+            }
         } else if (mode == AppMode.ARCHIVES) {
             // Halt radio stream when switching to browse archives
             stopPlayback()
@@ -302,6 +307,11 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     fun setLissajousMode(enabled: Boolean) {
         _lissajousMode.value = enabled
         prefs.edit().putBoolean("visuals_enabled", enabled).apply()
+    }
+
+    fun setAutoPlayEnabled(enabled: Boolean) {
+        _autoPlayEnabled.value = enabled
+        prefs.edit().putBoolean("autoplay_enabled", enabled).apply()
     }
 
     fun setAppTheme(theme: AppTheme) {
