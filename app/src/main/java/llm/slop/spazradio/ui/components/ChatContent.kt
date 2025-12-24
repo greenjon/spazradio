@@ -2,11 +2,13 @@ package llm.slop.spazradio.ui.components
 
 import android.text.util.Linkify
 import android.widget.TextView
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -111,6 +113,7 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatLayout(
     messages: List<llm.slop.spazradio.data.ChatMessage>,
@@ -121,6 +124,9 @@ fun ChatLayout(
     var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     var isInitialLoad by remember { mutableStateOf(true) }
+    
+    // State to track if the user list is expanded
+    var isUserListExpanded by remember { mutableStateOf(false) }
 
     val isImeVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
     LaunchedEffect(isImeVisible) {
@@ -146,26 +152,65 @@ fun ChatLayout(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // Expandable Header Container
+        Surface(
+            onClick = { isUserListExpanded = !isUserListExpanded },
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.People,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = if (onlineNames.isEmpty()) "..." else onlineNames.joinToString(", "),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .animateContentSize() // Smooth transition between 1 line and many
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.People,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (onlineNames.isEmpty()) "Connecting..." else "${onlineNames.size} online",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    
+                    if (!isUserListExpanded) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = onlineNames.joinToString(", "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                if (isUserListExpanded && onlineNames.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // This creates a wrapped list of names
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        onlineNames.forEach { name ->
+                            SuggestionChip(
+                                onClick = {},
+                                label = { Text(name, style = MaterialTheme.typography.labelSmall) },
+                                shape = CircleShape,
+                                modifier = Modifier.height(24.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
