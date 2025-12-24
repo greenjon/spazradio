@@ -32,9 +32,15 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _playbackUiState = MutableStateFlow<PlaybackUiState>(PlaybackUiState.Idle)
     val playbackUiState: StateFlow<PlaybackUiState> = _playbackUiState.asStateFlow()
 
-    private val _trackTitle = MutableStateFlow("SPAZ.Radio")
-    private val _trackListeners = MutableStateFlow("")
-    val trackListeners: StateFlow<String> = _trackListeners.asStateFlow()
+    // Internal persistent state for the live radio info (polled from service)
+    private val _liveTitle = MutableStateFlow("")
+    private val _liveListeners = MutableStateFlow("")
+    
+    // Internal state for the current archive track
+    private val _archiveTitle = MutableStateFlow("")
+
+    // Expose live listener count for the RADIO tab in the header
+    val trackListeners: StateFlow<String> = _liveListeners.asStateFlow()
 
     private val _headerTitle = MutableStateFlow("SPAZ.Radio")
     val headerTitle: StateFlow<String> = _headerTitle.asStateFlow()
@@ -61,7 +67,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _appMode = MutableStateFlow(AppMode.RADIO)
     val appMode: StateFlow<AppMode> = _appMode.asStateFlow()
 
-    // Default to INFO (Schedule) on launch
     private val _activeUtility = MutableStateFlow(ActiveUtility.INFO)
     val activeUtility: StateFlow<ActiveUtility> = _activeUtility.asStateFlow()
 
@@ -88,9 +93,22 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 mediaController = controller
                 setupController(controller)
                 
-                // Auto-play radio on launch if enabled
-                if (_appMode.value == AppMode.RADIO && _autoPlayEnabled.value) {
-                    showLiveStream()
+                if (_appMode.value == AppMode.RADIO) {
+                    if (_autoPlayEnabled.value) {
+                        showLiveStream()
+                    } else {
+                        // Switch to live stream item but do not start playback
+                        val isAlreadyLive = controller.currentMediaItem?.mediaId == liveStreamId
+                        if (!isAlreadyLive) {
+                            val mediaItem = MediaItem.Builder()
+                                .setUri(liveStreamUrl)
+                                .setMediaId(liveStreamId)
+                                .build()
+                            controller.setMediaItem(mediaItem)
+                        }
+                        controller.playWhenReady = false
+                        updateState(controller)
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -104,8 +122,8 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private fun observeMetadata() {
         viewModelScope.launch {
             RadioService.metaDataFlow.collect { metadata ->
-                _trackTitle.value = metadata.title
-                _trackListeners.value = if (metadata.listeners > 0) {
+                _liveTitle.value = metadata.title
+                _liveListeners.value = if (metadata.listeners > 0) {
                     context.getString(R.string.listening_template, metadata.listeners)
                 } else {
                     ""
@@ -132,8 +150,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             override fun onMediaMetadataChanged(metadata: MediaMetadata) {
-                // We primarily use RadioService.metaDataFlow now for live radio,
-                // but we still update for Archive metadata which comes from the controller.
                 if (_isArchivePlaying.value) {
                     updateState(controller)
                 }
@@ -154,10 +170,8 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         val mediaId = controller.currentMediaItem?.mediaId
         val isLive = mediaId == liveStreamId
 
-        // For archives, we take title/artist from the player metadata
-        if (!isLive) {
-            _trackTitle.value = metadata.title?.toString() ?: _trackTitle.value
-            _trackListeners.value = ""
+        if (!isLive && mediaId != null) {
+            _archiveTitle.value = metadata.title?.toString() ?: ""
         }
 
         _isArchivePlaying.value = mediaId?.startsWith("archive_") == true || (mediaId != liveStreamId && mediaId != null)
@@ -173,16 +187,17 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             Player.STATE_IDLE -> {
                 if (_appMode.value == AppMode.ARCHIVES && !_isArchivePlaying.value) {
                     PlaybackUiState.Idle
-                } else if (isLive && !controller.playWhenReady) {
-                    PlaybackUiState.Paused(_trackTitle.value, _trackListeners.value)
-                } else {
+                } else if (controller.playWhenReady) {
                     PlaybackUiState.Connecting
+                } else {
+                    // IDLE and NOT trying to play means we are paused or waiting for manual start
+                    PlaybackUiState.Paused("", "") 
                 }
             }
             Player.STATE_BUFFERING -> PlaybackUiState.Buffering
             Player.STATE_READY -> {
-                if (isPlaying) PlaybackUiState.Playing(_trackTitle.value, _trackListeners.value)
-                else PlaybackUiState.Paused(_trackTitle.value, _trackListeners.value)
+                if (isPlaying) PlaybackUiState.Playing("", "")
+                else PlaybackUiState.Paused("", "")
             }
             Player.STATE_ENDED -> PlaybackUiState.Reconnecting
             else -> PlaybackUiState.Connecting
@@ -191,29 +206,39 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateDisplayStrings() {
-        val controller = mediaController
-        val currentMediaId = controller?.currentMediaItem?.mediaId
+        val controller = mediaController ?: return
+        val currentMediaId = controller.currentMediaItem?.mediaId
         val isLive = currentMediaId == liveStreamId
+        val currentAppMode = _appMode.value
 
         _headerTitle.value = "SPAZ.Radio"
         
+        // Header subtitle always shows listener count in Radio mode, even if Archives screen is active
         _headerSubtitle.value = when {
-            _appMode.value == AppMode.ARCHIVES -> {
-                context.getString(R.string.label_archives)
-            }
-            isLive -> {
-                _trackListeners.value
-            }
-            else -> ""
+            currentAppMode == AppMode.ARCHIVES -> context.getString(R.string.label_archives)
+            else -> _liveListeners.value
         }
 
-        _trackSubtitle.value = when (val state = _playbackUiState.value) {
-            PlaybackUiState.Idle -> if (isLive) _trackTitle.value else ""
-            PlaybackUiState.Connecting -> context.getString(R.string.status_connecting)
-            PlaybackUiState.Buffering -> context.getString(R.string.status_buffering)
-            PlaybackUiState.Reconnecting -> context.getString(R.string.status_reconnecting)
-            is PlaybackUiState.Playing -> state.title
-            is PlaybackUiState.Paused -> state.title
+        _trackSubtitle.value = when (currentAppMode) {
+            AppMode.RADIO -> {
+                when (_playbackUiState.value) {
+                    PlaybackUiState.Connecting -> context.getString(R.string.status_connecting)
+                    PlaybackUiState.Buffering -> context.getString(R.string.status_buffering)
+                    PlaybackUiState.Reconnecting -> context.getString(R.string.status_reconnecting)
+                    else -> _liveTitle.value.ifEmpty { "Radio Spaz" }
+                }
+            }
+            AppMode.ARCHIVES -> {
+                if (_isArchivePlaying.value && !isLive) {
+                    if (_playbackUiState.value == PlaybackUiState.Buffering) {
+                        context.getString(R.string.status_buffering)
+                    } else {
+                        _archiveTitle.value
+                    }
+                } else {
+                    ""
+                }
+            }
         }
     }
 
@@ -293,17 +318,31 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         _appMode.value = mode
         _activeUtility.value = ActiveUtility.INFO
         
-        // Logical side effects
+        val controller = mediaController ?: return
+
         if (mode == AppMode.RADIO) {
+            val isAlreadyLive = controller.currentMediaItem?.mediaId == liveStreamId
+            if (!isAlreadyLive) {
+                // If we're not already on Radio stream, stop any playing archive
+                stopPlayback()
+                val mediaItem = MediaItem.Builder()
+                    .setUri(liveStreamUrl)
+                    .setMediaId(liveStreamId)
+                    .build()
+                controller.setMediaItem(mediaItem)
+            }
+
             if (_autoPlayEnabled.value) {
                 showLiveStream()
             } else {
-                updateState(mediaController ?: return)
+                // Ensure the player is NOT trying to connect if autoplay is off
+                controller.playWhenReady = false
+                updateState(controller)
             }
         } else if (mode == AppMode.ARCHIVES) {
-            stopPlayback()
-            if (!_isArchivePlaying.value) {
-                _playbackUiState.value = PlaybackUiState.Idle
+            // Only stop if the radio stream is playing
+            if (controller.currentMediaItem?.mediaId == liveStreamId) {
+                stopPlayback()
             }
         }
         

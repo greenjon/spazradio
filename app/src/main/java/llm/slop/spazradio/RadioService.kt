@@ -40,7 +40,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 
 data class RadioMetadata(
-    val title: String = "Radio Spaz",
+    val title: String = "",
     val listeners: Int = 0
 )
 
@@ -187,19 +187,16 @@ class RadioService : MediaSessionService() {
 
     private fun startMetadataPolling() {
         serviceScope.launch(Dispatchers.IO) {
+            // Initial immediate fetch
+            fetchAndUpdateMetadata()
+            
             while (isActive) {
+                delay(10000)
                 try {
-                    val currentMediaId = withContext(Dispatchers.Main) {
-                        player?.currentMediaItem?.mediaId
-                    }
-                    
-                    if (currentMediaId == liveMediaID) {
-                        fetchAndUpdateMetadata()
-                    }
+                    fetchAndUpdateMetadata()
                 } catch (e: Exception) {
                     Log.e("RadioService", "Error in metadata polling", e)
                 }
-                delay(10000)
             }
         }
     }
@@ -244,19 +241,19 @@ class RadioService : MediaSessionService() {
             // Broadcast metadata via flow for the UI to use immediately
             _metaDataFlow.value = RadioMetadata(playing, listeners)
 
-            // Only update the actual Player/Session metadata if we are actively playing or buffering.
-            // This prevents "zombie" notifications from being created when the app is just sitting there idle.
+            // Only update the actual Player/Session metadata if the live stream is currently active.
             withContext(Dispatchers.Main) {
                 player?.let { exoPlayer ->
-                    val isActive = exoPlayer.playWhenReady || exoPlayer.playbackState == Player.STATE_BUFFERING
-                    val currentItem = exoPlayer.currentMediaItem
-                    if (isActive && currentItem != null && currentItem.mediaId == liveMediaID) {
+                    val isLiveActive = exoPlayer.currentMediaItem?.mediaId == liveMediaID
+                    val isCurrentlyAudible = exoPlayer.playWhenReady || exoPlayer.playbackState == Player.STATE_BUFFERING
+                    
+                    if (isLiveActive && isCurrentlyAudible) {
                         val newMetadata = MediaMetadata.Builder()
                             .setTitle(playing)
                             .setArtist(getString(R.string.listening_template, listeners))
                             .build()
                         
-                        val newItem = currentItem.buildUpon()
+                        val newItem = exoPlayer.currentMediaItem!!.buildUpon()
                             .setMediaMetadata(newMetadata)
                             .build()
                         
@@ -275,8 +272,6 @@ class RadioService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Ensure the service stops and the notification is cleared when the app is swiped away.
-        // This is the modern Media3 equivalent of "stopForeground(true)"
         val player = player
         if (player != null) {
             if (!player.playWhenReady || player.mediaItemCount == 0) {
