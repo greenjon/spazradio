@@ -10,14 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.eclipse.paho.client.mqttv3.*
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
-import java.net.Inet4Address
-import java.net.InetAddress
-import java.net.Socket
-import javax.net.SocketFactory
 import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLSocketFactory
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 import kotlin.random.Random
 
 class ChatRepository(
@@ -26,6 +19,7 @@ class ChatRepository(
 ) {
     private val clientId = "mut${Random.nextInt(1, 1000000)}"
     private var mqttClient: MqttClient? = null
+    private var currentUsername: String? = null
 
     private val _onlineUsers = MutableStateFlow<Map<String, String>>(emptyMap())
     private val _incomingMessages = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 64)
@@ -37,23 +31,6 @@ class ChatRepository(
     
     private val connectionMutex = Mutex()
     private var isConnecting = false
-
-    // ATOMIC FIX: Force TLS 1.2 and IPv4 simultaneously
-    private class ForceCompatibilitySSLSocketFactory(private val delegate: SSLSocketFactory) : SSLSocketFactory() {
-        override fun getDefaultCipherSuites(): Array<String> = delegate.defaultCipherSuites
-        override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
-        override fun createSocket(): Socket = delegate.createSocket()
-        override fun createSocket(host: String?, port: Int): Socket {
-            val ipv4Address = InetAddress.getAllByName(host)
-                .firstOrNull { it is Inet4Address }
-                ?: throw java.net.UnknownHostException("No IPv4 address found for $host")
-            return delegate.createSocket(ipv4Address, port)
-        }
-        override fun createSocket(host: String?, port: Int, localHost: InetAddress?, localPort: Int): Socket = delegate.createSocket(host, port, localHost, localPort)
-        override fun createSocket(host: InetAddress?, port: Int): Socket = delegate.createSocket(host, port)
-        override fun createSocket(address: InetAddress?, port: Int, localAddress: InetAddress?, localPort: Int): Socket = delegate.createSocket(address, port, localAddress, localPort)
-        override fun createSocket(s: Socket?, host: String?, port: Int, autoClose: Boolean): Socket = delegate.createSocket(s, host, port, autoClose)
-    }
 
     suspend fun fetchHistory(): List<ChatMessage> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
@@ -91,6 +68,7 @@ class ChatRepository(
                 Log.d("ChatRepo", "MQTT Connect Complete. Reconnect: $reconnect")
                 repositoryScope.launch {
                     connectionMutex.withLock { isConnecting = false }
+                    currentUsername?.let { publishPresence(it, true) }
                 }
                 _connectionError.value = null
                 subscribeAll()
@@ -102,7 +80,7 @@ class ChatRepository(
             }
 
             override fun messageArrived(topic: String?, message: MqttMessage?) {
-                val payload = message?.payload?.let { String(it) } ?: return
+                val payload = message?.payload?.let { String(it) } ?: ""
                 if (topic == "spazradio") {
                     try {
                         val rawMsg = gson.fromJson(payload, ChatMessage::class.java)
@@ -114,7 +92,11 @@ class ChatRepository(
                     val id = topic.substringAfter("presence/")
                     val name = payload
                     val current = _onlineUsers.value.toMutableMap()
-                    if (name.isEmpty()) current.remove(id) else current[id] = name
+                    if (name.isEmpty() || name == "offline") {
+                        current.remove(id)
+                    } else {
+                        current[id] = name
+                    }
                     _onlineUsers.value = current
                 }
             }
@@ -127,13 +109,14 @@ class ChatRepository(
     }
 
     fun connect(username: String) {
+        currentUsername = username
         val client = getOrCreateMqttClient()
         
         repositoryScope.launch {
             connectionMutex.withLock {
                 if (client.isConnected || isConnecting) {
                     Log.d("ChatRepo", "Connect attempt blocked: Busy or already connected")
-                    if (client.isConnected) publishPresence(username)
+                    if (client.isConnected) publishPresence(username, true)
                     return@launch
                 }
                 isConnecting = true
@@ -142,10 +125,8 @@ class ChatRepository(
             try {
                 _connectionError.value = null
                 
-                // Set up TLS 1.2 explicitly to fix handshake closures on some devices
                 val sslContext = SSLContext.getInstance("TLSv1.2")
                 sslContext.init(null, null, null)
-                val compatibilityFactory = ForceCompatibilitySSLSocketFactory(sslContext.socketFactory)
 
                 val options = MqttConnectOptions().apply {
                     isCleanSession = true
@@ -153,11 +134,12 @@ class ChatRepository(
                     connectionTimeout = 30
                     keepAliveInterval = 30
                     mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1
-                    setWill("presence/$clientId", ByteArray(0), 2, true)
-                    socketFactory = compatibilityFactory
+                    // Reverting to the original "presence/" topic structure
+                    setWill("presence/$clientId", "".toByteArray(), 1, true)
+                    socketFactory = sslContext.socketFactory
                 }
                 
-                Log.d("ChatRepo", "Starting MQTT connection sequence (Forced TLS 1.2)...")
+                Log.d("ChatRepo", "Starting MQTT connection sequence (TLS 1.2 forced)...")
                 withContext(Dispatchers.IO) {
                     client.connect(options)
                 }
@@ -172,18 +154,24 @@ class ChatRepository(
     private fun subscribeAll() {
         try {
             mqttClient?.subscribe("spazradio", 2)
-            mqttClient?.subscribe("presence/#", 2)
+            mqttClient?.subscribe("presence/#", 1)
             _connectionError.value = null
         } catch (e: Exception) {
             Log.e("ChatRepo", "Subscribe failed")
         }
     }
 
-    private fun publishPresence(username: String) {
+    private fun publishPresence(username: String, isOnline: Boolean) {
         val client = mqttClient ?: return
         if (client.isConnected) {
             try {
-                client.publish("presence/$clientId", username.toByteArray(), 2, true)
+                val topic = "presence/$clientId"
+                val payload = if (isOnline) username else ""
+                val message = MqttMessage(payload.toByteArray()).apply {
+                    qos = 1
+                    isRetained = true
+                }
+                client.publish(topic, message)
             } catch (e: Exception) {
                 Log.e("ChatRepo", "Publish presence failed")
             }
@@ -215,12 +203,19 @@ class ChatRepository(
         try {
             repositoryScope.launch {
                 connectionMutex.withLock { isConnecting = false }
+                
+                currentUsername?.let { 
+                    publishPresence(it, false) 
+                }
+
+                if (mqttClient?.isConnected == true) {
+                    mqttClient?.disconnect()
+                }
+                mqttClient = null
+                currentUsername = null
+                _connectionError.value = null
+                _onlineUsers.value = emptyMap()
             }
-            if (mqttClient?.isConnected == true) {
-                mqttClient?.disconnect()
-            }
-            mqttClient = null
-            _connectionError.value = null
         } catch (e: Exception) {
             Log.e("ChatRepo", "Error during disconnect")
         }
