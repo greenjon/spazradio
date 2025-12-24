@@ -123,7 +123,8 @@ class RadioService : MediaSessionService() {
             .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
             .build()
         
-        player?.playWhenReady = true
+        // Remove automatic playWhenReady = true to respect settings
+        player?.playWhenReady = false
 
         val sessionActivityPendingIntent =
             PendingIntent.getActivity(
@@ -139,6 +140,8 @@ class RadioService : MediaSessionService() {
             .setCallback(MediaSessionCallback())
             .build()
 
+        // Set the live media item initially so polling can start immediately,
+        // but we don't prepare() it yet to save data until the user (or autoplay) starts it.
         val mediaItem = MediaItem.Builder()
             .setUri("https://radio.spaz.org:8060/radio.ogg")
             .setMediaId(liveMediaID)
@@ -146,7 +149,6 @@ class RadioService : MediaSessionService() {
             .build()
             
         player?.setMediaItem(mediaItem)
-        player?.prepare()
         
         player?.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -247,6 +249,7 @@ class RadioService : MediaSessionService() {
                             .setMediaMetadata(newMetadata)
                             .build()
                         
+                        // replaceMediaItem works even if player is IDLE, allowing metadata updates without playback
                         exoPlayer.replaceMediaItem(exoPlayer.currentMediaItemIndex, newItem)
                     }
                 }
