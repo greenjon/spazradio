@@ -12,6 +12,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -24,7 +25,6 @@ import llm.slop.spazradio.utils.SpazNetwork
 class ChatViewModel(application: Application) : AndroidViewModel(application), DefaultLifecycleObserver {
     private val sharedPrefs = application.getSharedPreferences("spaz_chat", Context.MODE_PRIVATE)
     
-    // Updated to use shared OkHttpClient
     private val repository = ChatRepository(SpazNetwork.client, Gson())
     private val networkMonitor = NetworkMonitor(application)
 
@@ -77,7 +77,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
             launch {
                 networkMonitor.isOnline.collectLatest { isOnline ->
                     if (isOnline && _username.value.isNotEmpty()) {
-                        repository.connect(_username.value)
+                        // Move to IO to avoid any main-thread DNS/Socket setup work
+                        launch(Dispatchers.IO) {
+                            repository.connect(_username.value)
+                        }
                     }
                 }
             }
@@ -88,31 +91,41 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
         super.onResume(owner)
         // Secondary trigger: App foregrounded
         if (_username.value.isNotEmpty()) {
-            repository.connect(_username.value)
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.connect(_username.value)
+            }
         }
     }
 
     fun setUsername(name: String) {
         _username.value = name
         sharedPrefs.edit().putString("username", name).apply()
-        repository.connect(name)
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.connect(name)
+        }
     }
 
     fun resetUsername() {
         _username.value = ""
         sharedPrefs.edit().remove("username").apply()
-        repository.disconnect()
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.disconnect()
+        }
     }
 
     fun sendMessage(text: String) {
         if (_username.value.isNotEmpty()) {
-            repository.sendMessage(_username.value, text)
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.sendMessage(_username.value, text)
+            }
         }
     }
 
     override fun onCleared() {
         super.onCleared()
         ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
-        repository.disconnect()
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.disconnect()
+        }
     }
 }
