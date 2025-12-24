@@ -39,6 +39,11 @@ import okhttp3.Request
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 
+data class RadioMetadata(
+    val title: String = "Radio Spaz",
+    val listeners: Int = 0
+)
+
 @OptIn(UnstableApi::class)
 class RadioService : MediaSessionService() {
 
@@ -56,6 +61,9 @@ class RadioService : MediaSessionService() {
     companion object {
         private val _waveformFlow = MutableStateFlow<ByteArray?>(null)
         val waveformFlow = _waveformFlow.asStateFlow()
+
+        private val _metaDataFlow = MutableStateFlow(RadioMetadata())
+        val metaDataFlow = _metaDataFlow.asStateFlow()
     }
 
     private val audioBufferSink = object : TeeAudioProcessor.AudioBufferSink {
@@ -123,7 +131,6 @@ class RadioService : MediaSessionService() {
             .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
             .build()
         
-        // Remove automatic playWhenReady = true to respect settings
         player?.playWhenReady = false
 
         val sessionActivityPendingIntent =
@@ -140,8 +147,6 @@ class RadioService : MediaSessionService() {
             .setCallback(MediaSessionCallback())
             .build()
 
-        // Set the live media item initially so polling can start immediately,
-        // but we don't prepare() it yet to save data until the user (or autoplay) starts it.
         val mediaItem = MediaItem.Builder()
             .setUri("https://radio.spaz.org:8060/radio.ogg")
             .setMediaId(liveMediaID)
@@ -236,20 +241,25 @@ class RadioService : MediaSessionService() {
             lastPlayingTitle = playing
             lastListenerCount = listeners
 
-            val newMetadata = MediaMetadata.Builder()
-                .setTitle(playing)
-                .setArtist(getString(R.string.listening_template, listeners))
-                .build()
+            // Broadcast metadata via flow for the UI to use immediately
+            _metaDataFlow.value = RadioMetadata(playing, listeners)
 
+            // Only update the actual Player/Session metadata if we are actively playing or buffering.
+            // This prevents "zombie" notifications from being created when the app is just sitting there idle.
             withContext(Dispatchers.Main) {
                 player?.let { exoPlayer ->
+                    val isActive = exoPlayer.playWhenReady || exoPlayer.playbackState == Player.STATE_BUFFERING
                     val currentItem = exoPlayer.currentMediaItem
-                    if (currentItem != null && currentItem.mediaId == liveMediaID) {
+                    if (isActive && currentItem != null && currentItem.mediaId == liveMediaID) {
+                        val newMetadata = MediaMetadata.Builder()
+                            .setTitle(playing)
+                            .setArtist(getString(R.string.listening_template, listeners))
+                            .build()
+                        
                         val newItem = currentItem.buildUpon()
                             .setMediaMetadata(newMetadata)
                             .build()
                         
-                        // replaceMediaItem works even if player is IDLE, allowing metadata updates without playback
                         exoPlayer.replaceMediaItem(exoPlayer.currentMediaItemIndex, newItem)
                     }
                 }
@@ -264,10 +274,22 @@ class RadioService : MediaSessionService() {
         return mediaSession
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // Ensure the service stops and the notification is cleared when the app is swiped away.
+        // This is the modern Media3 equivalent of "stopForeground(true)"
+        val player = player
+        if (player != null) {
+            if (!player.playWhenReady || player.mediaItemCount == 0) {
+                stopSelf()
+            }
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         serviceJob.cancel()
         mediaSession?.run {
-            player.release()
+            player?.release()
             release()
             mediaSession = null
         }

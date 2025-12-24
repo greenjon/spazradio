@@ -98,6 +98,21 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }, MoreExecutors.directExecutor())
         
         startPositionPolling()
+        observeMetadata()
+    }
+
+    private fun observeMetadata() {
+        viewModelScope.launch {
+            RadioService.metaDataFlow.collect { metadata ->
+                _trackTitle.value = metadata.title
+                _trackListeners.value = if (metadata.listeners > 0) {
+                    context.getString(R.string.listening_template, metadata.listeners)
+                } else {
+                    ""
+                }
+                updateDisplayStrings()
+            }
+        }
     }
 
     private fun setupController(controller: MediaController) {
@@ -117,7 +132,11 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             override fun onMediaMetadataChanged(metadata: MediaMetadata) {
-                updateState(controller)
+                // We primarily use RadioService.metaDataFlow now for live radio,
+                // but we still update for Archive metadata which comes from the controller.
+                if (_isArchivePlaying.value) {
+                    updateState(controller)
+                }
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -132,20 +151,13 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         _isPlaying.value = isPlaying
         
         val metadata = controller.mediaMetadata
-        _trackTitle.value = metadata.title?.toString() ?: _trackTitle.value
-        
-        val artist = metadata.artist?.toString() ?: ""
         val mediaId = controller.currentMediaItem?.mediaId
         val isLive = mediaId == liveStreamId
 
-        // STRICT CHECK: Only update listeners if it matches the "X listening" template.
-        val listenerPrefix = context.getString(R.string.listening_template).split("%d").first()
-        if (isLive) {
-            if (artist.startsWith(listenerPrefix) && artist.any { it.isDigit() }) {
-                _trackListeners.value = artist
-            } else {
-                _trackListeners.value = ""
-            }
+        // For archives, we take title/artist from the player metadata
+        if (!isLive) {
+            _trackTitle.value = metadata.title?.toString() ?: _trackTitle.value
+            _trackListeners.value = ""
         }
 
         _isArchivePlaying.value = mediaId?.startsWith("archive_") == true || (mediaId != liveStreamId && mediaId != null)
@@ -162,8 +174,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 if (_appMode.value == AppMode.ARCHIVES && !_isArchivePlaying.value) {
                     PlaybackUiState.Idle
                 } else if (isLive && !controller.playWhenReady) {
-                    // If we're in Radio mode but playback hasn't been triggered (manual start),
-                    // show the fetched metadata instead of "Connecting".
                     PlaybackUiState.Paused(_trackTitle.value, _trackListeners.value)
                 } else {
                     PlaybackUiState.Connecting
@@ -198,7 +208,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _trackSubtitle.value = when (val state = _playbackUiState.value) {
-            PlaybackUiState.Idle -> ""
+            PlaybackUiState.Idle -> if (isLive) _trackTitle.value else ""
             PlaybackUiState.Connecting -> context.getString(R.string.status_connecting)
             PlaybackUiState.Buffering -> context.getString(R.string.status_buffering)
             PlaybackUiState.Reconnecting -> context.getString(R.string.status_reconnecting)
@@ -256,7 +266,6 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             controller.prepare()
             controller.play()
         } else if (!controller.isPlaying) {
-            // Ensure the player is prepared when user manually hits play
             if (controller.playbackState == Player.STATE_IDLE) {
                 controller.prepare()
             }
@@ -292,11 +301,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 updateState(mediaController ?: return)
             }
         } else if (mode == AppMode.ARCHIVES) {
-            // Halt radio stream when switching to browse archives
             stopPlayback()
-            
-            // ATOMIC FIX: Immediately clear the radio show title from the UI
-            // before the controller even has a chance to report its IDLE state.
             if (!_isArchivePlaying.value) {
                 _playbackUiState.value = PlaybackUiState.Idle
             }
