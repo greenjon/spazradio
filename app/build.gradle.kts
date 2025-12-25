@@ -25,8 +25,8 @@ android {
         applicationId = "llm.slop.spazradio"
         minSdk = 24
         targetSdk = 35
-        versionCode = 132
-        versionName = "1.3.2"
+        versionCode = 141
+        versionName = "1.4.1"
     }
 
     compileOptions {
