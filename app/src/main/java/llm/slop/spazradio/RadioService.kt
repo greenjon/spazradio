@@ -187,33 +187,35 @@ class RadioService : MediaSessionService() {
     private suspend fun fetchAndUpdateMetadata() {
         val request = Request.Builder().url("https://radio.spaz.org/playing").build()
         try {
-            val response = okHttpClient.newCall(request).execute()
-            if (!response.isSuccessful) { response.close(); return }
-            val body = response.body
-            val jsonStr = body.string()
-            response.close()
-            val jsonObject = JsonParser.parseString(jsonStr).asJsonObject
-            val playing = if (jsonObject.has("playing") && !jsonObject.get("playing").isJsonNull) jsonObject.get("playing").asString else "Radio Spaz"
-            val listeners = if (jsonObject.has("listeners") && !jsonObject.get("listeners").isJsonNull) {
-                try { jsonObject.get("listeners").asInt } catch (_: Exception) { 0 }
-            } else { 0 }
+            okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return
+                
+                val body = response.body ?: return
+                val jsonStr = body.string()
+                
+                val jsonObject = JsonParser.parseString(jsonStr).asJsonObject
+                val playing = if (jsonObject.has("playing") && !jsonObject.get("playing").isJsonNull) jsonObject.get("playing").asString else "Radio Spaz"
+                val listeners = if (jsonObject.has("listeners") && !jsonObject.get("listeners").isJsonNull) {
+                    try { jsonObject.get("listeners").asInt } catch (_: Exception) { 0 }
+                } else { 0 }
 
-            if (playing == lastPlayingTitle && listeners == lastListenerCount) return
-            lastPlayingTitle = playing
-            lastListenerCount = listeners
-            _metaDataFlow.value = RadioMetadata(playing, listeners)
+                if (playing == lastPlayingTitle && listeners == lastListenerCount) return
+                lastPlayingTitle = playing
+                lastListenerCount = listeners
+                _metaDataFlow.value = RadioMetadata(playing, listeners)
 
-            withContext(Dispatchers.Main) {
-                player?.let { exoPlayer ->
-                    val isLiveActive = exoPlayer.currentMediaItem?.mediaId == liveMediaID
-                    val isCurrentlyAudible = exoPlayer.playWhenReady || exoPlayer.playbackState == Player.STATE_BUFFERING
-                    if (isLiveActive && isCurrentlyAudible) {
-                        val newMetadata = MediaMetadata.Builder()
-                            .setTitle(playing)
-                            .setArtist(getString(R.string.listening_template, listeners))
-                            .build()
-                        val newItem = exoPlayer.currentMediaItem!!.buildUpon().setMediaMetadata(newMetadata).build()
-                        exoPlayer.replaceMediaItem(exoPlayer.currentMediaItemIndex, newItem)
+                withContext(Dispatchers.Main) {
+                    player?.let { exoPlayer ->
+                        val isLiveActive = exoPlayer.currentMediaItem?.mediaId == liveMediaID
+                        val isCurrentlyAudible = exoPlayer.playWhenReady || exoPlayer.playbackState == Player.STATE_BUFFERING
+                        if (isLiveActive && isCurrentlyAudible) {
+                            val newMetadata = MediaMetadata.Builder()
+                                .setTitle(playing)
+                                .setArtist(getString(R.string.listening_template, listeners))
+                                .build()
+                            val newItem = exoPlayer.currentMediaItem!!.buildUpon().setMediaMetadata(newMetadata).build()
+                            exoPlayer.replaceMediaItem(exoPlayer.currentMediaItemIndex, newItem)
+                        }
                     }
                 }
             }

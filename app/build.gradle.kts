@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "llm.slop.spazradio"
-    compileSdk = 35 // Aligned with AGP 8.4.2 requirements
+    compileSdk = 35
 
     buildTypes {
         release {
@@ -17,7 +17,6 @@ android {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             )
-            // No signing config in release - F-Droid will sign the APK
             signingConfig = null
         }
     }
@@ -25,7 +24,7 @@ android {
     defaultConfig {
         applicationId = "llm.slop.spazradio"
         minSdk = 24
-        targetSdk = 34 // F-Droid and Play Store stable target
+        targetSdk = 34
         versionCode = 141
         versionName = "1.4.1"
     }
@@ -61,9 +60,7 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_11)
-        // Disable incremental compilation to ensure deterministic builds
         freeCompilerArgs.addAll(
-            "-Xno-incremental-compilation",
             "-Xjvm-default=all"
         )
     }
@@ -91,7 +88,7 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.material)
     implementation(libs.paho)
-    implementation("androidx.work:work-runtime-ktx:2.8.1") // Downgraded for compatibility with older AGP
+    implementation("androidx.work:work-runtime-ktx:2.8.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -102,7 +99,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
-// Enable dependency locking for reproducible F-Droid builds
 dependencyLocking {
     lockAllConfigurations()
 }
@@ -110,13 +106,9 @@ dependencyLocking {
 androidComponents {
     onVariants { variant ->
         val capName = variant.name.replaceFirstChar { it.uppercase() }
-        
-        // Disable Baseline Profile generation
         tasks.matching { it.name.contains("ArtProfile") }.configureEach {
             enabled = false
         }
-
-        // Strip Baseline Profile files from the build output
         tasks.matching {
             it.name == "merge${capName}Assets" ||
             it.name == "package${capName}Resources" ||

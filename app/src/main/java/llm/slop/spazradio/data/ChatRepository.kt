@@ -43,10 +43,12 @@ class ChatRepository(
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
                         val body = response.body
-                        val json = body.string()
-                        val historyResponse = gson.fromJson(json, HistoryResponse::class.java)
-                        return@withContext historyResponse.history.map { msg ->
-                            msg.copy(timeReceived = msg.timeReceived / 1000L)
+                        if (body != null) {
+                            val json = body.string()
+                            val historyResponse = gson.fromJson(json, HistoryResponse::class.java)
+                            return@withContext historyResponse.history.map { msg ->
+                                msg.copy(timeReceived = msg.timeReceived / 1000L)
+                            }
                         }
                     }
                 }
