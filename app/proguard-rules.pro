@@ -43,3 +43,6 @@
 -keep class androidx.compose.runtime.snapshots.** { *; }
 -dontwarn androidx.compose.runtime.snapshots.**
 -keep class androidx.compose.runtime.** { *; }
+
+# Ensures that the minifier doesn't use random naming seeds
+-repackageclasses ''
