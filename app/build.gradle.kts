@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.io.File
 
 plugins {
     alias(libs.plugins.android.application)
@@ -9,22 +8,24 @@ plugins {
 
 android {
     namespace = "llm.slop.spazradio"
-    compileSdk = 36
+    compileSdk = 35 // Aligned with AGP 8.4.2 requirements
 
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),"proguard-rules.pro"
+                getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             )
+            // No signing config in release - F-Droid will sign the APK
+            signingConfig = null
         }
     }
 
     defaultConfig {
         applicationId = "llm.slop.spazradio"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 34 // F-Droid and Play Store stable target
         versionCode = 141
         versionName = "1.4.1"
     }
@@ -46,10 +47,13 @@ android {
                 "**/baseline.profm",
                 "**/*.baseline.prof",
                 "**/*.baseline.profm",
-                "assets/dexopt/*"
+                "assets/dexopt/*",
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties"
             )
-            excludes += "/META-INF/INDEX.LIST"
-            excludes += "/META-INF/io.netty.versions.properties"
+        }
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
@@ -57,7 +61,11 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_11)
-     //   languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        // Disable incremental compilation to ensure deterministic builds
+        freeCompilerArgs.addAll(
+            "-Xno-incremental-compilation",
+            "-Xjvm-default=all"
+        )
     }
 }
 
@@ -83,7 +91,7 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.material)
     implementation(libs.paho)
-    implementation("androidx.work:work-runtime-ktx:2.11.0")
+    implementation("androidx.work:work-runtime-ktx:2.8.1") // Downgraded for compatibility with older AGP
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -94,22 +102,33 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
+// Enable dependency locking for reproducible F-Droid builds
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 androidComponents {
     onVariants { variant ->
         val capName = variant.name.replaceFirstChar { it.uppercase() }
+        
+        // Disable Baseline Profile generation
         tasks.matching { it.name.contains("ArtProfile") }.configureEach {
             enabled = false
         }
+
+        // Strip Baseline Profile files from the build output
         tasks.matching {
-            it.name.contains("merge${capName}Assets") ||
-                    it.name.contains("package${capName}Resources") ||
-                    it.name.contains("process${capName}JavaRes")
+            it.name == "merge${capName}Assets" ||
+            it.name == "package${capName}Resources" ||
+            it.name == "process${capName}JavaRes"
         }.configureEach {
             doLast {
                 outputs.files.forEach { root ->
-                    root.walkBottomUp().forEach { file ->
-                        if (file.name == "baseline.prof" || file.name == "baseline.profm" || file.name == "dexopt") {
-                            file.deleteRecursively()
+                    if (root.exists()) {
+                        root.walkBottomUp().forEach { file ->
+                            if (file.name == "baseline.prof" || file.name == "baseline.profm" || file.name == "dexopt") {
+                                file.deleteRecursively()
+                            }
                         }
                     }
                 }
