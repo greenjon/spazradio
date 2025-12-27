@@ -12,6 +12,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -99,8 +100,11 @@ class RadioService : MediaSessionService() {
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
 
+        // Wrap OkHttpDataSource in DefaultDataSource to support file:// and other local URIs
         val okHttpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
             .setUserAgent("SpazRadio/1.0")
+        
+        val dataSourceFactory = DefaultDataSource.Factory(this, okHttpDataSourceFactory)
 
         // INCREASED BUFFER: Reduce crackling by allowing more audio to sit in memory
         val loadControl = DefaultLoadControl.Builder()
@@ -126,7 +130,7 @@ class RadioService : MediaSessionService() {
             .build()
 
         player = ExoPlayer.Builder(this, renderersFactory)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(okHttpDataSourceFactory))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(dataSourceFactory))
             .setLoadControl(loadControl)
             .setAudioAttributes(audioAttributes, true)
             .build()
