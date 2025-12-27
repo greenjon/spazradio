@@ -22,6 +22,8 @@ class ArchiveRepository(
     private val inputDateFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US)
     private val outputDateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
 
+    private val ITUNES_NAMESPACE = "http://www.itunes.com/dtds/podcast-1.0.dtd"
+
     fun getCachedArchives(): List<ArchiveShow> {
         return try {
             if (cacheFile.exists()) {
@@ -58,7 +60,8 @@ class ArchiveRepository(
                 val body = response.body ?: return@withContext emptyList()
                 
                 val parser = Xml.newPullParser()
-                parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+                // Enabling namespace processing to correctly handle itunes: tags
+                parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
                 parser.setInput(body.byteStream(), null)
 
                 var eventType = parser.eventType
@@ -66,9 +69,12 @@ class ArchiveRepository(
                 var currentUrl: String? = null
                 var currentPubDate: String? = null
                 var currentImageUrl: String? = null
+                var currentDuration: String? = null
 
                 while (eventType != XmlPullParser.END_DOCUMENT) {
                     val name = parser.name
+                    val namespace = parser.namespace
+                    
                     when (eventType) {
                         XmlPullParser.START_TAG -> {
                             when (name) {
@@ -77,6 +83,7 @@ class ArchiveRepository(
                                     currentUrl = null
                                     currentPubDate = null
                                     currentImageUrl = null
+                                    currentDuration = null
                                 }
                                 "title" -> {
                                     if (currentTitle == null) currentTitle = parser.nextText()
@@ -87,8 +94,15 @@ class ArchiveRepository(
                                 "enclosure" -> {
                                     currentUrl = parser.getAttributeValue(null, "url")
                                 }
-                                "itunes:image" -> {
-                                    currentImageUrl = parser.getAttributeValue(null, "href")
+                                "image" -> {
+                                    if (namespace == ITUNES_NAMESPACE) {
+                                        currentImageUrl = parser.getAttributeValue(null, "href")
+                                    }
+                                }
+                                "duration" -> {
+                                    if (namespace == ITUNES_NAMESPACE) {
+                                        currentDuration = parser.nextText()
+                                    }
                                 }
                             }
                         }
@@ -101,7 +115,8 @@ class ArchiveRepository(
                                         url = currentUrl,
                                         date = formattedDate,
                                         originalDate = currentPubDate ?: "",
-                                        imageUrl = currentImageUrl
+                                        imageUrl = currentImageUrl,
+                                        duration = currentDuration
                                     )
                                 )
                             }

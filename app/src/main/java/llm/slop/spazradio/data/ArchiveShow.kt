@@ -5,5 +5,6 @@ data class ArchiveShow(
     val url: String,
     val date: String, // Formatted date for display
     val originalDate: String, // Raw pubDate string
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val duration: String? = null // Format: "HH:mm:ss" or "mm:ss"
 )

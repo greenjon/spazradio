@@ -250,11 +250,21 @@ fun ArchiveShowRow(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.CenterStart
         ) {
-            Text(
-                text = show.date,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = show.date,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (!show.duration.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "(${show.duration})",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    )
+                }
+            }
             Row(
                 modifier = Modifier.align(Alignment.CenterEnd),
                 verticalAlignment = Alignment.CenterVertically
@@ -291,7 +301,6 @@ fun ArchiveShowRow(
                 }
             }
         }
-        // Removed padding here to pull the title closer to the date/icon row
         Text(
             text = show.title,
             style = MaterialTheme.typography.bodyLarge,
