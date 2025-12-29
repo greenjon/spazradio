@@ -64,7 +64,7 @@ class ArchiveViewModel(
         allShows = repository.getCachedArchives()
         _cachedArchiveCount.value = allShows.size
         if (allShows.isNotEmpty()) {
-            filterShows("") // Initial state
+            filterShows("")
             refreshDownloadStatus()
         }
         startPolling()
@@ -141,6 +141,8 @@ class ArchiveViewModel(
                 delay(150)
             }
             
+            val downloadedUrls = getDownloadedUrls(allShows)
+            
             val filtered = if (query.isBlank()) {
                 allShows
             } else {
@@ -153,11 +155,10 @@ class ArchiveViewModel(
                         it.date.contains(exactQuery, ignoreCase = true) 
                     }
                 } else {
-                    val searchTerms = query.trim().split("\\s+".toRegex())
+                    val tokens = parseSearchQuery(query)
                     allShows.filter { show ->
-                        searchTerms.all { term ->
-                            show.title.contains(term, ignoreCase = true) || 
-                            show.date.contains(term, ignoreCase = true)
+                        tokens.all { token ->
+                            evaluateToken(token, show, downloadedUrls)
                         }
                     }
                 }
@@ -167,10 +168,9 @@ class ArchiveViewModel(
                 if (filtered.isEmpty() && query.isNotBlank()) {
                     _uiState.value = ArchiveUiState.EmptySearch(query)
                 } else {
-                    val downloaded = getDownloadedUrls(filtered)
                     _uiState.value = ArchiveUiState.Success(
                         filteredShows = filtered,
-                        downloadedUrls = downloaded,
+                        downloadedUrls = downloadedUrls,
                         downloadingUrls = downloadTracker.downloadingUrls.value
                     )
                 }
@@ -178,11 +178,111 @@ class ArchiveViewModel(
         }
     }
 
+    // --- Search Engine DSL Logic ---
+
+    private sealed class SearchToken {
+        data class Text(val term: String) : SearchToken()
+        data class Downloaded(val invert: Boolean) : SearchToken()
+        data class DateRule(val operator: String, val year: Int) : SearchToken()
+        data class DurationRule(val operator: String, val seconds: Int) : SearchToken()
+    }
+
+    private fun parseSearchQuery(query: String): List<SearchToken> {
+        val tokens = mutableListOf<SearchToken>()
+        // Regex to split by whitespace but keep quoted strings together if we wanted, 
+        // but here we just split by words and then process rules.
+        val parts = query.trim().split("\\s+".toRegex())
+        
+        for (part in parts) {
+            when {
+                // Downloaded rules: !downloaded, is:downloaded, not:downloaded, etc.
+                part.contains("downloaded", ignoreCase = true) -> {
+                    val invert = part.startsWith("!") || part.startsWith("not", ignoreCase = true) || part.contains("not", ignoreCase = true)
+                    tokens.add(SearchToken.Downloaded(invert))
+                }
+                
+                // Date rules: date<2017, date:2017, 2017<=date (we'll focus on key:op:value)
+                part.startsWith("date", ignoreCase = true) -> {
+                    val match = "date([<>]=?|[:=])(\\d{4})".toRegex(RegexOption.IGNORE_CASE).find(part)
+                    match?.let {
+                        val op = it.groupValues[1].replace(":", "=")
+                        val year = it.groupValues[2].toIntOrNull() ?: 0
+                        tokens.add(SearchToken.DateRule(op, year))
+                    } ?: tokens.add(SearchToken.Text(part))
+                }
+
+                // Duration rules: duration<2h, duration:90m
+                part.startsWith("duration", ignoreCase = true) -> {
+                    val match = "duration([<>]=?|[:=])(\\d+)([hm])?".toRegex(RegexOption.IGNORE_CASE).find(part)
+                    match?.let {
+                        val op = it.groupValues[1].replace(":", "=")
+                        val amount = it.groupValues[2].toIntOrNull() ?: 0
+                        val unit = it.groupValues[3].lowercase()
+                        val seconds = when (unit) {
+                            "h" -> amount * 3600
+                            "m" -> amount * 60
+                            else -> amount * 60 // default to minutes
+                        }
+                        tokens.add(SearchToken.DurationRule(op, seconds))
+                    } ?: tokens.add(SearchToken.Text(part))
+                }
+
+                else -> tokens.add(SearchToken.Text(part))
+            }
+        }
+        return tokens
+    }
+
+    private fun evaluateToken(token: SearchToken, show: ArchiveShow, downloadedUrls: Set<String>): Boolean {
+        return when (token) {
+            is SearchToken.Text -> {
+                show.title.contains(token.term, ignoreCase = true) || 
+                show.date.contains(token.term, ignoreCase = true)
+            }
+            is SearchToken.Downloaded -> {
+                val isDownloaded = downloadedUrls.contains(show.url)
+                if (token.invert) !isDownloaded else isDownloaded
+            }
+            is SearchToken.DateRule -> {
+                val showYear = show.date.take(4).toIntOrNull() ?: 0
+                compareInts(showYear, token.year, token.operator)
+            }
+            is SearchToken.DurationRule -> {
+                val showSeconds = parseDurationToSeconds(show.duration ?: "")
+                compareInts(showSeconds, token.seconds, token.operator)
+            }
+        }
+    }
+
+    private fun compareInts(actual: Int, target: Int, op: String): Boolean {
+        return when (op) {
+            "<" -> actual < target
+            ">" -> actual > target
+            "<=" -> actual <= target
+            ">=" -> actual >= target
+            "=" -> actual == target
+            else -> true
+        }
+    }
+
+    private fun parseDurationToSeconds(duration: String): Int {
+        // Formats: "HH:mm:ss" or "mm:ss"
+        val parts = duration.split(":").mapNotNull { it.toIntOrNull() }
+        return when (parts.size) {
+            3 -> (parts[0] * 3600) + (parts[1] * 60) + parts[2]
+            2 -> (parts[0] * 60) + parts[1]
+            1 -> parts[0]
+            else -> 0
+        }
+    }
+
+    // --- End Search Engine DSL Logic ---
+
     private fun refreshDownloadStatus() {
         val currentState = _uiState.value
         if (currentState is ArchiveUiState.Success) {
             viewModelScope.launch {
-                val downloaded = getDownloadedUrls(currentState.filteredShows)
+                val downloaded = getDownloadedUrls(allShows)
                 _uiState.value = currentState.copy(
                     downloadedUrls = downloaded,
                     downloadingUrls = downloadTracker.downloadingUrls.value
