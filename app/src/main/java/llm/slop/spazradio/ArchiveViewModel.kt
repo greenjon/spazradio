@@ -137,7 +137,6 @@ class ArchiveViewModel(
     private fun filterShows(query: String) {
         filterJob?.cancel()
         filterJob = viewModelScope.launch(Dispatchers.Default) {
-            // Only debounce if the query is not empty (for immediate clear)
             if (query.isNotEmpty()) {
                 delay(150)
             }
@@ -145,9 +144,22 @@ class ArchiveViewModel(
             val filtered = if (query.isBlank()) {
                 allShows
             } else {
-                allShows.filter { 
-                    it.title.contains(query, ignoreCase = true) || 
-                    it.date.contains(query, ignoreCase = true) 
+                val isQuoted = query.length >= 2 && query.startsWith("\"") && query.endsWith("\"")
+                
+                if (isQuoted) {
+                    val exactQuery = query.substring(1, query.length - 1)
+                    allShows.filter { 
+                        it.title.contains(exactQuery, ignoreCase = true) || 
+                        it.date.contains(exactQuery, ignoreCase = true) 
+                    }
+                } else {
+                    val searchTerms = query.trim().split("\\s+".toRegex())
+                    allShows.filter { show ->
+                        searchTerms.all { term ->
+                            show.title.contains(term, ignoreCase = true) || 
+                            show.date.contains(term, ignoreCase = true)
+                        }
+                    }
                 }
             }
             
