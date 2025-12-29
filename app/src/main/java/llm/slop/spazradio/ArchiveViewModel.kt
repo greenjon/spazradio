@@ -28,7 +28,7 @@ sealed class ArchiveUiState {
         val downloadedUrls: Set<String> = emptySet(),
         val downloadingUrls: Set<String> = emptySet()
     ) : ArchiveUiState()
-    data object EmptySearch : ArchiveUiState()
+    data class EmptySearch(val query: String) : ArchiveUiState()
     data class Error(val message: String) : ArchiveUiState()
 }
 
@@ -153,7 +153,7 @@ class ArchiveViewModel(
             
             withContext(Dispatchers.Main) {
                 if (filtered.isEmpty() && query.isNotBlank()) {
-                    _uiState.value = ArchiveUiState.EmptySearch
+                    _uiState.value = ArchiveUiState.EmptySearch(query)
                 } else {
                     val downloaded = getDownloadedUrls(filtered)
                     _uiState.value = ArchiveUiState.Success(

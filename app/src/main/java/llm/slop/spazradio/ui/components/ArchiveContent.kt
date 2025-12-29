@@ -159,7 +159,7 @@ fun ArchiveContent(
                     }
                 }
                 is ArchiveUiState.EmptySearch -> {
-                    EmptySearchState(query = searchQuery) {
+                    EmptySearchState(query = state.query) {
                         archiveViewModel.updateSearchQuery("")
                         keyboardController?.hide()
                     }
@@ -182,22 +182,28 @@ fun ArchiveContent(
 @Composable
 fun EmptySearchState(query: String, onClear: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+        ) {
             Icon(
                 Icons.Default.SearchOff,
                 contentDescription = null,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(32.dp),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.search_no_results, query),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onClear) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onClear,
+                shape = RoundedCornerShape(8.dp)
+            ) {
                 Text(stringResource(R.string.action_clear_search))
             }
         }
