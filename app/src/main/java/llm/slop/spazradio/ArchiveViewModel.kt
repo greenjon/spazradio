@@ -184,46 +184,78 @@ class ArchiveViewModel(
         data class Text(val term: String) : SearchToken()
         data class Downloaded(val invert: Boolean) : SearchToken()
         data class DateRule(val operator: String, val year: Int) : SearchToken()
+        data class DateRangeRule(val startYear: Int, val endYear: Int) : SearchToken()
         data class DurationRule(val operator: String, val seconds: Int) : SearchToken()
+        data class DurationRangeRule(val startSeconds: Int, val endSeconds: Int) : SearchToken()
     }
 
     private fun parseSearchQuery(query: String): List<SearchToken> {
         val tokens = mutableListOf<SearchToken>()
-        // Regex to split by whitespace but keep quoted strings together if we wanted, 
-        // but here we just split by words and then process rules.
         val parts = query.trim().split("\\s+".toRegex())
         
         for (part in parts) {
             when {
-                // Downloaded rules: !downloaded, is:downloaded, not:downloaded, etc.
+                // Downloaded rules
                 part.contains("downloaded", ignoreCase = true) -> {
-                    val invert = part.startsWith("!") || part.startsWith("not", ignoreCase = true) || part.contains("not", ignoreCase = true)
+                    val invert = part.startsWith("!") || part.startsWith("not", ignoreCase = true) || 
+                                part.contains("not", ignoreCase = true)
                     tokens.add(SearchToken.Downloaded(invert))
                 }
                 
-                // Date rules: date<2017, date:2017, 2017<=date (we'll focus on key:op:value)
-                part.startsWith("date", ignoreCase = true) -> {
-                    val match = "date([<>]=?|[:=])(\\d{4})".toRegex(RegexOption.IGNORE_CASE).find(part)
+                // Date/Year Range: year:2015-2020 or date:2015-2020
+                (part.startsWith("date", ignoreCase = true) || part.startsWith("year", ignoreCase = true)) && 
+                part.contains("-") -> {
+                    val match = "(?:date|year)[:=](\\d{4})-(\\d{4})".toRegex(RegexOption.IGNORE_CASE).find(part)
+                    match?.let {
+                        val start = it.groupValues[1].toInt()
+                        val end = it.groupValues[2].toInt()
+                        tokens.add(SearchToken.DateRangeRule(minOf(start, end), maxOf(start, end)))
+                    } ?: tokens.add(SearchToken.Text(part))
+                }
+
+                // Date/Year Single: year<2020, date:2017
+                part.startsWith("date", ignoreCase = true) || part.startsWith("year", ignoreCase = true) -> {
+                    val match = "(?:date|year)([<>]=?|[:=])(\\d{4})".toRegex(RegexOption.IGNORE_CASE).find(part)
                     match?.let {
                         val op = it.groupValues[1].replace(":", "=")
-                        val year = it.groupValues[2].toIntOrNull() ?: 0
+                        val year = it.groupValues[2].toInt()
+                        tokens.add(SearchToken.DateRule(op, year))
+                    } ?: tokens.add(SearchToken.Text(part))
+                }
+                
+                // Reverse year rules: 2017<=
+                "(\\d{4})([<>]=?)".toRegex().matches(part) -> {
+                    val match = "(\\d{4})([<>]=?)".toRegex().find(part)
+                    match?.let {
+                        val year = it.groupValues[1].toInt()
+                        val op = it.groupValues[2]
                         tokens.add(SearchToken.DateRule(op, year))
                     } ?: tokens.add(SearchToken.Text(part))
                 }
 
-                // Duration rules: duration<2h, duration:90m
+                // Duration Range: duration:1h-3h or duration:1-3h
+                part.startsWith("duration", ignoreCase = true) && part.contains("-") -> {
+                    val match = "duration[:=](\\d+)([hm])?-(\\d+)([hm])?".toRegex(RegexOption.IGNORE_CASE).find(part)
+                    match?.let {
+                        val val1 = it.groupValues[1].toInt()
+                        val unit1 = it.groupValues[2].lowercase()
+                        val val2 = it.groupValues[3].toInt()
+                        val unit2 = it.groupValues[4].lowercase().ifEmpty { unit1 }
+                        
+                        val startSec = convertToSeconds(val1, unit1.ifEmpty { unit2 }.ifEmpty { "m" })
+                        val endSec = convertToSeconds(val2, unit2.ifEmpty { "m" })
+                        tokens.add(SearchToken.DurationRangeRule(minOf(startSec, endSec), maxOf(startSec, endSec)))
+                    } ?: tokens.add(SearchToken.Text(part))
+                }
+
+                // Duration Single: duration<2h
                 part.startsWith("duration", ignoreCase = true) -> {
                     val match = "duration([<>]=?|[:=])(\\d+)([hm])?".toRegex(RegexOption.IGNORE_CASE).find(part)
                     match?.let {
                         val op = it.groupValues[1].replace(":", "=")
-                        val amount = it.groupValues[2].toIntOrNull() ?: 0
-                        val unit = it.groupValues[3].lowercase()
-                        val seconds = when (unit) {
-                            "h" -> amount * 3600
-                            "m" -> amount * 60
-                            else -> amount * 60 // default to minutes
-                        }
-                        tokens.add(SearchToken.DurationRule(op, seconds))
+                        val amount = it.groupValues[2].toInt()
+                        val unit = it.groupValues[3].lowercase().ifEmpty { "m" }
+                        tokens.add(SearchToken.DurationRule(op, convertToSeconds(amount, unit)))
                     } ?: tokens.add(SearchToken.Text(part))
                 }
 
@@ -231,6 +263,12 @@ class ArchiveViewModel(
             }
         }
         return tokens
+    }
+
+    private fun convertToSeconds(amount: Int, unit: String): Int = when (unit) {
+        "h" -> amount * 3600
+        "m" -> amount * 60
+        else -> amount * 60
     }
 
     private fun evaluateToken(token: SearchToken, show: ArchiveShow, downloadedUrls: Set<String>): Boolean {
@@ -244,12 +282,20 @@ class ArchiveViewModel(
                 if (token.invert) !isDownloaded else isDownloaded
             }
             is SearchToken.DateRule -> {
-                val showYear = show.date.take(4).toIntOrNull() ?: 0
+                val showYear = if (show.date.length >= 4) show.date.takeLast(4).toIntOrNull() ?: 0 else 0
                 compareInts(showYear, token.year, token.operator)
+            }
+            is SearchToken.DateRangeRule -> {
+                val showYear = if (show.date.length >= 4) show.date.takeLast(4).toIntOrNull() ?: 0 else 0
+                showYear in token.startYear..token.endYear
             }
             is SearchToken.DurationRule -> {
                 val showSeconds = parseDurationToSeconds(show.duration ?: "")
                 compareInts(showSeconds, token.seconds, token.operator)
+            }
+            is SearchToken.DurationRangeRule -> {
+                val showSeconds = parseDurationToSeconds(show.duration ?: "")
+                showSeconds in token.startSeconds..token.endSeconds
             }
         }
     }
@@ -266,7 +312,6 @@ class ArchiveViewModel(
     }
 
     private fun parseDurationToSeconds(duration: String): Int {
-        // Formats: "HH:mm:ss" or "mm:ss"
         val parts = duration.split(":").mapNotNull { it.toIntOrNull() }
         return when (parts.size) {
             3 -> (parts[0] * 3600) + (parts[1] * 60) + parts[2]
