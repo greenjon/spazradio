@@ -71,6 +71,7 @@ fun ArchiveContent(
     radioViewModel: RadioViewModel
 ) {
     val uiState by archiveViewModel.uiState.collectAsState()
+    val searchQuery by archiveViewModel.searchQuery.collectAsState()
     val isRefreshing by archiveViewModel.isRefreshing.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -89,14 +90,8 @@ fun ArchiveContent(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Search Bar
-            val currentQuery = when (val state = uiState) {
-                is ArchiveUiState.Success -> state.searchQuery
-                is ArchiveUiState.EmptySearch -> state.query
-                else -> ""
-            }
-
             OutlinedTextField(
-                value = currentQuery,
+                value = searchQuery,
                 onValueChange = { archiveViewModel.updateSearchQuery(it) },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -104,7 +99,7 @@ fun ArchiveContent(
                 placeholder = { Text(stringResource(R.string.search_archives), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 14.sp) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 trailingIcon = {
-                    if (currentQuery.isNotEmpty()) {
+                    if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { 
                             archiveViewModel.updateSearchQuery("")
                             keyboardController?.hide()
@@ -164,7 +159,7 @@ fun ArchiveContent(
                     }
                 }
                 is ArchiveUiState.EmptySearch -> {
-                    EmptySearchState(query = state.query) {
+                    EmptySearchState(query = searchQuery) {
                         archiveViewModel.updateSearchQuery("")
                         keyboardController?.hide()
                     }
@@ -269,43 +264,44 @@ fun ArchiveShowRow(
                 modifier = Modifier.align(Alignment.CenterEnd),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onDownload,
-                    modifier = Modifier.size(40.dp),
-                    enabled = !isDownloaded && !isDownloading
-                ) {
-                    if (isDownloading) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    } else {
+                if (isDownloading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else if (isDownloaded) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Downloaded",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    IconButton(onClick = onDownload) {
                         Icon(
-                            imageVector = if (isDownloaded) Icons.Default.CheckCircle else Icons.Default.Download,
-                            contentDescription = if (isDownloaded) stringResource(R.string.label_downloaded) else stringResource(R.string.label_download),
-                            tint = if (isDownloaded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Download",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(
-                    onClick = onPlay,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = stringResource(R.string.label_play),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
         Text(
             text = show.title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.fillMaxWidth()
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        androidx.compose.material3.HorizontalDivider(
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
         )
     }
 }

@@ -24,13 +24,11 @@ import java.util.concurrent.TimeUnit
 sealed class ArchiveUiState {
     data object Loading : ArchiveUiState()
     data class Success(
-        val shows: List<ArchiveShow>,
         val filteredShows: List<ArchiveShow>,
         val downloadedUrls: Set<String> = emptySet(),
-        val downloadingUrls: Set<String> = emptySet(),
-        val searchQuery: String = ""
+        val downloadingUrls: Set<String> = emptySet()
     ) : ArchiveUiState()
-    data class EmptySearch(val query: String) : ArchiveUiState()
+    data object EmptySearch : ArchiveUiState()
     data class Error(val message: String) : ArchiveUiState()
 }
 
@@ -49,34 +47,28 @@ class ArchiveViewModel(
     private val _uiState = MutableStateFlow<ArchiveUiState>(ArchiveUiState.Loading)
     val uiState: StateFlow<ArchiveUiState> = _uiState.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
     private val _cachedArchiveCount = MutableStateFlow(repository.getCachedArchives().size)
     val cachedArchiveCount: StateFlow<Int> = _cachedArchiveCount.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
-    private var searchJob: Job? = null
+    private var filterJob: Job? = null
     private var isFetching = false
+    private var allShows: List<ArchiveShow> = emptyList()
 
     init {
-        loadFromCache()
-        startPolling()
-        observeDownloads()
-    }
-
-    private fun loadFromCache() {
-        val cachedShows = repository.getCachedArchives()
-        _cachedArchiveCount.value = cachedShows.size
-        if (cachedShows.isNotEmpty()) {
-            _uiState.value = ArchiveUiState.Success(
-                shows = cachedShows,
-                filteredShows = cachedShows,
-                downloadedUrls = emptySet(),
-                downloadingUrls = downloadTracker.downloadingUrls.value,
-                searchQuery = ""
-            )
+        allShows = repository.getCachedArchives()
+        _cachedArchiveCount.value = allShows.size
+        if (allShows.isNotEmpty()) {
+            filterShows("") // Initial state
             refreshDownloadStatus()
         }
+        startPolling()
+        observeDownloads()
     }
 
     private fun observeDownloads() {
@@ -102,7 +94,7 @@ class ArchiveViewModel(
     }
 
     fun fetchArchivesIfNeeded() {
-        if (_uiState.value !is ArchiveUiState.Success) {
+        if (_uiState.value is ArchiveUiState.Loading || allShows.isEmpty()) {
             fetchArchives()
         }
     }
@@ -113,43 +105,21 @@ class ArchiveViewModel(
         _isRefreshing.value = true
         
         viewModelScope.launch {
-            if (_uiState.value !is ArchiveUiState.Success) {
+            if (allShows.isEmpty()) {
                 _uiState.value = ArchiveUiState.Loading
             }
             
             try {
                 val shows = repository.fetchArchiveFeed()
                 if (shows.isNotEmpty()) {
+                    allShows = shows
                     _cachedArchiveCount.value = shows.size
-                    
-                    val currentQuery = when (val state = _uiState.value) {
-                        is ArchiveUiState.Success -> state.searchQuery
-                        is ArchiveUiState.EmptySearch -> state.query
-                        else -> ""
-                    }
-                    
-                    val filtered = if (currentQuery.isBlank()) shows else shows.filter { 
-                        it.title.contains(currentQuery, ignoreCase = true) || 
-                        it.date.contains(currentQuery, ignoreCase = true) 
-                    }
-
-                    if (filtered.isEmpty() && currentQuery.isNotBlank()) {
-                        _uiState.value = ArchiveUiState.EmptySearch(currentQuery)
-                    } else {
-                        _uiState.value = ArchiveUiState.Success(
-                            shows = shows,
-                            filteredShows = filtered,
-                            downloadedUrls = emptySet(),
-                            downloadingUrls = downloadTracker.downloadingUrls.value,
-                            searchQuery = currentQuery
-                        )
-                        refreshDownloadStatus()
-                    }
-                } else if (_uiState.value !is ArchiveUiState.Success) {
+                    filterShows(_searchQuery.value)
+                } else if (allShows.isEmpty()) {
                     _uiState.value = ArchiveUiState.Error("No archives found or network error.")
                 }
             } catch (e: Exception) {
-                if (_uiState.value !is ArchiveUiState.Success) {
+                if (allShows.isEmpty()) {
                     _uiState.value = ArchiveUiState.Error(e.message ?: "Unknown error")
                 }
             } finally {
@@ -160,30 +130,17 @@ class ArchiveViewModel(
     }
 
     fun updateSearchQuery(query: String) {
-        val currentState = _uiState.value
-        val shows = when (currentState) {
-            is ArchiveUiState.Success -> currentState.shows
-            is ArchiveUiState.EmptySearch -> {
-                // We need to keep the original shows to re-filter
-                // For simplicity in this state, we'll let the job handle it if we can find them
-                null 
+        _searchQuery.value = query
+        filterShows(query)
+    }
+
+    private fun filterShows(query: String) {
+        filterJob?.cancel()
+        filterJob = viewModelScope.launch(Dispatchers.Default) {
+            // Only debounce if the query is not empty (for immediate clear)
+            if (query.isNotEmpty()) {
+                delay(150)
             }
-            else -> null
-        }
-
-        // If we are in Success state, update immediately for responsive typing
-        if (currentState is ArchiveUiState.Success) {
-            _uiState.value = currentState.copy(searchQuery = query)
-        } else if (currentState is ArchiveUiState.EmptySearch) {
-            // Placeholder update while typing
-        }
-
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch(Dispatchers.Default) {
-            delay(150)
-            
-            // Re-fetch shows from repository cache if we lost them in the state transition
-            val allShows = repository.getCachedArchives()
             
             val filtered = if (query.isBlank()) {
                 allShows
@@ -196,16 +153,14 @@ class ArchiveViewModel(
             
             withContext(Dispatchers.Main) {
                 if (filtered.isEmpty() && query.isNotBlank()) {
-                    _uiState.value = ArchiveUiState.EmptySearch(query)
+                    _uiState.value = ArchiveUiState.EmptySearch
                 } else {
+                    val downloaded = getDownloadedUrls(filtered)
                     _uiState.value = ArchiveUiState.Success(
-                        shows = allShows,
                         filteredShows = filtered,
-                        downloadedUrls = emptySet(), // Will be refreshed
-                        downloadingUrls = downloadTracker.downloadingUrls.value,
-                        searchQuery = query
+                        downloadedUrls = downloaded,
+                        downloadingUrls = downloadTracker.downloadingUrls.value
                     )
-                    refreshDownloadStatus()
                 }
             }
         }
@@ -215,7 +170,7 @@ class ArchiveViewModel(
         val currentState = _uiState.value
         if (currentState is ArchiveUiState.Success) {
             viewModelScope.launch {
-                val downloaded = getDownloadedUrls(currentState.shows)
+                val downloaded = getDownloadedUrls(currentState.filteredShows)
                 _uiState.value = currentState.copy(
                     downloadedUrls = downloaded,
                     downloadingUrls = downloadTracker.downloadingUrls.value
