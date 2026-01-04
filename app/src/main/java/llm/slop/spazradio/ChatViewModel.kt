@@ -77,7 +77,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
             launch {
                 networkMonitor.isOnline.collectLatest { isOnline ->
                     if (isOnline && _username.value.isNotEmpty()) {
-                        // Move to IO to avoid any main-thread DNS/Socket setup work
                         launch(Dispatchers.IO) {
                             repository.connect(_username.value)
                         }
@@ -87,13 +86,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
         }
     }
 
-    override fun onResume(owner: LifecycleOwner) {
-        super.onResume(owner)
-        // Secondary trigger: App foregrounded
+    override fun onStart(owner: LifecycleOwner) {
+        super.onStart(owner)
+        // App came to foreground
         if (_username.value.isNotEmpty()) {
-            viewModelScope.launch(Dispatchers.IO) {
-                repository.connect(_username.value)
-            }
+            Log.d("ChatViewModel", "App foregrounded - Publishing online status")
+            repository.publishPresence(_username.value, true)
+        }
+    }
+
+    override fun onStop(owner: LifecycleOwner) {
+        super.onStop(owner)
+        // App went to background
+        if (_username.value.isNotEmpty()) {
+            Log.d("ChatViewModel", "App backgrounded - Publishing offline status")
+            repository.publishPresence(_username.value, false)
         }
     }
 

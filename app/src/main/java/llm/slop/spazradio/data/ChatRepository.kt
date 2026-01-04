@@ -94,6 +94,7 @@ class ChatRepository(
                     val id = topic.substringAfter("presence/")
                     val name = payload
                     val current = _onlineUsers.value.toMutableMap()
+                    // If payload is empty, the user is offline (graceful or LWT)
                     if (name.isEmpty() || name == "offline") {
                         current.remove(id)
                     } else {
@@ -134,10 +135,12 @@ class ChatRepository(
                     isCleanSession = true
                     isAutomaticReconnect = true
                     connectionTimeout = 30
-                    keepAliveInterval = 30
+                    keepAliveInterval = 60 // Broker checks every 60s
                     mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1
-                    // Reverting to the original "presence/" topic structure
+                    
+                    // LAST WILL: If we crash, the broker publishes an empty string to our presence topic
                     setWill("presence/$clientId", "".toByteArray(), 1, true)
+                    
                     socketFactory = sslContext.socketFactory
                 }
                 
@@ -163,19 +166,22 @@ class ChatRepository(
         }
     }
 
-    private fun publishPresence(username: String, isOnline: Boolean) {
+    fun publishPresence(username: String, isOnline: Boolean) {
         val client = mqttClient ?: return
         if (client.isConnected) {
-            try {
-                val topic = "presence/$clientId"
-                val payload = if (isOnline) username else ""
-                val message = MqttMessage(payload.toByteArray()).apply {
-                    qos = 1
-                    isRetained = true
+            repositoryScope.launch(Dispatchers.IO) {
+                try {
+                    val topic = "presence/$clientId"
+                    val payload = if (isOnline) username else ""
+                    val message = MqttMessage(payload.toByteArray()).apply {
+                        qos = 1
+                        isRetained = true // New joiners see current status
+                    }
+                    client.publish(topic, message)
+                    Log.d("ChatRepo", "Published presence: $username (Online: $isOnline)")
+                } catch (e: Exception) {
+                    Log.e("ChatRepo", "Publish presence failed: ${e.message}")
                 }
-                client.publish(topic, message)
-            } catch (e: Exception) {
-                Log.e("ChatRepo", "Publish presence failed")
             }
         }
     }
