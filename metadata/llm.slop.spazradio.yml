@@ -18,8 +18,8 @@ AutoUpdateMode: Version
 UpdateCheckMode: Tags
 
 Builds:
-  - versionName: "1.6.0"
-    versionCode: 160
-    commit: v1.6.0
+  - versionName: "1.6.2"
+    versionCode: 162
+    commit: v1.6.2
     gradle:
       - assembleRelease
