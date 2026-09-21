@@ -1,0 +1,20 @@
+# Example key.properties
+# Copy this file to 'key.properties' (which is gitignored) and fill in your credentials.
+
+# Default release key
+storeFile=/path/to/uploadkey.jks
+storePassword=your_store_password
+keyAlias=upload
+keyPassword=your_key_password
+
+# Play Upload key (used for Google Play AAB bundles)
+playStoreFile=/path/to/uploadkey.jks
+playStorePassword=your_play_store_password
+playKeyAlias=upload
+playKeyPassword=your_play_key_password
+
+# Master App key (used for standalone APK releases with -PuseMasterKey)
+masterStoreFile=/path/to/spazradio.jks
+masterStorePassword=your_master_password
+masterKeyAlias=spazradio key
+masterKeyPassword=your_master_password

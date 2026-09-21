@@ -30,9 +30,26 @@ platform :android do
     # You can also use other beta testing services here
   end
 
+  desc "Build signed Google Play App Bundle (AAB)"
+  lane :build_play_bundle do
+    gradle(task: "clean bundleRelease")
+  end
+
+  desc "Build signed standalone APK (Master Key)"
+  lane :build_standalone_apk do
+    gradle(
+      task: "clean assembleRelease",
+      properties: {
+        "useMasterKey" => "true"
+      }
+    )
+  end
+
   desc "Deploy a new version to the Google Play"
   lane :deploy do
-    gradle(task: "clean assembleRelease")
-    upload_to_play_store
+    gradle(task: "clean bundleRelease")
+    upload_to_play_store(
+      aab: "app/build/outputs/bundle/release/app-release.aab"
+    )
   end
 end

@@ -1,4 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -6,9 +8,51 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val keyPropertiesFile = rootProject.file("key.properties")
+val keyProperties = Properties()
+if (keyPropertiesFile.exists()) {
+    FileInputStream(keyPropertiesFile).use { keyProperties.load(it) }
+}
+
 android {
     namespace = "llm.slop.spazradio"
     compileSdk = 36
+
+    signingConfigs {
+        create("release") {
+            val isMasterRequested = project.hasProperty("useMasterKey") || project.findProperty("target") == "standalone"
+
+            val envStorePath = System.getenv("KEYSTORE_PATH")
+            val storePath = when {
+                !envStorePath.isNullOrEmpty() -> envStorePath
+                isMasterRequested && keyProperties.getProperty("masterStoreFile") != null -> keyProperties.getProperty("masterStoreFile")
+                !isMasterRequested && keyProperties.getProperty("playStoreFile") != null -> keyProperties.getProperty("playStoreFile")
+                keyProperties.getProperty("storeFile") != null -> keyProperties.getProperty("storeFile")
+                else -> null
+            }
+
+            val storePass = System.getenv("KEYSTORE_PASSWORD")
+                ?: (if (isMasterRequested) keyProperties.getProperty("masterStorePassword") else keyProperties.getProperty("playStorePassword"))
+                ?: keyProperties.getProperty("storePassword")
+
+            val aliasName = System.getenv("KEY_ALIAS")
+                ?: (if (isMasterRequested) keyProperties.getProperty("masterKeyAlias") else keyProperties.getProperty("playKeyAlias"))
+                ?: keyProperties.getProperty("keyAlias")
+
+            val keyPass = System.getenv("KEY_PASSWORD")
+                ?: (if (isMasterRequested) keyProperties.getProperty("masterKeyPassword") else keyProperties.getProperty("playKeyPassword"))
+                ?: keyProperties.getProperty("keyPassword")
+
+            if (storePath != null && File(storePath).exists() && !storePass.isNullOrEmpty() && !aliasName.isNullOrEmpty()) {
+                storeFile = File(storePath)
+                storePassword = storePass
+                keyAlias = aliasName
+                keyPassword = keyPass ?: storePass
+            } else {
+                initWith(getByName("debug"))
+            }
+        }
+    }
 
     buildFeatures {
         compose = true
@@ -27,7 +71,7 @@ configurations.all {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -60,9 +104,6 @@ configurations.all {
                 "META-INF/INDEX.LIST",
                 "META-INF/io.netty.versions.properties"
             )
-        }
-        jniLibs {
-            useLegacyPackaging = true
         }
     }
 }
