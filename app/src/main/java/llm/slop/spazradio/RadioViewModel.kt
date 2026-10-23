@@ -20,6 +20,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import llm.slop.spazradio.data.ArchiveShow
+import llm.slop.spazradio.visuals.ReducedMotion
+import llm.slop.spazradio.visuals.VisualQuality
+import llm.slop.spazradio.visuals.VisualsSettings
 
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -72,6 +75,24 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _lissajousMode = MutableStateFlow(prefs.getBoolean("visuals_enabled", true))
     val lissajousMode: StateFlow<Boolean> = _lissajousMode.asStateFlow()
+
+    /** The web visuals couldn't start on this device (no WebView or WebGL2); the oscilloscope is shown instead. */
+    val webVisualsFailed = MutableStateFlow(false)
+
+    private val _visuals = MutableStateFlow(
+        VisualsSettings(
+            quality = enumPref("visuals_quality", VisualQuality.AUTO),
+            reactivity = prefs.getFloat("visuals_reactivity", 2f),
+            reducedMotion = enumPref("visuals_reduced_motion", ReducedMotion.AUTO),
+            live = prefs.getBoolean("visuals_live", false),
+            syncMs = prefs.getInt("visuals_sync_ms", VisualsSettings.DEFAULT_SYNC_MS),
+        )
+    )
+    val visuals: StateFlow<VisualsSettings> = _visuals.asStateFlow()
+
+    private fun <E : Enum<E>> enumPref(key: String, default: E): E =
+        default.javaClass.enumConstants
+            ?.firstOrNull { it.name == prefs.getString(key, null) } ?: default
 
     private val _autoPlayEnabled = MutableStateFlow(prefs.getBoolean("autoplay_enabled", true))
     val autoPlayEnabled: StateFlow<Boolean> = _autoPlayEnabled.asStateFlow()
@@ -379,6 +400,18 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     fun setLissajousMode(enabled: Boolean) {
         _lissajousMode.value = enabled
         prefs.edit().putBoolean("visuals_enabled", enabled).apply()
+    }
+
+    fun updateVisuals(change: (VisualsSettings) -> VisualsSettings) {
+        val v = change(_visuals.value)
+        _visuals.value = v
+        prefs.edit()
+            .putString("visuals_quality", v.quality.name)
+            .putFloat("visuals_reactivity", v.reactivity)
+            .putString("visuals_reduced_motion", v.reducedMotion.name)
+            .putBoolean("visuals_live", v.live)
+            .putInt("visuals_sync_ms", v.syncMs)
+            .apply()
     }
 
     fun setAutoPlayEnabled(enabled: Boolean) {

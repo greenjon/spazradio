@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "name": "web-gyroid-hat",
+  "visualSourceType": "gyroid_hyperspace",
+  "parameters": {
+    "SurfaceType": {
+      "baseValue": 2.0,
+      "baseMin": 0.0,
+      "baseMax": 2.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "WallThickness": {
+      "baseValue": 0.3,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "Frequency": {
+      "baseValue": 0.5,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "FlightSpeed": {
+      "baseValue": 0.15,
+      "baseMin": -1.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "WireframeMode": {
+      "baseValue": 1.0,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "CoreGlow": {
+      "baseValue": 0.3,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "audio_flux_high",
+          "operator": "ADD",
+          "depth": 0.5,
+          "dcOffset": 0.0,
+          "followerMode": "CUSTOM",
+          "attackMs": 3.0,
+          "decayMs": 140.0
+        }
+      ]
+    },
+    "ColorMode": {
+      "baseValue": 3.0,
+      "baseMin": 0.0,
+      "baseMax": 3.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "HueOffset": {
+      "baseValue": 0.0,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "audio_flux_high",
+          "operator": "ADD",
+          "depth": 0.4,
+          "dcOffset": 0.0,
+          "followerMode": "CUSTOM",
+          "attackMs": 3.0,
+          "decayMs": 250.0
+        }
+      ]
+    },
+    "Saturation": {
+      "baseValue": 0.9,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "Brightness": {
+      "baseValue": 0.4,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "audio_flux_high",
+          "operator": "ADD",
+          "depth": 0.2,
+          "dcOffset": 0.0,
+          "followerMode": "CUSTOM",
+          "attackMs": 3.0,
+          "decayMs": 120.0
+        }
+      ]
+    },
+    "Zoom": {
+      "baseValue": 0.4,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "RotateX": {
+      "baseValue": 0.0,
+      "baseMin": -3.14159265,
+      "baseMax": 3.14159265,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "lfo",
+          "operator": "ADD",
+          "depth": 1.0,
+          "dcOffset": 0.0,
+          "waveform": "SINE",
+          "genUnit": "BEAT",
+          "subdivision": 64.0,
+          "slope": 0.5,
+          "phaseOffset": 0.0
+        }
+      ]
+    }
+  },
+  "tags": [
+    "web",
+    "hat",
+    "high",
+    "bar"
+  ],
+  "presetNotes": "A steady wireframe flight that glints and shifts colour on the hi-hats.",
+  "globalAlpha": {
+    "baseValue": 1.0,
+    "baseMin": 0.0,
+    "baseMax": 1.0,
+    "randomizeBase": false,
+    "modulators": []
+  }
+}

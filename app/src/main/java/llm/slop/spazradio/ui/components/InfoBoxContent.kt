@@ -187,6 +187,10 @@ fun SettingsContent(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
+            VisualsSettingsSection(radioViewModel)
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+
             // Debug & Logs Section
             Text(
                 text = "Debug & Support",

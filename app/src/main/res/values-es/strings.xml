@@ -68,4 +68,18 @@
 
     <string name="playback_settings">Reproducción</string>
     <string name="autoplay_radio">Iniciar radio automáticamente</string>
+    <string name="visuals_settings">Visuales</string>
+    <string name="visuals_fallback">Los visuales animados no están disponibles en este dispositivo; se muestra el osciloscopio simple.</string>
+    <string name="visuals_quality">Calidad</string>
+    <string name="visuals_auto">Auto</string>
+    <string name="visuals_quality_low">Baja (ahorra batería)</string>
+    <string name="visuals_quality_high">Alta</string>
+    <string name="visuals_reactivity">Reacción a la música: %1$d%%</string>
+    <string name="visuals_reduced_motion">Movimiento reducido</string>
+    <string name="visuals_on">Sí</string>
+    <string name="visuals_off">No</string>
+    <string name="visuals_sync">Retraso de la imagen: %1$d ms</string>
+    <string name="visuals_sync_help">Súbelo si la imagen se mueve antes de oír el ritmo (los altavoces Bluetooth necesitan más).</string>
+    <string name="visuals_live">Seguir emisiones en directo</string>
+    <string name="visuals_live_help">Muestra los visuales en vivo de un artista de Liquid LSD cuando está en el aire (usa datos).</string>
 </resources>

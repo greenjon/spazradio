@@ -68,4 +68,18 @@
 
     <string name="playback_settings">Wiedergabe</string>
     <string name="autoplay_radio">Radiostream automatisch starten</string>
+    <string name="visuals_settings">Visuals</string>
+    <string name="visuals_fallback">Animierte Visuals sind auf diesem Gerät nicht verfügbar; es wird das einfache Oszilloskop gezeigt.</string>
+    <string name="visuals_quality">Qualität</string>
+    <string name="visuals_auto">Auto</string>
+    <string name="visuals_quality_low">Niedrig (spart Akku)</string>
+    <string name="visuals_quality_high">Hoch</string>
+    <string name="visuals_reactivity">Reaktion auf die Musik: %1$d%%</string>
+    <string name="visuals_reduced_motion">Weniger Bewegung</string>
+    <string name="visuals_on">An</string>
+    <string name="visuals_off">Aus</string>
+    <string name="visuals_sync">Bildverzögerung: %1$d ms</string>
+    <string name="visuals_sync_help">Erhöhen, wenn sich das Bild vor dem Beat bewegt (Bluetooth-Lautsprecher brauchen mehr).</string>
+    <string name="visuals_live">Live-Sendungen verfolgen</string>
+    <string name="visuals_live_help">Zeigt die Live-Visuals eines Liquid-LSD-Künstlers, wenn einer sendet (nutzt Daten).</string>
 </resources>

@@ -48,6 +48,7 @@ import llm.slop.spazradio.ui.components.ChatContent
 import llm.slop.spazradio.ui.components.FooterToolbar
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
+import llm.slop.spazradio.ui.components.VisualizerView
 import llm.slop.spazradio.ui.components.PlayerHeader
 import llm.slop.spazradio.ui.components.ScheduleContent
 import llm.slop.spazradio.ui.components.SettingsContent
@@ -128,6 +129,9 @@ fun RadioApp(
     val listenerCount by radioViewModel.trackListeners.collectAsState()
     val archiveCount by archiveViewModel.cachedArchiveCount.collectAsState()
     val appTheme by radioViewModel.appTheme.collectAsState()
+    val visuals by radioViewModel.visuals.collectAsState()
+    // The web visuals couldn't start on this device (no WebView or WebGL2): the oscilloscope takes over.
+    val webVisualsFailed by radioViewModel.webVisualsFailed.collectAsState()
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -212,13 +216,22 @@ fun RadioApp(
             )
         },
         oscilloscope = { modifier ->
-            val waveform by RadioService.waveformFlow.collectAsState()
-            Oscilloscope(
-                waveform = waveform,
-                isPlaying = isPlaying,
-                lissajousMode = true,
-                modifier = modifier
-            )
+            if (webVisualsFailed) {
+                val waveform by RadioService.waveformFlow.collectAsState()
+                Oscilloscope(
+                    waveform = waveform,
+                    isPlaying = isPlaying,
+                    lissajousMode = true,
+                    modifier = modifier
+                )
+            } else {
+                VisualizerView(
+                    settings = visuals,
+                    active = isPlaying,
+                    onFailed = { radioViewModel.webVisualsFailed.value = true },
+                    modifier = modifier
+                )
+            }
         },
         infoBox = { modifier ->
             if (activeUtility != ActiveUtility.NONE) {

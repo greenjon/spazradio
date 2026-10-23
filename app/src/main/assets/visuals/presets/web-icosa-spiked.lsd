@@ -1,0 +1,243 @@
+{
+  "version": 1,
+  "name": "web-icosa-spiked",
+  "visualSourceType": "icosa_h3",
+  "parameters": {
+    "Morph": {
+      "baseValue": 0.2,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "audio_flux_bass",
+          "operator": "ADD",
+          "depth": 0.6,
+          "dcOffset": 0.0,
+          "followerMode": "CUSTOM",
+          "attackMs": 4.0,
+          "decayMs": 250.0
+        }
+      ]
+    },
+    "StellationBoost": {
+      "baseValue": 0.0,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "audio_bass",
+          "operator": "ADD",
+          "depth": 1.5,
+          "dcOffset": -0.75,
+          "followerMode": "CUSTOM",
+          "attackMs": 15.0,
+          "decayMs": 250.0
+        }
+      ]
+    },
+    "SpikeMode": {
+      "baseValue": 1.0,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "SpikePhase": {
+      "baseValue": 0.0,
+      "baseMin": -3.14159,
+      "baseMax": 3.14159,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "lfo",
+          "operator": "ADD",
+          "depth": 1.0,
+          "dcOffset": 0.0,
+          "waveform": "SINE",
+          "genUnit": "BEAT",
+          "subdivision": 4.0,
+          "slope": 0.5,
+          "phaseOffset": 0.0
+        }
+      ]
+    },
+    "SpikeSharpness": {
+      "baseValue": 0.9,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "BlockerSize": {
+      "baseValue": 0.45,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "ColorMode": {
+      "baseValue": 1.0,
+      "baseMin": 0.0,
+      "baseMax": 4.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "HueOffset": {
+      "baseValue": 0.0,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "lfo",
+          "operator": "ADD",
+          "depth": 1.0,
+          "dcOffset": 0.0,
+          "waveform": "SINE",
+          "genUnit": "BEAT",
+          "subdivision": 16.0,
+          "slope": 0.5,
+          "phaseOffset": 0.0
+        }
+      ]
+    },
+    "Saturation": {
+      "baseValue": 0.9,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "Brightness": {
+      "baseValue": 0.65,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "Opacity": {
+      "baseValue": 0.85,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "EdgeThickness": {
+      "baseValue": 0.08,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": []
+    },
+    "EdgeBrightness": {
+      "baseValue": 0.3,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "lfo",
+          "operator": "ADD",
+          "depth": 0.3,
+          "dcOffset": 0.0,
+          "waveform": "TRIANGLE",
+          "genUnit": "BEAT",
+          "subdivision": 0.5,
+          "slope": 0.0,
+          "phaseOffset": 0.0
+        }
+      ]
+    },
+    "RimGlow": {
+      "baseValue": 0.35,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "audio_flux_high",
+          "operator": "ADD",
+          "depth": 0.3,
+          "dcOffset": 0.0,
+          "followerMode": "CUSTOM",
+          "attackMs": 3.0,
+          "decayMs": 120.0
+        }
+      ]
+    },
+    "Zoom": {
+      "baseValue": 0.7,
+      "baseMin": 0.0,
+      "baseMax": 1.0,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "audio_flux_bass",
+          "operator": "ADD",
+          "depth": 0.08,
+          "dcOffset": 0.0,
+          "followerMode": "CUSTOM",
+          "attackMs": 4.0,
+          "decayMs": 150.0
+        }
+      ]
+    },
+    "RotateX": {
+      "baseValue": 0.0,
+      "baseMin": -3.14159265,
+      "baseMax": 3.14159265,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "lfo",
+          "operator": "ADD",
+          "depth": 1.0,
+          "dcOffset": 0.0,
+          "waveform": "SINE",
+          "genUnit": "BEAT",
+          "subdivision": 16.0,
+          "slope": 0.5,
+          "phaseOffset": 0.0
+        }
+      ]
+    },
+    "RotateY": {
+      "baseValue": 0.0,
+      "baseMin": -3.14159265,
+      "baseMax": 3.14159265,
+      "randomizeBase": false,
+      "modulators": [
+        {
+          "sourceId": "lfo",
+          "operator": "ADD",
+          "depth": 1.0,
+          "dcOffset": 0.0,
+          "waveform": "SINE",
+          "genUnit": "BEAT",
+          "subdivision": 12.0,
+          "slope": 0.5,
+          "phaseOffset": 0.0
+        }
+      ]
+    }
+  },
+  "tags": [
+    "web",
+    "hard",
+    "beat",
+    "bar",
+    "kick",
+    "high",
+    "bass-gated"
+  ],
+  "presetNotes": "Needle-sharp spikes that spin on a four-beat cycle; kicks push the morph and bass hits blow up the stellation.",
+  "globalAlpha": {
+    "baseValue": 1.0,
+    "baseMin": 0.0,
+    "baseMax": 1.0,
+    "randomizeBase": false,
+    "modulators": []
+  }
+}

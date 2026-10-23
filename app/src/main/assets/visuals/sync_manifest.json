@@ -1,0 +1,488 @@
+{
+  "$schema": "./sync_manifest.schema.json",
+  "version": "1.0.0",
+  "description": "Tracks desktop-to-web synchronization, auto-transpiled shaders, and manual review parity hashes.",
+  "shaders": [
+    {
+      "desktop": "src/main/resources/shaders/blit.vert",
+      "web": "web/shaders/blit.vert",
+      "mode": "auto_shader",
+      "description": "Blit fullscreen quad vertex shader"
+    },
+    {
+      "desktop": "src/main/resources/shaders/blit.frag",
+      "web": "web/shaders/blit.frag",
+      "mode": "auto_shader",
+      "description": "Blit texture sampler fragment shader"
+    },
+    {
+      "desktop": "src/main/resources/shaders/mixer.frag",
+      "web": "web/shaders/mixer.frag",
+      "mode": "auto_shader",
+      "description": "Master deck mixer & crossfader compositing shader"
+    },
+    {
+      "desktop": "library/sources/dynamic_spiral/dynamic_spiral.fs",
+      "web": "web/shaders/dynamic_spiral.frag",
+      "mode": "auto_shader",
+      "description": "Dynamic logarithmic spiral visualizer"
+    },
+    {
+      "desktop": "library/sources/icosa_h3/icosa_h3.fs",
+      "web": "web/shaders/icosa_h3.frag",
+      "mode": "auto_shader",
+      "description": "Icosahedral H3 Coxeter raymarcher: duality morph crossfaded with spike/blocker stellation CSG"
+    },
+    {
+      "desktop": "library/sources/mandala/shader.frag",
+      "web": "web/shaders/mandala.frag",
+      "mode": "auto_shader",
+      "description": "Multi-ribbon mandala geometry fragment shader"
+    },
+    {
+      "desktop": "library/sources/mandala/shader.vert",
+      "web": "web/shaders/mandala.vert",
+      "mode": "auto_shader",
+      "description": "Mandala Fourier series ribbon vertex displacement shader"
+    },
+    {
+      "desktop": "library/sources/domain_warp_fluid/domain_warp_fluid.fs",
+      "web": "web/shaders/domain_warp_fluid.frag",
+      "mode": "auto_shader",
+      "description": "Domain-warped fluid simulation with curl noise and iridescent marbling"
+    },
+    {
+      "desktop": "library/sources/gyroid_hyperspace/gyroid_hyperspace.fs",
+      "web": "web/shaders/gyroid_hyperspace.frag",
+      "mode": "auto_shader",
+      "description": "Raymarched Triply Periodic Minimal Surfaces (TPMS) with continuous morphing"
+    },
+    {
+      "desktop": "library/sources/celestial_engine/celestial_engine.fs",
+      "web": "web/shaders/celestial_engine.frag",
+      "mode": "auto_shader",
+      "description": "Multi-symmetry sacred geometry, Flower of Life folding, and op-art moir\u00e9 fringes"
+    },
+    {
+      "desktop": "library/sources/hyper_slice/hyper_slice.fs",
+      "web": "web/shaders/hyper_slice.frag",
+      "mode": "auto_shader",
+      "description": "Raymarched 3D cross-section MRI scan through 4D 120-cell and 600-cell polychora"
+    },
+    {
+      "desktop": "library/sources/chladni_cymatics/chladni_cymatics.fs",
+      "web": "web/shaders/chladni_cymatics.frag",
+      "mode": "auto_shader",
+      "description": "Physical 2D acoustic plate resonance simulation (Chladni cymatics)"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/3d_elevation.fs",
+      "web": "web/shaders/fx/3d_elevation.fs",
+      "mode": "auto_shader",
+      "description": "Elevates 2D visual sources into 3D space across Tri-Axial (3-Plane), Cube Cage (6-Plane), Hex-Planar (6-Plane), and Tetrahedral Kaleidoscope (24-Chamber) projections"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/anamorphic_streak.fs",
+      "web": "web/shaders/fx/anamorphic_streak.fs",
+      "mode": "auto_shader",
+      "description": "Cinematic anamorphic lens flare with horizontal exponential glare streaks, chromatic edge dispersion, highlight knee threshold, and starburst cross-flare"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/bloom.fs",
+      "web": "web/shaders/fx/bloom.fs",
+      "mode": "auto_shader",
+      "description": "Multi-pass bloom highlights and diffusion blur"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/color_levels.fs",
+      "web": "web/shaders/fx/color_levels.fs",
+      "mode": "auto_shader",
+      "description": "Mastering-grade perceptual color grading in Oklab color space with ACES filmic highlight compression and anti-banding dither"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/directional_blur.fs",
+      "web": "web/shaders/fx/directional_blur.fs",
+      "mode": "auto_shader",
+      "description": "Stochastic dithered directional motion blur with angle, exponential decay, and bidirectional streak diffusion"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/faceted_glass.fs",
+      "web": "web/shaders/fx/faceted_glass.fs",
+      "mode": "auto_shader",
+      "description": "Dynamic cellular Voronoi crystal gem facets with 3D prism refraction, surface normal glints, specular bevel highlights, and chromatic dispersion"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/feedback.fs",
+      "web": "web/shaders/fx/feedback.fs",
+      "mode": "auto_shader",
+      "description": "Full feedback loop with zoom, rotate, kaleidoscope, hue shift, chromatic aberration, blur, and mode blend"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/fluid_smear.fs",
+      "web": "web/shaders/fx/fluid_smear.fs",
+      "mode": "auto_shader",
+      "description": "Persistent 2-pass fluid curl-noise advection simulating organic liquid melting, ink diffusion, and viscous paint smearing"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/gradient_map.fs",
+      "web": "web/shaders/fx/gradient_map.fs",
+      "mode": "auto_shader",
+      "description": "Perceptual multi-stop gradient map and duotone colorizer with filmic palettes, cycling, and Oklab interpolation"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/halftone.fs",
+      "web": "web/shaders/fx/halftone.fs",
+      "mode": "auto_shader",
+      "description": "Authentic 4-plate CMYK lithographic screen angles with anti-aliased dot rosettes, monochrome halftone, and paper texture tinting"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/invert.fs",
+      "web": "web/shaders/fx/invert.fs",
+      "mode": "auto_shader",
+      "description": "Inverts colors"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/kaleidoscope.fs",
+      "web": "web/shaders/fx/kaleidoscope.fs",
+      "mode": "auto_shader",
+      "description": "Multi-axis polyhedral kaleidoscope with aspect-corrected polar folding and seamless reflection"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/luma_displace.fs",
+      "web": "web/shaders/fx/luma_displace.fs",
+      "mode": "auto_shader",
+      "description": "2D surface normal gradient refraction simulating liquid marbling, oily fluids, and melting glass with chromatic dispersion"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/luma_key.fs",
+      "web": "web/shaders/fx/luma_key.fs",
+      "mode": "auto_shader",
+      "description": "Luminance threshold keying"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/mirror_sphere.fs",
+      "web": "web/shaders/fx/mirror_sphere.fs",
+      "mode": "auto_shader",
+      "description": "Raytraced 3D chrome mirror sphere reflecting the visual environment with surface normals, Fresnel rim glow, and chromatic curvature"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/neon_edge.fs",
+      "web": "web/shaders/fx/neon_edge.fs",
+      "mode": "auto_shader",
+      "description": "Directional Sobel edge detection with angle-to-hue glowing neon color palettes and dark-stage or overlay compositing"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/pinch_bulge.fs",
+      "web": "web/shaders/fx/pinch_bulge.fs",
+      "mode": "auto_shader",
+      "description": "Aspect-preserving spherical lens deformation with smooth Hermite cubic falloff (Bulge / Magnify vs Pinch / Funnel)"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/pixelate.fs",
+      "web": "web/shaders/fx/pixelate.fs",
+      "mode": "auto_shader",
+      "description": "Aspect-preserving multi-lattice pixelation (Square, Diamond, Hexagonal Honeycomb) with optional retro color depth quantization"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/polar_tunnel.fs",
+      "web": "web/shaders/fx/polar_tunnel.fs",
+      "mode": "auto_shader",
+      "description": "Aspect-preserving infinite log-polar tunnel with spiral twist, azimuthal symmetry, and singularity depth fog"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/radial_blur.fs",
+      "web": "web/shaders/fx/radial_blur.fs",
+      "mode": "auto_shader",
+      "description": "Stochastic dithered radial zoom blur and explosive light shafts"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/retro_crt.fs",
+      "web": "web/shaders/fx/retro_crt.fs",
+      "mode": "auto_shader",
+      "description": "Authentic analog CRT monitor simulation with barrel tube curvature, RGB phosphor triad mask, and scanline rasterization"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/rgb_split.fs",
+      "web": "web/shaders/fx/rgb_split.fs",
+      "mode": "auto_shader",
+      "description": "Dual-mode chromatic aberration and RGB glitch with 3-tap channel split and 12-tap continuous spectral lens dispersion"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/thermal_scanner.fs",
+      "web": "web/shaders/fx/thermal_scanner.fs",
+      "mode": "auto_shader",
+      "description": "Tactical FLIR thermal camera and military night vision optics with heat bloom, sensor grain, and optic vignette"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/vhs_glitch.fs",
+      "web": "web/shaders/fx/vhs_glitch.fs",
+      "mode": "auto_shader",
+      "description": "Authentic magnetic VHS videotape degradation with tracking error jitter, bottom head-switching bar, Y/C chrominance delay, RF tape dropouts, and analog static"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/video_strobe.fs",
+      "web": "web/shaders/fx/video_strobe.fs",
+      "mode": "auto_shader",
+      "description": "Multi-mode rhythmic strobe and persistent freeze gate with beat flash modes and duty cycle modulation"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/vortex_swirl.fs",
+      "web": "web/shaders/fx/vortex_swirl.fs",
+      "mode": "auto_shader",
+      "description": "Logarithmic gravitational accretion vortex swirl with aspect-ratio preservation, cubic Hermite boundary falloff, and chromatic angular dispersion"
+    },
+    {
+      "desktop": "src/main/resources/default_filters/wave_displace.fs",
+      "web": "web/shaders/fx/wave_displace.fs",
+      "mode": "auto_shader",
+      "description": "Dual-mode fluid wave displacement: Cartesian cross-waves and aspect-corrected concentric liquid droplet ripples with seamless mirror wrapping"
+    },
+    {
+      "desktop": "src/main/resources/default_transitions/cyber_datamosh.fs",
+      "web": "web/shaders/transitions/cyber_datamosh.fs",
+      "mode": "auto_shader",
+      "description": "Cyber Datamosh"
+    },
+    {
+      "desktop": "src/main/resources/default_transitions/film_burn.fs",
+      "web": "web/shaders/transitions/film_burn.fs",
+      "mode": "auto_shader",
+      "description": "Film Burn"
+    },
+    {
+      "desktop": "src/main/resources/default_transitions/kinetic_zoom.fs",
+      "web": "web/shaders/transitions/kinetic_zoom.fs",
+      "mode": "auto_shader",
+      "description": "Kinetic Zoom"
+    },
+    {
+      "desktop": "src/main/resources/default_transitions/linear_crossfade.fs",
+      "web": "web/shaders/transitions/linear_crossfade.fs",
+      "mode": "auto_shader",
+      "description": "Linear Crossfade"
+    },
+    {
+      "desktop": "src/main/resources/default_transitions/liquid_displacement.fs",
+      "web": "web/shaders/transitions/liquid_displacement.fs",
+      "mode": "auto_shader",
+      "description": "Liquid Displacement"
+    },
+    {
+      "desktop": "src/main/resources/default_transitions/luminous_flash.fs",
+      "web": "web/shaders/transitions/luminous_flash.fs",
+      "mode": "auto_shader",
+      "description": "Luminous Flash"
+    },
+    {
+      "desktop": "src/main/resources/default_transitions/noise_dissolve.fs",
+      "web": "web/shaders/transitions/noise_dissolve.fs",
+      "mode": "auto_shader",
+      "description": "Noise Dissolve"
+    },
+    {
+      "desktop": "src/main/resources/default_transitions/vortex_swirl.fs",
+      "web": "web/shaders/transitions/vortex_swirl.fs",
+      "mode": "auto_shader",
+      "description": "Vortex Swirl"
+    },
+    {
+      "desktop": "library/sources/quasicrystal/quasicrystal.fs",
+      "web": "web/shaders/quasicrystal.frag",
+      "mode": "auto_shader",
+      "description": "Quasicrystal interference: 5 to 8 rotated cosine gratings"
+    },
+    {
+      "desktop": "library/sources/thin_film/thin_film.fs",
+      "web": "web/shaders/thin_film.frag",
+      "mode": "auto_shader",
+      "description": "Thin-film oil-slick iridescence"
+    },
+    {
+      "desktop": "library/sources/tunnel_scenes/tunnel_scenes.fs",
+      "web": "web/shaders/tunnel_scenes.frag",
+      "mode": "auto_shader",
+      "description": "Analytic grid, Truchet and polygonal tunnels"
+    },
+    {
+      "desktop": "library/sources/video_feedback/video_feedback.fs",
+      "web": "web/shaders/video_feedback.frag",
+      "mode": "auto_shader",
+      "description": "Persistent video-feedback loop generator"
+    },
+    {
+      "desktop": "library/sources/hyperbolic_tiling/hyperbolic_tiling.fs",
+      "web": "web/shaders/hyperbolic_tiling.frag",
+      "mode": "auto_shader",
+      "description": "Poincare-disk hyperbolic {P,Q} tiling"
+    },
+    {
+      "desktop": "library/sources/cyclic_ca/cyclic_ca.fs",
+      "web": "web/shaders/cyclic_ca.frag",
+      "mode": "auto_shader",
+      "description": "Cyclic CA generator"
+    },
+    {
+      "desktop": "library/sources/metaballs/metaballs.fs",
+      "web": "web/shaders/metaballs.frag",
+      "mode": "auto_shader",
+      "description": "Metaballs generator"
+    },
+    {
+      "desktop": "library/sources/wave_ripples/wave_ripples.fs",
+      "web": "web/shaders/wave_ripples.frag",
+      "mode": "auto_shader",
+      "description": "Wave Ripples generator"
+    },
+    {
+      "desktop": "library/sources/harmonograph/harmonograph.fs",
+      "web": "web/shaders/harmonograph.frag",
+      "mode": "auto_shader",
+      "description": "Harmonograph generator"
+    },
+    {
+      "desktop": "library/sources/aurora_ribbons/aurora_ribbons.fs",
+      "web": "web/shaders/aurora_ribbons.frag",
+      "mode": "auto_shader",
+      "description": "Aurora Ribbons generator"
+    },
+    {
+      "desktop": "library/sources/isometric_voxels/isometric_voxels.fs",
+      "web": "web/shaders/isometric_voxels.frag",
+      "mode": "auto_shader",
+      "description": "Isometric Voxels generator"
+    },
+    {
+      "desktop": "library/sources/halftone_matrix/halftone_matrix.fs",
+      "web": "web/shaders/halftone_matrix.frag",
+      "mode": "auto_shader",
+      "description": "Halftone Matrix generator"
+    },
+    {
+      "desktop": "library/sources/kali_set/kali_set.fs",
+      "web": "web/shaders/kali_set.frag",
+      "mode": "auto_shader",
+      "description": "Kali Set generator"
+    },
+    {
+      "desktop": "library/sources/girih_stars/girih_stars.fs",
+      "web": "web/shaders/girih_stars.frag",
+      "mode": "auto_shader",
+      "description": "Girih Stars generator"
+    },
+    {
+      "desktop": "library/sources/glitch_blocks/glitch_blocks.fs",
+      "web": "web/shaders/glitch_blocks.frag",
+      "mode": "auto_shader",
+      "description": "Glitch Blocks generator"
+    },
+    {
+      "desktop": "library/sources/voronoi_cells/voronoi_cells.fs",
+      "web": "web/shaders/voronoi_cells.frag",
+      "mode": "auto_shader",
+      "description": "Voronoi Cells generator"
+    },
+    {
+      "desktop": "library/sources/apollonian/apollonian.fs",
+      "web": "web/shaders/apollonian.frag",
+      "mode": "auto_shader",
+      "description": "Raymarched Apollonian-style sphere gasket"
+    },
+    {
+      "desktop": "library/sources/escape_time/escape_time.fs",
+      "web": "web/shaders/escape_time.frag",
+      "mode": "auto_shader",
+      "description": "High-iteration 2D escape-time fractals"
+    },
+    {
+      "desktop": "library/sources/fluid_ink/fluid_ink.fs",
+      "web": "web/shaders/fluid_ink.frag",
+      "mode": "auto_shader",
+      "description": "Stable-fluids ink"
+    },
+    {
+      "desktop": "library/sources/kifs/kifs.fs",
+      "web": "web/shaders/kifs.frag",
+      "mode": "auto_shader",
+      "description": "Raymarched kaleidoscopic IFS fractal"
+    },
+    {
+      "desktop": "library/sources/lenia/lenia.fs",
+      "web": "web/shaders/lenia.frag",
+      "mode": "auto_shader",
+      "description": "Lenia"
+    },
+    {
+      "desktop": "library/sources/mandelbox/mandelbox.fs",
+      "web": "web/shaders/mandelbox.frag",
+      "mode": "auto_shader",
+      "description": "Raymarched distance-estimated Mandelbox"
+    },
+    {
+      "desktop": "library/sources/mandelbulb/mandelbulb.fs",
+      "web": "web/shaders/mandelbulb.frag",
+      "mode": "auto_shader",
+      "description": "Raymarched Mandelbulb with an animatable power, Julia-mode blend, orbit-trap col"
+    },
+    {
+      "desktop": "library/sources/nebula_volume/nebula_volume.fs",
+      "web": "web/shaders/nebula_volume.frag",
+      "mode": "auto_shader",
+      "description": "Volumetric nebula"
+    },
+    {
+      "desktop": "library/sources/pseudo_kleinian/pseudo_kleinian.fs",
+      "web": "web/shaders/pseudo_kleinian.frag",
+      "mode": "auto_shader",
+      "description": "Raymarched Kleinian-style fractal"
+    },
+    {
+      "desktop": "library/sources/reaction_diffusion/reaction_diffusion.fs",
+      "web": "web/shaders/reaction_diffusion.frag",
+      "mode": "auto_shader",
+      "description": "Gray-Scott reaction-diffusion on a persistent fixed-size grid"
+    }
+  ],
+  "monitored_sources": [
+    {
+      "desktop": "src/main/kotlin/llm/slop/liquidlsd/cv/Evaluators.kt",
+      "web": "web/evaluator.js",
+      "mode": "manual_review",
+      "description": "Modulation signal evaluators and math function parity",
+      "last_synced_hash": "9b8d0806863db79c836a61fccc4aa3daf2e1b41ac7234778f098a71a7436066b"
+    },
+    {
+      "desktop": "src/main/kotlin/llm/slop/liquidlsd/broadcast/WebPresetSerializer.kt",
+      "web": "web/graph.js",
+      "mode": "manual_review",
+      "description": "JSON preset serialization schema & dead reckoning state sync",
+      "last_synced_hash": "252ef239e084664ea92e043ccdd7d1135f74acc9a6926b236b61dad42d10e1d1"
+    }
+  ],
+  "content": [
+    {
+      "desktop_dir": "defaults/fx_chains",
+      "web_dir": "web/content/fxchains",
+      "ext": ".lsdfxchain",
+      "catalog_key": "fxChains",
+      "description": "Desktop FX chain presets (FXChainDto) the autopilot can apply to decks"
+    },
+    {
+      "desktop_dir": "defaults/transitions",
+      "web_dir": "web/content/transitions",
+      "ext": ".lsdtrans",
+      "catalog_key": "transitionPresets",
+      "description": "Desktop transition presets (a transition filter plus parameters)"
+    },
+    {
+      "web_dir": "web/fxchains",
+      "ext": ".lsdfxchain",
+      "catalog_key": "fxChains",
+      "web_only": true,
+      "description": "Web-authored FX chains (desktop FXChainDto format), named web-*"
+    }
+  ],
+  "mandala_recipes": {
+    "desktop": "src/main/kotlin/llm/slop/liquidlsd/rendering/MandalaLibrary.kt",
+    "web": "web/mandala_recipes.json"
+  }
+}

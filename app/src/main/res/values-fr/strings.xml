@@ -68,4 +68,18 @@
 
     <string name="playback_settings">Lecture</string>
     <string name="autoplay_radio">Lancer la radio automatiquement</string>
+    <string name="visuals_settings">Visuels</string>
+    <string name="visuals_fallback">Les visuels animés ne sont pas disponibles sur cet appareil ; l\'oscilloscope simple est affiché.</string>
+    <string name="visuals_quality">Qualité</string>
+    <string name="visuals_auto">Auto</string>
+    <string name="visuals_quality_low">Basse (économise la batterie)</string>
+    <string name="visuals_quality_high">Haute</string>
+    <string name="visuals_reactivity">Réaction à la musique : %1$d%%</string>
+    <string name="visuals_reduced_motion">Mouvement réduit</string>
+    <string name="visuals_on">Oui</string>
+    <string name="visuals_off">Non</string>
+    <string name="visuals_sync">Retard de l\'image : %1$d ms</string>
+    <string name="visuals_sync_help">Augmentez-le si l\'image bouge avant que vous n\'entendiez le rythme (les enceintes Bluetooth en demandent plus).</string>
+    <string name="visuals_live">Suivre les directs</string>
+    <string name="visuals_live_help">Affiche les visuels en direct d\'un artiste Liquid LSD quand il est à l\'antenne (utilise des données).</string>
 </resources>

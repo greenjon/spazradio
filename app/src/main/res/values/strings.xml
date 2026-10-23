@@ -68,4 +68,18 @@
 
     <string name="playback_settings">Playback</string>
     <string name="autoplay_radio">Auto-start radio stream</string>
+    <string name="visuals_settings">Visuals</string>
+    <string name="visuals_fallback">Animated visuals unavailable on this device; showing the simple scope.</string>
+    <string name="visuals_quality">Quality</string>
+    <string name="visuals_auto">Auto</string>
+    <string name="visuals_quality_low">Low (saves battery)</string>
+    <string name="visuals_quality_high">High</string>
+    <string name="visuals_reactivity">Reaction to the music: %1$d%%</string>
+    <string name="visuals_reduced_motion">Reduced motion</string>
+    <string name="visuals_on">On</string>
+    <string name="visuals_off">Off</string>
+    <string name="visuals_sync">Picture delay: %1$d ms</string>
+    <string name="visuals_sync_help">Raise it if the picture moves before you hear the beat (Bluetooth speakers need more).</string>
+    <string name="visuals_live">Follow live broadcasts</string>
+    <string name="visuals_live_help">Show a Liquid LSD artist\'s live visuals when one is on air (uses data).</string>
 </resources>

@@ -46,3 +46,7 @@
 
 # Ensures that the minifier doesn't use random naming seeds
 -repackageclasses ''
+# The web visuals' bridge (window.LSDHost): WebView calls these by name.
+-keepclassmembers class llm.slop.spazradio.ui.components.LsdHostBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}

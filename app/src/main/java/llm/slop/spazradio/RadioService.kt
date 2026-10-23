@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import llm.slop.spazradio.visuals.PcmTap
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 
@@ -71,9 +72,12 @@ class RadioService : MediaSessionService() {
     }
 
     private val audioBufferSink = object : TeeAudioProcessor.AudioBufferSink {
-        override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {}
+        override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {
+            PcmTap.configure(sampleRateHz, channelCount)
+        }
 
         override fun handleBuffer(buffer: ByteBuffer) {
+            PcmTap.onBuffer(buffer) // the web visuals, only while they are listening
             val now = System.currentTimeMillis()
             if (now - lastWaveformUpdateTime < 33) return // Cap at ~30fps
             lastWaveformUpdateTime = now
