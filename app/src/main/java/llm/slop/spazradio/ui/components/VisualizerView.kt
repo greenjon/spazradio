@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
 import android.content.res.AssetManager
 import android.graphics.Color
 import android.os.Handler
@@ -114,6 +115,7 @@ fun VisualizerView(
     LaunchedEffect(webView, ready, active, visible) {
         val web = webView
         if (web == null || !ready) return@LaunchedEffect
+        Log.d(TAG, "picture active=$active visible=$visible ready=$ready")
         if (active && visible) {
             warmedUp = true
             web.onResume()
@@ -159,11 +161,12 @@ fun VisualizerView(
             factory = { ctx ->
                 val bridge = LsdHostBridge(
                     handler,
-                    onReady = { ready = true },
+                    onReady = { Log.d(TAG, "page ready"); ready = true },
                     onFailed = { reason -> Log.w(TAG, "visuals failed: $reason"); currentOnFailed() },
                 )
                 try {
-                    createWebView(ctx, bridge) {
+                    val debug = (ctx.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                    createWebView(ctx, bridge, debug) {
                         handler.post {
                             ready = false
                             if (restarts < MAX_RESTARTS) restarts++ else currentOnFailed()
@@ -197,8 +200,9 @@ private class LsdHostBridge(
 }
 
 @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
-private fun createWebView(ctx: Context, bridge: LsdHostBridge, onRenderGone: () -> Unit): WebView =
+private fun createWebView(ctx: Context, bridge: LsdHostBridge, debug: Boolean, onRenderGone: () -> Unit): WebView =
     WebView(ctx).apply {
+        if (debug) WebView.setWebContentsDebuggingEnabled(true) // chrome://inspect over adb
         setBackgroundColor(Color.BLACK)
         isFocusable = false
         isFocusableInTouchMode = false
@@ -225,7 +229,7 @@ private fun createWebView(ctx: Context, bridge: LsdHostBridge, onRenderGone: () 
                 return true
             }
         }
-        loadUrl(PAGE)
+        loadUrl(if (debug) "$PAGE&debug" else PAGE)
     }
 
 /** Serves assets/visuals/ at https://appassets.androidplatform.net/visuals/ and refuses everything else. */
