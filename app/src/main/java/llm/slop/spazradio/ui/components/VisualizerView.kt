@@ -13,10 +13,12 @@ import android.os.PowerManager
 import android.util.Base64
 import android.util.Log
 import android.view.View
+import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
@@ -47,6 +49,7 @@ private const val HOST = "appassets.androidplatform.net"
 private const val PAGE = "https://$HOST/visuals/index.html?embed"
 private const val STARTUP_TIMEOUT_MS = 20_000L
 private const val MAX_RESTARTS = 2
+private const val FIRST_LOOK_GRACE_MS = 6_000L // the first look needs a moment to load before a freeze can show it
 
 /**
  * The Liquid LSD web TV, picture only, bundled in assets/visuals (scripts/sync_visuals.sh) and served to a
@@ -107,13 +110,20 @@ fun VisualizerView(
     }
 
     // Drawing and analysis run only while the app is on screen and the radio is playing.
+    var warmedUp by remember { mutableStateOf(false) }
     LaunchedEffect(webView, ready, active, visible) {
         val web = webView
         if (web == null || !ready) return@LaunchedEffect
         if (active && visible) {
+            warmedUp = true
             web.onResume()
             web.evaluateJavascript("window.LSD&&LSD.resume()", null)
         } else {
+            // Just started with the radio not playing: keep drawing until the first look is on screen, then freeze.
+            if (!warmedUp && visible) {
+                delay(FIRST_LOOK_GRACE_MS)
+                warmedUp = true
+            }
             web.evaluateJavascript("window.LSD&&LSD.pause()", null)
             web.onPause()
         }
@@ -209,6 +219,12 @@ private fun createWebView(ctx: Context, bridge: LsdHostBridge, onRenderGone: () 
         }
         addJavascriptInterface(bridge, "LSDHost")
         webViewClient = AssetClient(ctx.assets, onRenderGone)
+        webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(m: ConsoleMessage): Boolean {
+                Log.d(TAG, "js ${m.messageLevel()}: ${m.message()} (${m.sourceId().substringAfterLast('/')}:${m.lineNumber()})")
+                return true
+            }
+        }
         loadUrl(PAGE)
     }
 
