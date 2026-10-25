@@ -72,6 +72,7 @@ jobs:
         with:
           tag_name: ${{ env.VERSION_TAG }}
           name: Release ${{ env.VERSION_TAG }}
+          prerelease: ${{ contains(env.VERSION_TAG, '-') }}   # v1.6.4-beta1 and the like are for testers
           files: |
             app/build/outputs/apk/release/*.apk
             app/build/outputs/bundle/release/*.aab
