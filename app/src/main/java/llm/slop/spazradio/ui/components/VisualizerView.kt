@@ -39,10 +39,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.delay
+import llm.slop.spazradio.visuals.ContentStore
+import llm.slop.spazradio.visuals.ContentUpdates
 import llm.slop.spazradio.visuals.PcmTap
 import llm.slop.spazradio.visuals.VisualQuality
 import llm.slop.spazradio.visuals.VisualsSettings
 import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.FileInputStream
 import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "VisualizerView"
@@ -222,7 +226,7 @@ private fun createWebView(ctx: Context, bridge: LsdHostBridge, debug: Boolean, o
             setSupportZoom(false)
         }
         addJavascriptInterface(bridge, "LSDHost")
-        webViewClient = AssetClient(ctx.assets, onRenderGone)
+        webViewClient = AssetClient(ctx.assets, ContentUpdates.store(ctx).activeDir(), onRenderGone)
         webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(m: ConsoleMessage): Boolean {
                 Log.d(TAG, "js ${m.messageLevel()}: ${m.message()} (${m.sourceId().substringAfterLast('/')}:${m.lineNumber()})")
@@ -232,14 +236,23 @@ private fun createWebView(ctx: Context, bridge: LsdHostBridge, debug: Boolean, o
         loadUrl(if (debug) "$PAGE&debug" else PAGE)
     }
 
-/** Serves assets/visuals/ at https://appassets.androidplatform.net/visuals/ and refuses everything else. */
-private class AssetClient(private val assets: AssetManager, private val onRenderGone: () -> Unit) : WebViewClient() {
+/**
+ * Serves assets/visuals/ at https://appassets.androidplatform.net/visuals/ and refuses everything else. Data files
+ * downloaded by [ContentUpdates] ([content], fixed when the page loads) win over the bundled copy.
+ */
+private class AssetClient(
+    private val assets: AssetManager,
+    private val content: File?,
+    private val onRenderGone: () -> Unit,
+) : WebViewClient() {
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
         val url = request.url
         val path = url.path.orEmpty().removePrefix("/")
         if (url.scheme != "https" || url.host != HOST) return reply(403, "Forbidden")
         if (!path.startsWith("visuals/") || path.contains("..")) return reply(404, "Not Found")
-        val stream = try { assets.open(path) } catch (_: Exception) { return reply(404, "Not Found") }
+        val downloaded = content?.let { ContentStore.resolve(it, path.removePrefix("visuals/")) }
+        val stream = if (downloaded != null) FileInputStream(downloaded)
+        else try { assets.open(path) } catch (_: Exception) { return reply(404, "Not Found") }
         val mime = mimeFor(path)
         val text = mime.startsWith("text/") || mime == "application/json"
         return WebResourceResponse(mime, if (text) "utf-8" else null, 200, "OK", mapOf("Cache-Control" to "no-store"), stream)
@@ -261,7 +274,7 @@ private class AssetClient(private val assets: AssetManager, private val onRender
         "js", "mjs" -> "text/javascript"
         "css" -> "text/css"
         "json" -> "application/json"
-        "frag", "vert", "lsd", "lsdplay", "txt" -> "text/plain"
+        "frag", "vert", "fs", "lsd", "lsdplay", "lsdfxchain", "lsdtrans", "txt" -> "text/plain"
         "png" -> "image/png"
         "jpg", "jpeg" -> "image/jpeg"
         else -> "application/octet-stream"

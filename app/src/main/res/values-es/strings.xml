@@ -82,4 +82,14 @@
     <string name="visuals_sync_help">Súbelo si la imagen se mueve antes de oír el ritmo (los altavoces Bluetooth necesitan más).</string>
     <string name="visuals_live">Seguir emisiones en directo</string>
     <string name="visuals_live_help">Muestra los visuales en vivo de un artista de Liquid LSD cuando está en el aire (usa datos).</string>
+    <string name="visuals_updates">Actualizar looks por la red</string>
+    <string name="visuals_updates_help">Descarga nuevos looks y listas en segundo plano (descargas pequeñas, usa datos).</string>
+    <string name="visuals_updates_version">Looks: %1$s</string>
+    <string name="visuals_updates_builtin">incluidos</string>
+    <string name="visuals_updates_check">Comprobar ahora</string>
+    <string name="visuals_updates_checking">Comprobando…</string>
+    <string name="visuals_updates_updated">Looks nuevos descargados. Aparecerán la próxima vez que se inicie la imagen.</string>
+    <string name="visuals_updates_current">Los looks están al día.</string>
+    <string name="visuals_updates_newer_app">Estos looks requieren una versión más reciente de la app.</string>
+    <string name="visuals_updates_failed">No se pudo contactar con el servidor.</string>
 </resources>

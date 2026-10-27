@@ -82,4 +82,14 @@
     <string name="visuals_sync_help">Augmentez-le si l\'image bouge avant que vous n\'entendiez le rythme (les enceintes Bluetooth en demandent plus).</string>
     <string name="visuals_live">Suivre les directs</string>
     <string name="visuals_live_help">Affiche les visuels en direct d\'un artiste Liquid LSD quand il est à l\'antenne (utilise des données).</string>
+    <string name="visuals_updates">Mettre à jour les looks par le réseau</string>
+    <string name="visuals_updates_help">Télécharge de nouveaux looks et playlists en arrière-plan (petits téléchargements, utilise des données).</string>
+    <string name="visuals_updates_version">Looks : %1$s</string>
+    <string name="visuals_updates_builtin">intégrés</string>
+    <string name="visuals_updates_check">Vérifier maintenant</string>
+    <string name="visuals_updates_checking">Vérification…</string>
+    <string name="visuals_updates_updated">Nouveaux looks téléchargés. Ils apparaîtront au prochain démarrage de l\'image.</string>
+    <string name="visuals_updates_current">Les looks sont à jour.</string>
+    <string name="visuals_updates_newer_app">Ces looks nécessitent une version plus récente de l\'app.</string>
+    <string name="visuals_updates_failed">Serveur injoignable.</string>
 </resources>

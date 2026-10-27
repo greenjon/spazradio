@@ -15,11 +15,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import java.text.DateFormat
+import java.util.Date
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -102,6 +105,46 @@ fun VisualsSettingsSection(radioViewModel: RadioViewModel) {
                     checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                 ),
             )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.visuals_updates), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                Text(stringResource(R.string.visuals_updates_help), style = MaterialTheme.typography.bodySmall, color = muted)
+            }
+            Switch(
+                checked = v.contentUpdates,
+                onCheckedChange = { on -> radioViewModel.updateVisuals { it.copy(contentUpdates = on) } },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                ),
+            )
+        }
+        val version by radioViewModel.contentVersion.collectAsState()
+        val status by radioViewModel.contentStatus.collectAsState()
+        val shown = version?.let { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it * 1000)) }
+            ?: stringResource(R.string.visuals_updates_builtin)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.visuals_updates_version, shown), style = MaterialTheme.typography.bodySmall, color = muted)
+                val statusText = when (status) {
+                    RadioViewModel.ContentStatus.IDLE -> null
+                    RadioViewModel.ContentStatus.CHECKING -> R.string.visuals_updates_checking
+                    RadioViewModel.ContentStatus.UPDATED -> R.string.visuals_updates_updated
+                    RadioViewModel.ContentStatus.UP_TO_DATE -> R.string.visuals_updates_current
+                    RadioViewModel.ContentStatus.NEEDS_NEWER_APP -> R.string.visuals_updates_newer_app
+                    RadioViewModel.ContentStatus.FAILED -> R.string.visuals_updates_failed
+                }
+                if (statusText != null) Text(stringResource(statusText), style = MaterialTheme.typography.bodySmall, color = muted)
+            }
+            TextButton(onClick = { radioViewModel.checkContentNow() }, enabled = status != RadioViewModel.ContentStatus.CHECKING) {
+                Text(stringResource(R.string.visuals_updates_check))
+            }
         }
     }
 }

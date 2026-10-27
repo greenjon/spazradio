@@ -15,6 +15,8 @@ data class VisualsSettings(
     val live: Boolean = false,
     /** Milliseconds the picture is held back so it lines up with what is heard (the audio sink buffers ahead). */
     val syncMs: Int = DEFAULT_SYNC_MS,
+    /** Fetch new looks and playlists from the Liquid LSD server in the background (small downloads). */
+    val contentUpdates: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_SYNC_MS = 250

@@ -82,4 +82,14 @@
     <string name="visuals_sync_help">Erhöhen, wenn sich das Bild vor dem Beat bewegt (Bluetooth-Lautsprecher brauchen mehr).</string>
     <string name="visuals_live">Live-Sendungen verfolgen</string>
     <string name="visuals_live_help">Zeigt die Live-Visuals eines Liquid-LSD-Künstlers, wenn einer sendet (nutzt Daten).</string>
+    <string name="visuals_updates">Looks über das Netzwerk aktualisieren</string>
+    <string name="visuals_updates_help">Lädt neue Looks und Playlists im Hintergrund (kleine Downloads, nutzt Daten).</string>
+    <string name="visuals_updates_version">Looks: %1$s</string>
+    <string name="visuals_updates_builtin">eingebaut</string>
+    <string name="visuals_updates_check">Jetzt prüfen</string>
+    <string name="visuals_updates_checking">Prüfe…</string>
+    <string name="visuals_updates_updated">Neue Looks geladen. Sie erscheinen beim nächsten Start des Bildes.</string>
+    <string name="visuals_updates_current">Die Looks sind aktuell.</string>
+    <string name="visuals_updates_newer_app">Diese Looks brauchen eine neuere App-Version.</string>
+    <string name="visuals_updates_failed">Server nicht erreichbar.</string>
 </resources>

@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import llm.slop.spazradio.data.ArchiveShow
+import llm.slop.spazradio.visuals.ContentUpdater
+import llm.slop.spazradio.visuals.ContentUpdates
 import llm.slop.spazradio.visuals.ReducedMotion
 import llm.slop.spazradio.visuals.VisualQuality
 import llm.slop.spazradio.visuals.VisualsSettings
@@ -86,9 +88,34 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             reducedMotion = enumPref("visuals_reduced_motion", ReducedMotion.AUTO),
             live = prefs.getBoolean("visuals_live", false),
             syncMs = prefs.getInt("visuals_sync_ms", VisualsSettings.DEFAULT_SYNC_MS),
+            contentUpdates = prefs.getBoolean("visuals_content_updates", true),
         )
     )
     val visuals: StateFlow<VisualsSettings> = _visuals.asStateFlow()
+
+    enum class ContentStatus { IDLE, CHECKING, UPDATED, UP_TO_DATE, NEEDS_NEWER_APP, FAILED }
+
+    /** Version (epoch seconds) of the downloaded looks in use, or null when only the bundled ones are. */
+    private val _contentVersion = MutableStateFlow<Long?>(ContentUpdates.store(context).version())
+    val contentVersion: StateFlow<Long?> = _contentVersion.asStateFlow()
+    private val _contentStatus = MutableStateFlow(ContentStatus.IDLE)
+    val contentStatus: StateFlow<ContentStatus> = _contentStatus.asStateFlow()
+
+    /** "Check now" in Settings. New looks are picked up the next time the picture starts. */
+    fun checkContentNow() {
+        if (_contentStatus.value == ContentStatus.CHECKING) return
+        _contentStatus.value = ContentStatus.CHECKING
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val result = ContentUpdates.runCheck(context)
+            _contentVersion.value = ContentUpdates.store(context).version()
+            _contentStatus.value = when (result) {
+                is ContentUpdater.Result.Updated -> ContentStatus.UPDATED
+                is ContentUpdater.Result.UpToDate -> ContentStatus.UP_TO_DATE
+                is ContentUpdater.Result.Rejected -> if (result.reason == "needs a newer app") ContentStatus.NEEDS_NEWER_APP else ContentStatus.FAILED
+                null -> ContentStatus.FAILED
+            }
+        }
+    }
 
     private fun <E : Enum<E>> enumPref(key: String, default: E): E =
         default.javaClass.enumConstants
@@ -106,6 +133,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private var controllerFuture: ListenableFuture<MediaController>? = null
 
     init {
+        ContentUpdates.schedule(context, _visuals.value.contentUpdates)
         val token = SessionToken(context, ComponentName(context, RadioService::class.java))
         controllerFuture = MediaController.Builder(context, token).buildAsync()
         controllerFuture?.addListener({
@@ -403,14 +431,17 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateVisuals(change: (VisualsSettings) -> VisualsSettings) {
-        val v = change(_visuals.value)
+        val old = _visuals.value
+        val v = change(old)
         _visuals.value = v
+        if (v.contentUpdates != old.contentUpdates) ContentUpdates.schedule(context, v.contentUpdates)
         prefs.edit()
             .putString("visuals_quality", v.quality.name)
             .putFloat("visuals_reactivity", v.reactivity)
             .putString("visuals_reduced_motion", v.reducedMotion.name)
             .putBoolean("visuals_live", v.live)
             .putInt("visuals_sync_ms", v.syncMs)
+            .putBoolean("visuals_content_updates", v.contentUpdates)
             .apply()
     }
 

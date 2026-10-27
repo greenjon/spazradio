@@ -7,6 +7,8 @@ Behind the panels it shows [Liquid LSD](https://liquid-lsd.greenjon.com) audio-r
 
 The visuals live in `app/src/main/assets/visuals/`, a committed copy of the Liquid LSD web TV in its `?embed` mode. After changing the web TV, run `scripts/sync_visuals.sh [path/to/liquid-lsd]` and commit the result.
 
+Looks can also improve without an app release: once a day (and on "Check now" in Settings > Visuals) the app reads the signed manifest at https://spaz.org/tv/update/, downloads changed data files (presets, playlists, shaders; never code) into app storage and uses them in place of the bundled copies. The signature is checked against the public key in `visuals/ContentUpdates.kt`; the manifest is made and signed by `scripts/publish_web_tv.sh` in the liquid-lsd repo. Downloaded content is dropped when the app itself updates, since the bundled files may be newer.
+
 Translated for EN, ES, FR, DE.
 
 We don't collect any info, serve any ads, want any money, etc.
