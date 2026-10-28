@@ -10,6 +10,8 @@ import androidx.core.content.ContextCompat
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,17 +41,23 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import llm.slop.spazradio.ui.components.ArchiveContent
+import llm.slop.spazradio.ui.components.CONTROLS_FADE_MS
 import llm.slop.spazradio.ui.components.ChatContent
+import llm.slop.spazradio.ui.components.ControlsAutoHide
 import llm.slop.spazradio.ui.components.FooterToolbar
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
 import llm.slop.spazradio.ui.components.VisualizerView
+import llm.slop.spazradio.ui.components.rememberControlsAutoHide
+import llm.slop.spazradio.ui.components.restartsAutoHide
 import llm.slop.spazradio.ui.components.PlayerHeader
+import llm.slop.spazradio.ui.components.RevealControlsLayer
 import llm.slop.spazradio.ui.components.ScheduleContent
 import llm.slop.spazradio.ui.components.SettingsContent
 import llm.slop.spazradio.ui.theme.DeepBlue
@@ -132,6 +140,12 @@ fun RadioApp(
     val visuals by radioViewModel.visuals.collectAsState()
     // The web visuals couldn't start on this device (no WebView or WebGL2): the oscilloscope takes over.
     val webVisualsFailed by radioViewModel.webVisualsFailed.collectAsState()
+    val autoHideControls by radioViewModel.autoHideControls.collectAsState()
+
+    // Only worth hiding when there is a picture to watch and nothing open to read.
+    val controls = rememberControlsAutoHide(
+        armed = autoHideControls && lissajousMode && isPlaying && activeUtility == ActiveUtility.NONE
+    )
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -200,6 +214,7 @@ fun RadioApp(
         showOscilloscope = lissajousMode,
         showInfoBox = activeUtility != ActiveUtility.NONE,
         appTheme = appTheme,
+        controls = controls,
         header = {
             PlayerHeader(
                 trackStatus = trackSubtitle,
@@ -312,12 +327,19 @@ fun MainLayout(
     showOscilloscope: Boolean,
     showInfoBox: Boolean,
     appTheme: AppTheme,
+    controls: ControlsAutoHide,
     header: @Composable () -> Unit,
     oscilloscope: @Composable (Modifier) -> Unit,
     infoBox: @Composable (Modifier) -> Unit,
     footer: @Composable () -> Unit
 ) {
     val isKeyboardOpen = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+    // Fade, don't remove: the layout stays put and the reveal layer takes the touches while they're hidden.
+    val controlsAlpha by animateFloatAsState(
+        targetValue = if (controls.visible) 1f else 0f,
+        animationSpec = tween(CONTROLS_FADE_MS),
+        label = "controlsAlpha"
+    )
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -333,6 +355,7 @@ fun MainLayout(
             modifier = Modifier
                 .fillMaxSize()
                 .then(backgroundModifier)
+                .restartsAutoHide(controls)
         ) {
             if (showOscilloscope) {
                 oscilloscope(Modifier.fillMaxSize())
@@ -344,7 +367,9 @@ fun MainLayout(
                     .padding(innerPadding)
                     .imePadding() 
             ) {
-                header()
+                Box(Modifier.graphicsLayer { alpha = controlsAlpha }) {
+                    header()
+                }
                 
                 Box(
                     modifier = Modifier
@@ -369,9 +394,12 @@ fun MainLayout(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .graphicsLayer { alpha = controlsAlpha }
             ) {
                 footer()
             }
+
+            RevealControlsLayer(controls)
         }
     }
 }

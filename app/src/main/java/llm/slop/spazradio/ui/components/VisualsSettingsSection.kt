@@ -51,6 +51,28 @@ fun VisualsSettingsSection(radioViewModel: RadioViewModel) {
             }
         }
 
+        val visualsOn by radioViewModel.lissajousMode.collectAsState()
+        val autoHide by radioViewModel.autoHideControls.collectAsState()
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.visuals_auto_hide), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                Text(stringResource(R.string.visuals_auto_hide_help), style = MaterialTheme.typography.bodySmall, color = muted)
+            }
+            Switch(
+                checked = autoHide,
+                onCheckedChange = { radioViewModel.setAutoHideControls(it) },
+                enabled = visualsOn,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                ),
+            )
+        }
+
         Label(stringResource(R.string.visuals_quality), muted)
         ChipRow(
             options = listOf(

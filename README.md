@@ -3,7 +3,7 @@ Simple Android app to play the audio stream from spaz.radio.
 
 Written in Kotlin/JetPack Compose on Android Studio.
 
-Behind the panels it shows [Liquid LSD](https://liquid-lsd.greenjon.com) audio-reactive visuals (the same picture as spaz.org/tv), bundled in the app so they work offline. The simple lissajous scope is the fallback on devices without WebGL2. Tune them in Settings > Visuals.
+Behind the panels it shows [Liquid LSD](https://liquid-lsd.greenjon.com) audio-reactive visuals (the same picture as spaz.org/tv), bundled in the app so they work offline. The simple lissajous scope is the fallback on devices without WebGL2. Tune them in Settings > Visuals. While visuals play with no panel open, the controls and system bars fade away after a few seconds and the screen stays on; the first tap (or Back) brings them back. Turn this off with "Auto-hide controls" in Settings > Visuals (it never hides under TalkBack).
 
 The visuals live in `app/src/main/assets/visuals/`, a committed copy of the Liquid LSD web TV in its `?embed` mode. After changing the web TV, run `scripts/sync_visuals.sh [path/to/liquid-lsd]` and commit the result.
 

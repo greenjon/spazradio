@@ -78,6 +78,10 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _lissajousMode = MutableStateFlow(prefs.getBoolean("visuals_enabled", true))
     val lissajousMode: StateFlow<Boolean> = _lissajousMode.asStateFlow()
 
+    /** Fade the controls out over the visuals after a few seconds; the first tap brings them back. */
+    private val _autoHideControls = MutableStateFlow(prefs.getBoolean("visuals_auto_hide", true))
+    val autoHideControls: StateFlow<Boolean> = _autoHideControls.asStateFlow()
+
     /** The web visuals couldn't start on this device (no WebView or WebGL2); the oscilloscope is shown instead. */
     val webVisualsFailed = MutableStateFlow(false)
 
@@ -428,6 +432,11 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     fun setLissajousMode(enabled: Boolean) {
         _lissajousMode.value = enabled
         prefs.edit().putBoolean("visuals_enabled", enabled).apply()
+    }
+
+    fun setAutoHideControls(enabled: Boolean) {
+        _autoHideControls.value = enabled
+        prefs.edit().putBoolean("visuals_auto_hide", enabled).apply()
     }
 
     fun updateVisuals(change: (VisualsSettings) -> VisualsSettings) {
