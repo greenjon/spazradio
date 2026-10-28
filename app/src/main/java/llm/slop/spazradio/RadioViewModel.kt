@@ -88,7 +88,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _visuals = MutableStateFlow(
         VisualsSettings(
             quality = enumPref("visuals_quality", VisualQuality.AUTO),
-            reactivity = prefs.getFloat("visuals_reactivity", 2f),
+            reactivity = migratedReactivity(),
             reducedMotion = enumPref("visuals_reduced_motion", ReducedMotion.AUTO),
             live = prefs.getBoolean("visuals_live", false),
             syncMs = prefs.getInt("visuals_sync_ms", VisualsSettings.DEFAULT_SYNC_MS),
@@ -437,6 +437,19 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     fun setAutoHideControls(enabled: Boolean) {
         _autoHideControls.value = enabled
         prefs.edit().putBoolean("visuals_auto_hide", enabled).apply()
+    }
+
+    /**
+     * The saved reactivity. Before 1.6.4-beta4 it was on the old web TV scale (0.25..4, default 2, no auto
+     * gain); auto gain made 1 the equivalent of the old 2, so a saved value is halved once.
+     */
+    private fun migratedReactivity(): Float {
+        val saved = prefs.getFloat("visuals_reactivity", VisualsSettings.DEFAULT_REACTIVITY)
+        if (prefs.getBoolean("visuals_reactivity_agc", false)) return saved
+        val v = if (prefs.contains("visuals_reactivity")) saved / 2f else saved
+        val clamped = v.coerceIn(VisualsSettings.MIN_REACTIVITY, VisualsSettings.MAX_REACTIVITY)
+        prefs.edit().putFloat("visuals_reactivity", clamped).putBoolean("visuals_reactivity_agc", true).apply()
+        return clamped
     }
 
     fun updateVisuals(change: (VisualsSettings) -> VisualsSettings) {

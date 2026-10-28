@@ -88,7 +88,7 @@ fun VisualsSettingsSection(radioViewModel: RadioViewModel) {
         Slider(
             value = v.reactivity,
             onValueChange = { r -> radioViewModel.updateVisuals { it.copy(reactivity = (r * 20).roundToInt() / 20f) } },
-            valueRange = 0.25f..4f,
+            valueRange = VisualsSettings.MIN_REACTIVITY..VisualsSettings.MAX_REACTIVITY,
         )
 
         Label(stringResource(R.string.visuals_reduced_motion), muted)
