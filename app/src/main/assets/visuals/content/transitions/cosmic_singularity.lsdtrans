@@ -15,24 +15,52 @@
     "parameters": {
       "rotations": {
         "baseValue": 0.44444,
-        "baseMin": 0.0,
-        "baseMax": 1.0,
-        "randomizeBase": false,
-        "modulators": []
+        "baseMin": 0.15,
+        "baseMax": 0.7,
+        "randomizeBase": true,
+        "modulators": [
+          {
+            "sourceId": "audio_bass",
+            "operator": "ADD",
+            "depth": 0.2,
+            "followerMode": "SMOOTH",
+            "attackMs": 20,
+            "decayMs": 300
+          }
+        ]
       },
       "radius": {
         "baseValue": 0.45833,
-        "baseMin": 0.0,
-        "baseMax": 1.0,
-        "randomizeBase": false,
-        "modulators": []
+        "baseMin": 0.25,
+        "baseMax": 0.7,
+        "randomizeBase": true,
+        "modulators": [
+          {
+            "sourceId": "audio_amp",
+            "operator": "ADD",
+            "depth": 0.2,
+            "followerMode": "SMOOTH",
+            "attackMs": 40,
+            "decayMs": 400,
+            "bypassed": true
+          }
+        ]
       },
       "chromatic": {
         "baseValue": 0.5,
-        "baseMin": 0.0,
-        "baseMax": 1.0,
-        "randomizeBase": false,
-        "modulators": []
+        "baseMin": 0.1,
+        "baseMax": 0.5,
+        "randomizeBase": true,
+        "modulators": [
+          {
+            "sourceId": "audio_flux_bass",
+            "operator": "ADD",
+            "depth": 0.4,
+            "followerMode": "PUNCHY",
+            "attackMs": 5,
+            "decayMs": 120
+          }
+        ]
       }
     }
   }

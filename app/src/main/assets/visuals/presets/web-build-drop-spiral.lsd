@@ -19,8 +19,8 @@
         {
           "sourceId": "lfo",
           "operator": "ADD",
-          "depth": -0.15,
-          "dcOffset": 0.0,
+          "depth": -0.075,
+          "dcOffset": -0.075,
           "waveform": "TRIANGLE",
           "genUnit": "BEAT",
           "subdivision": 32.0,
@@ -95,8 +95,8 @@
         {
           "sourceId": "lfo",
           "operator": "ADD",
-          "depth": 0.2,
-          "dcOffset": 0.0,
+          "depth": 0.1,
+          "dcOffset": 0.1,
           "waveform": "TRIANGLE",
           "genUnit": "BEAT",
           "subdivision": 32.0,
@@ -123,8 +123,8 @@
         {
           "sourceId": "lfo",
           "operator": "ADD",
-          "depth": 0.3,
-          "dcOffset": 0.0,
+          "depth": 0.15,
+          "dcOffset": 0.15,
           "waveform": "TRIANGLE",
           "genUnit": "BEAT",
           "subdivision": 32.0,
@@ -142,8 +142,8 @@
         {
           "sourceId": "lfo",
           "operator": "ADD",
-          "depth": 0.8,
-          "dcOffset": 0.0,
+          "depth": 0.4,
+          "dcOffset": 0.4,
           "waveform": "TRIANGLE",
           "genUnit": "BEAT",
           "subdivision": 32.0,
@@ -154,13 +154,6 @@
     },
     "HueSweep": {
       "baseValue": 0.15,
-      "baseMin": 0.0,
-      "baseMax": 1.0,
-      "randomizeBase": false,
-      "modulators": []
-    },
-    "TrailDecay": {
-      "baseValue": 0.8,
       "baseMin": 0.0,
       "baseMax": 1.0,
       "randomizeBase": false,

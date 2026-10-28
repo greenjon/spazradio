@@ -334,12 +334,6 @@
       "description": "Wave Ripples generator"
     },
     {
-      "desktop": "library/sources/harmonograph/harmonograph.fs",
-      "web": "web/shaders/harmonograph.frag",
-      "mode": "auto_shader",
-      "description": "Harmonograph generator"
-    },
-    {
       "desktop": "library/sources/aurora_ribbons/aurora_ribbons.fs",
       "web": "web/shaders/aurora_ribbons.frag",
       "mode": "auto_shader",
@@ -448,7 +442,7 @@
       "web": "web/evaluator.js",
       "mode": "manual_review",
       "description": "Modulation signal evaluators and math function parity",
-      "last_synced_hash": "9b8d0806863db79c836a61fccc4aa3daf2e1b41ac7234778f098a71a7436066b"
+      "last_synced_hash": "26a304a11ae5e468f3fc43579366a19a95c46741a92bb78bb205ecbe23fb3c77"
     },
     {
       "desktop": "src/main/kotlin/llm/slop/liquidlsd/broadcast/WebPresetSerializer.kt",
