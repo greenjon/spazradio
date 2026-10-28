@@ -6,16 +6,20 @@
 // Rows: { label, value(): string, step?(dir), run?(), locked?(): bool, help?: string }. ui.js builds them;
 // `help` explains the row: a hover tooltip, and the line at the bottom while the row is selected.
 
-export function createMenu(screen, rows, { onOpen = () => {}, onClose = () => {} } = {}) {
+export function createMenu(screen, rows, { version = '', onOpen = () => {}, onClose = () => {} } = {}) {
   const el = document.createElement('div');
   el.id = 'tv-menu';
   el.setAttribute('role', 'menu');
   el.hidden = true;
   screen.appendChild(el);
+  // A row click re-renders the menu, detaching the clicked element before the click bubbles on, so the
+  // cabinet's power handler could no longer see it came from the menu: menu clicks stop here.
+  el.addEventListener('click', (e) => e.stopPropagation());
   let sel = 0;
 
   function render() {
-    el.innerHTML = '<div class="menu-title">MENU</div>';
+    el.innerHTML = '<div class="menu-title">MENU<span class="menu-version"></span></div>';
+    el.querySelector('.menu-version').textContent = version;
     rows.forEach((row, i) => {
       const r = document.createElement('div');
       r.className = 'menu-row' + (i === sel ? ' sel' : '') + (row.locked?.() ? ' locked' : '');

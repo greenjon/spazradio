@@ -6,6 +6,7 @@ import { lookupParam } from './isf.js';
 import { Library, DeckPipeline, MixerPipeline } from './graph.js';
 import { MandalaRecipes } from './mandala.js';
 import { heardBeats, DelayLine } from './sync.js';
+import { DropEnvelope } from './energy.js';
 import { installEmbedApi } from './embed.js';
 import { embed } from './embedmode.js';
 
@@ -170,7 +171,8 @@ async function init() {
 
   const evalCtx = makeEvalContext();
   const audioDelay = new DelayLine();
-  const AUDIO_KEYS = ['audio_amp', 'audio_bass', 'audio_mid', 'audio_high', 'audio_flux_amp', 'audio_flux_bass', 'audio_flux_mid', 'audio_flux_high'];
+  const AUDIO_KEYS = ['audio_amp', 'audio_bass', 'audio_mid', 'audio_high', 'audio_flux_amp', 'audio_flux_bass', 'audio_flux_mid', 'audio_flux_high', 'audio_energy'];
+  const drop = new DropEnvelope();
   function updateEvalContext() {
     // Live broadcast: the desktop's beat clock (phase-locked flywheel). Standalone: the web's own
     // beat detector (dsp.js) integrates tempo into total beats, so a tempo change never jumps the phase.
@@ -181,6 +183,7 @@ async function init() {
     const beats = heardBeats(now, viewerState.syncMs);
     audioDelay.push(now, Object.fromEntries(AUDIO_KEYS.map((key) => [key, cvState[key]])));
     const heard = { ...audioDelay.read(now, viewerState.syncMs) };
+    drop.report(cvState.drops, cvState.dropLag, heardBeats(now, 0), bpm); // dated in analysis time, read at the heard beat
     evalCtx.time = elapsedTime;
     evalCtx.beats = beats;
     evalCtx.frame = frameCount;
@@ -195,6 +198,8 @@ async function init() {
       audio_mid: r(heard.audio_mid), audio_high: r(heard.audio_high),
       audio_flux_amp: r(heard.audio_flux_amp), audio_flux_bass: r(heard.audio_flux_bass),
       audio_flux_mid: r(heard.audio_flux_mid), audio_flux_high: r(heard.audio_flux_high),
+      // Song sections are not scaled by REACT (like Audio Response on the desktop); reduced motion softens the hit.
+      audio_energy: heard.audio_energy ?? 0, audio_drop: drop.value(beats) * (viewerState.reducedNow ? 0.6 : 1),
       beatSine: Math.sin(beats * 2 * Math.PI), bpm,
     };
   }
@@ -263,7 +268,7 @@ async function init() {
     adapt.slow = adapt.fast = 0;
     return true;
   }
-  // Shader prewarm for looks the autopilot has queued (Library.get starts the fetch and compile).
+  // Shader prewarm for scenes the autopilot has queued (Library.get starts the fetch and compile).
   setPrewarm((deck, transition) => {
     if (deck?.source && deck.source !== 'mandala') ctx.library.get('sources', deck.source.toLowerCase());
     for (const slot of deck?.fx ?? []) if (slot?.id) ctx.library.get('filters', slot.id);
@@ -271,7 +276,7 @@ async function init() {
   });
   // GPU probe, once, at the first power-on: render the heaviest source a few times with gl.finish() and let
   // the heavy sources (settings.json heavySources) into the rotation only if it is fast enough. Integrated
-  // GPUs and phones keep the light looks; discrete GPUs, Apple Silicon and fast integrated chips get all.
+  // GPUs and phones keep the light scenes; discrete GPUs, Apple Silicon and fast integrated chips get all.
   // ?heavy=1 / ?heavy=0 overrides it. The result is window.LSD.gpu.
   const gpu = { state: 'pending', ms: null, heavy: false };
   const heavyParam = new URLSearchParams(location.search).get('heavy');
@@ -287,7 +292,7 @@ async function init() {
     const probe = autopilotSettings.gpuProbe;
     if (gpu.state !== 'pending' || !probe) return;
     if (!ctx.library.get('sources', probe.source)) {
-      // Still compiling; if it never becomes ready (failed), stay with the light looks.
+      // Still compiling; if it never becomes ready (failed), stay with the light scenes.
       probeWaitedSince ??= now;
       if (now - probeWaitedSince > 8000 || ctx.library.failed.has(`sources/${probe.source}`)) gpu.state = 'failed';
       return;
@@ -307,7 +312,7 @@ async function init() {
       n++;
     }
     gpu.ms = total / n;
-    // Embedded on a phone the probe can't be trusted (gl.finish() returned in 0.4 ms on a Pixel 7a): heavy looks
+    // Embedded on a phone the probe can't be trusted (gl.finish() returned in 0.4 ms on a Pixel 7a): heavy scenes
     // stay off until the host asks for quality 'high'.
     gpu.heavy = gpu.ms <= probe.maxMs && !embed;
     gpu.state = 'done';
