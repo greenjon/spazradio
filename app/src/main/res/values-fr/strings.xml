@@ -81,7 +81,7 @@
     <string name="visuals_sync">Retard de l\'image : %1$d ms</string>
     <string name="visuals_sync_help">Augmentez-le si l\'image bouge avant que vous n\'entendiez le rythme (les enceintes Bluetooth en demandent plus).</string>
     <string name="visuals_auto_hide">Masquer les commandes</string>
-    <string name="visuals_auto_hide_help">Pendant les visuels, les commandes disparaissent après quelques secondes et l\'écran reste allumé. Touchez n\'importe où pour les faire revenir.</string>
+    <string name="visuals_auto_hide_help">Pendant les visuels, les commandes disparaissent après quelques secondes et l\'écran reste allumé, jusqu\'à ce que vous rangiez le téléphone dans une poche ou le posiez face contre la table. Touchez n\'importe où pour les faire revenir.</string>
     <string name="visuals_live">Suivre les directs</string>
     <string name="visuals_live_help">Affiche les visuels en direct d\'un artiste Liquid LSD quand il est à l\'antenne (utilise des données).</string>
     <string name="visuals_updates">Mettre à jour les scènes par le réseau</string>

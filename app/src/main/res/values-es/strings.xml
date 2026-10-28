@@ -81,7 +81,7 @@
     <string name="visuals_sync">Retraso de la imagen: %1$d ms</string>
     <string name="visuals_sync_help">Súbelo si la imagen se mueve antes de oír el ritmo (los altavoces Bluetooth necesitan más).</string>
     <string name="visuals_auto_hide">Ocultar controles</string>
-    <string name="visuals_auto_hide_help">Mientras se ven los visuales, los controles se desvanecen tras unos segundos y la pantalla sigue encendida. Toca en cualquier sitio para que vuelvan.</string>
+    <string name="visuals_auto_hide_help">Mientras se ven los visuales, los controles se desvanecen tras unos segundos y la pantalla sigue encendida, hasta que guardes el móvil o lo pongas boca abajo. Toca en cualquier sitio para que vuelvan.</string>
     <string name="visuals_live">Seguir emisiones en directo</string>
     <string name="visuals_live_help">Muestra los visuales en vivo de un artista de Liquid LSD cuando está en el aire (usa datos).</string>
     <string name="visuals_updates">Actualizar escenas por la red</string>

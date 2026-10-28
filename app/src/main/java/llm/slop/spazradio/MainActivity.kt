@@ -242,7 +242,7 @@ fun RadioApp(
             } else {
                 VisualizerView(
                     settings = visuals,
-                    active = isPlaying,
+                    active = isPlaying && !controls.pocketed, // nobody watches a pocketed screen
                     onFailed = { radioViewModel.webVisualsFailed.value = true },
                     modifier = modifier
                 )

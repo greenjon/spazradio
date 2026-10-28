@@ -36,6 +36,9 @@ const val CONTROLS_FADE_MS = 300
 class ControlsAutoHide {
     var visible by mutableStateOf(true)
         internal set
+    /** The screen has been covered for a few seconds (pocket, bag, face down): nobody is watching. */
+    var pocketed by mutableStateOf(false)
+        internal set
     internal var touching by mutableStateOf(false)
     internal var lastRelease by mutableIntStateOf(0)
 
@@ -48,6 +51,8 @@ class ControlsAutoHide {
  * Fades the controls out after a few seconds without touches while [armed] (visuals on, music playing, no
  * panel open). While they are hidden the system bars hide too, the screen stays awake and Back brings the
  * controls back. Never arms under TalkBack: controls that vanish under a screen reader can't be found.
+ * While armed, a covered screen ([rememberPocketed]) lets go of keep-awake, so the system's screen timeout
+ * (counted from the last touch) turns it off as usual; the radio plays on in its service.
  */
 @Composable
 fun rememberControlsAutoHide(armed: Boolean): ControlsAutoHide {
@@ -78,8 +83,9 @@ fun rememberControlsAutoHide(armed: Boolean): ControlsAutoHide {
         }
     }
 
-    DisposableEffect(active) {
-        view.keepScreenOn = active
+    state.pocketed = rememberPocketed(active)
+    DisposableEffect(active, state.pocketed) {
+        view.keepScreenOn = active && !state.pocketed
         onDispose { view.keepScreenOn = false }
     }
 
