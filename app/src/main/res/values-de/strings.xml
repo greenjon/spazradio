@@ -84,14 +84,14 @@
     <string name="visuals_auto_hide_help">Während Visuals laufen, verschwinden die Bedienelemente nach ein paar Sekunden und der Bildschirm bleibt an. Tippe irgendwo, um sie zurückzuholen.</string>
     <string name="visuals_live">Live-Sendungen verfolgen</string>
     <string name="visuals_live_help">Zeigt die Live-Visuals eines Liquid-LSD-Künstlers, wenn einer sendet (nutzt Daten).</string>
-    <string name="visuals_updates">Looks über das Netzwerk aktualisieren</string>
-    <string name="visuals_updates_help">Lädt neue Looks und Playlists im Hintergrund (kleine Downloads, nutzt Daten).</string>
-    <string name="visuals_updates_version">Looks: %1$s</string>
+    <string name="visuals_updates">Szenen über das Netzwerk aktualisieren</string>
+    <string name="visuals_updates_help">Lädt neue Szenen und Playlists im Hintergrund (kleine Downloads, nutzt Daten).</string>
+    <string name="visuals_updates_version">Szenen: %1$s</string>
     <string name="visuals_updates_builtin">eingebaut</string>
     <string name="visuals_updates_check">Jetzt prüfen</string>
     <string name="visuals_updates_checking">Prüfe…</string>
-    <string name="visuals_updates_updated">Neue Looks geladen. Sie erscheinen beim nächsten Start des Bildes.</string>
-    <string name="visuals_updates_current">Die Looks sind aktuell.</string>
-    <string name="visuals_updates_newer_app">Diese Looks brauchen eine neuere App-Version.</string>
+    <string name="visuals_updates_updated">Neue Szenen geladen. Sie erscheinen beim nächsten Start des Bildes.</string>
+    <string name="visuals_updates_current">Die Szenen sind aktuell.</string>
+    <string name="visuals_updates_newer_app">Diese Szenen brauchen eine neuere App-Version.</string>
     <string name="visuals_updates_failed">Server nicht erreichbar.</string>
 </resources>

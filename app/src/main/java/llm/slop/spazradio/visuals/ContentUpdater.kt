@@ -7,7 +7,7 @@ import java.security.PublicKey
 import java.security.Signature
 
 /**
- * Fetches new presets, playlists and shaders from the Liquid LSD server so the look can improve without an app
+ * Fetches new presets, playlists and shaders from the Liquid LSD server so the visuals can improve without an app
  * release. The server publishes `update/manifest.json` (every data file with sha256 and size) and
  * `update/manifest.json.sig`, an ECDSA P-256 / SHA-256 signature over the manifest bytes (scripts/make_content_manifest.py
  * in the liquid-lsd repo). Nothing is used unless the signature verifies against [key], every file matches its hash,

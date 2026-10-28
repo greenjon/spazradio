@@ -84,14 +84,14 @@
     <string name="visuals_auto_hide_help">While visuals play, the controls fade out after a few seconds and the screen stays on. Tap anywhere to bring them back.</string>
     <string name="visuals_live">Follow live broadcasts</string>
     <string name="visuals_live_help">Show a Liquid LSD artist\'s live visuals when one is on air (uses data).</string>
-    <string name="visuals_updates">Update looks over the network</string>
-    <string name="visuals_updates_help">Fetches new looks and playlists in the background (small downloads, uses data).</string>
-    <string name="visuals_updates_version">Looks: %1$s</string>
+    <string name="visuals_updates">Update scenes over the network</string>
+    <string name="visuals_updates_help">Fetches new scenes and playlists in the background (small downloads, uses data).</string>
+    <string name="visuals_updates_version">Scenes: %1$s</string>
     <string name="visuals_updates_builtin">built in</string>
     <string name="visuals_updates_check">Check now</string>
     <string name="visuals_updates_checking">Checking…</string>
-    <string name="visuals_updates_updated">New looks downloaded. They appear next time the picture starts.</string>
-    <string name="visuals_updates_current">Looks are up to date.</string>
-    <string name="visuals_updates_newer_app">These looks need a newer version of the app.</string>
+    <string name="visuals_updates_updated">New scenes downloaded. They appear next time the picture starts.</string>
+    <string name="visuals_updates_current">Scenes are up to date.</string>
+    <string name="visuals_updates_newer_app">These scenes need a newer version of the app.</string>
     <string name="visuals_updates_failed">Couldn\'t reach the server.</string>
 </resources>

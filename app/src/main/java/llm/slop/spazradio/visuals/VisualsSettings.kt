@@ -3,7 +3,7 @@ package llm.slop.spazradio.visuals
 /** How hard the picture may work. Auto lets the web app's GPU probe and adaptive resolution decide. */
 enum class VisualQuality(val js: String) { AUTO("auto"), LOW("low"), HIGH("high") }
 
-/** Calmer motion: no flashes or hard looks. Auto follows the system's "remove animations" setting. */
+/** Calmer motion: no flashes or hard scenes. Auto follows the system's "remove animations" setting. */
 enum class ReducedMotion(val js: String) { AUTO("auto"), ON("on"), OFF("off") }
 
 data class VisualsSettings(
@@ -15,7 +15,7 @@ data class VisualsSettings(
     val live: Boolean = false,
     /** Milliseconds the picture is held back so it lines up with what is heard (the audio sink buffers ahead). */
     val syncMs: Int = DEFAULT_SYNC_MS,
-    /** Fetch new looks and playlists from the Liquid LSD server in the background (small downloads). */
+    /** Fetch new scenes and playlists from the Liquid LSD server in the background (small downloads). */
     val contentUpdates: Boolean = true,
 ) {
     companion object {

@@ -99,13 +99,13 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     enum class ContentStatus { IDLE, CHECKING, UPDATED, UP_TO_DATE, NEEDS_NEWER_APP, FAILED }
 
-    /** Version (epoch seconds) of the downloaded looks in use, or null when only the bundled ones are. */
+    /** Version (epoch seconds) of the downloaded scenes in use, or null when only the bundled ones are. */
     private val _contentVersion = MutableStateFlow<Long?>(ContentUpdates.store(context).version())
     val contentVersion: StateFlow<Long?> = _contentVersion.asStateFlow()
     private val _contentStatus = MutableStateFlow(ContentStatus.IDLE)
     val contentStatus: StateFlow<ContentStatus> = _contentStatus.asStateFlow()
 
-    /** "Check now" in Settings. New looks are picked up the next time the picture starts. */
+    /** "Check now" in Settings. New scenes are picked up the next time the picture starts. */
     fun checkContentNow() {
         if (_contentStatus.value == ContentStatus.CHECKING) return
         _contentStatus.value = ContentStatus.CHECKING

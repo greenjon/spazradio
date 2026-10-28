@@ -55,7 +55,7 @@ private const val HOST = "appassets.androidplatform.net"
 private const val PAGE = "https://$HOST/visuals/index.html?embed"
 private const val STARTUP_TIMEOUT_MS = 20_000L
 private const val MAX_RESTARTS = 2
-private const val FIRST_LOOK_GRACE_MS = 6_000L // the first look needs a moment to load before a freeze can show it
+private const val FIRST_LOOK_GRACE_MS = 6_000L // the first scene needs a moment to load before a freeze can show it
 
 /**
  * The Liquid LSD web TV, picture only, bundled in assets/visuals (scripts/sync_visuals.sh) and served to a
@@ -126,7 +126,7 @@ fun VisualizerView(
             web.onResume()
             web.evaluateJavascript("window.LSD&&LSD.resume()", null)
         } else {
-            // Just started with the radio not playing: keep drawing until the first look is on screen, then freeze.
+            // Just started with the radio not playing: keep drawing until the first scene is on screen, then freeze.
             if (!warmedUp && visible) {
                 delay(FIRST_LOOK_GRACE_MS)
                 warmedUp = true
