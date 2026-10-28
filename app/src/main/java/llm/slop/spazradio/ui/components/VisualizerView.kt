@@ -22,6 +22,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -260,6 +261,8 @@ private class AssetClient(
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = true
 
+    // The framework only calls this on API 26+, where RenderProcessGoneDetail exists.
+    @RequiresApi(26)
     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
         Log.w(TAG, "WebView renderer gone (crashed=${detail.didCrash()})")
         onRenderGone()
