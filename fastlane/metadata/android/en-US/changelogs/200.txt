@@ -1,0 +1,6 @@
+SPAZ Radio 2.0: Liquid LSD visuals behind the radio.
+- The full audio-reactive picture from spaz.org/tv replaces the simple scope. It's built in, works offline and follows the music you hear.
+- New scenes arrive over the network (Settings > Visuals).
+- Controls fade away while you watch; tap to bring them back.
+- In a pocket or face down, the screen goes dark and the radio plays on.
+- Settings for quality, reaction, reduced motion and picture delay.

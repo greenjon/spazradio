@@ -2,6 +2,6 @@ SPAZ Radio is an open-source radio player for the SPAZ.Radio audio stream featur
 
 Features:
 - Live audio streaming
-- Lissajous-based visualizer
+- Liquid LSD audio-reactive visuals (the picture from spaz.org/tv), built in and working offline; a Lissajous scope on devices without WebGL2
 - Lightweight, native Android implementation
 - No ads, no tracking
