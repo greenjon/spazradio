@@ -51,7 +51,6 @@ fun VisualsSettingsSection(radioViewModel: RadioViewModel) {
             }
         }
 
-        val visualsOn by radioViewModel.lissajousMode.collectAsState()
         val autoHide by radioViewModel.autoHideControls.collectAsState()
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -65,7 +64,6 @@ fun VisualsSettingsSection(radioViewModel: RadioViewModel) {
             Switch(
                 checked = autoHide,
                 onCheckedChange = { radioViewModel.setAutoHideControls(it) },
-                enabled = visualsOn,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.primary,
                     checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
