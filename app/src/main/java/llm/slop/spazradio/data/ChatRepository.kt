@@ -23,6 +23,9 @@ class ChatRepository(
 
     private val _onlineUsers = MutableStateFlow<Map<String, String>>(emptyMap())
     private val _incomingMessages = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 64)
+    // One event per successful (re)connect, after the subscriptions: the chat then fetches the history again to
+    // fill in whatever was sent while the connection was down.
+    private val _connected = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
     
     private val _connectionError = MutableStateFlow<String?>(null)
     val connectionError: StateFlow<String?> = _connectionError.asStateFlow()
@@ -46,9 +49,8 @@ class ChatRepository(
                         if (body != null) {
                             val json = body.string()
                             val historyResponse = gson.fromJson(json, HistoryResponse::class.java)
-                            return@withContext historyResponse.history.map { msg ->
-                                msg.copy(timeReceived = msg.timeReceived / 1000L)
-                            }
+                            val now = System.currentTimeMillis()
+                            return@withContext historyResponse.history.mapNotNull { ChatMessages.normalize(it, now) }
                         }
                     }
                 }
@@ -74,6 +76,7 @@ class ChatRepository(
                 }
                 _connectionError.value = null
                 subscribeAll()
+                _connected.tryEmit(Unit)
             }
 
             override fun connectionLost(cause: Throwable?) {
@@ -85,8 +88,9 @@ class ChatRepository(
                 val payload = message?.payload?.let { String(it) } ?: ""
                 if (topic == "spazradio") {
                     try {
+                        // Live messages carry no time (only the server's log stamps one): use the moment it arrived.
                         val rawMsg = gson.fromJson(payload, ChatMessage::class.java)
-                        _incomingMessages.tryEmit(rawMsg.copy(timeReceived = rawMsg.timeReceived / 1000L))
+                        ChatMessages.normalize(rawMsg, System.currentTimeMillis())?.let { _incomingMessages.tryEmit(it) }
                     } catch (e: Exception) {
                         Log.e("ChatRepo", "JSON parse error")
                     }
@@ -187,6 +191,7 @@ class ChatRepository(
     }
 
     fun observeMessages(): Flow<ChatMessage> = _incomingMessages.asSharedFlow()
+    fun observeConnected(): Flow<Unit> = _connected.asSharedFlow()
     fun observePresenceCount(): Flow<Int> = _onlineUsers.map { it.values.distinct().size }
     fun observeOnlineNames(): Flow<List<String>> = _onlineUsers.map { it.values.distinct().sorted() }
 

@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import llm.slop.spazradio.data.ChatMessage
+import llm.slop.spazradio.data.ChatMessages
 import llm.slop.spazradio.data.ChatRepository
 import llm.slop.spazradio.utils.NetworkMonitor
 import llm.slop.spazradio.utils.SpazNetwork
@@ -46,19 +47,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         viewModelScope.launch {
-            // Load history once on start
-            try {
-                val history = repository.fetchHistory()
-                messages.clear()
-                messages.addAll(history)
-            } catch (e: Exception) {
-                Log.e("ChatViewModel", "Error loading history", e)
-            }
-            
+            // History at start (also for viewers who haven't joined, who never connect)...
+            loadHistory()
+
             launch {
                 repository.observeMessages().collect { message ->
                     messages.add(message)
                 }
+            }
+
+            // ...and again after every (re)connect, merged, so messages sent while the connection was down
+            // (a tunnel, Wi-Fi to mobile data) appear instead of being lost.
+            launch {
+                repository.observeConnected().collect { loadHistory() }
             }
             
             launch {
@@ -83,6 +84,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
                     }
                 }
             }
+        }
+    }
+
+    private suspend fun loadHistory() {
+        try {
+            val history = repository.fetchHistory()
+            val merged = ChatMessages.merge(messages.toList(), history)
+            messages.clear()
+            messages.addAll(merged)
+        } catch (e: Exception) {
+            Log.e("ChatViewModel", "Error loading history", e)
         }
     }
 
