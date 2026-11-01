@@ -97,7 +97,7 @@ class ContentUpdater(
 
     companion object {
         /** What the bundled web engine can render. Raise it together with CONTENT_ENGINE gates in scripts/make_content_manifest.py. */
-        const val ENGINE = 1
+        const val ENGINE = 2
         private const val MAX_FILE_BYTES = 5L * 1024 * 1024
         private const val MAX_TOTAL_BYTES = 20L * 1024 * 1024
         private const val MAX_FILES = 2000
