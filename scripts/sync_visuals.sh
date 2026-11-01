@@ -10,10 +10,11 @@ dest="$here/app/src/main/assets/visuals"
 [ -f "$web/index.html" ] || { echo "no web/index.html under $src (pass the liquid-lsd path)" >&2; exit 1; }
 
 mkdir -p "$dest"
-# Only what embed mode loads: no checks, tools, service worker, manifest or icons.
+# Only what embed mode loads: no checks, tools, service worker, manifest or icons, and no fonts (only the
+# web TV's chat blackboard uses them, and embed never shows it). The chat's .js files stay: ui.js imports them.
 rsync -a --delete --checksum \
   --exclude 'checks/' --exclude 'tools/' --exclude 'sw.js' --exclude 'manifest.webmanifest' \
-  --exclude '*.png' --exclude '*.jpg' --exclude '*.ico' \
+  --exclude '*.png' --exclude '*.jpg' --exclude '*.ico' --exclude 'fonts/' \
   "$web/" "$dest/"
 git -C "$src" rev-parse HEAD > "$dest/VERSION"
 echo "synced $(find "$dest" -type f | wc -l) files, $(du -sh "$dest" | cut -f1), liquid-lsd $(cut -c1-9 "$dest/VERSION")"
