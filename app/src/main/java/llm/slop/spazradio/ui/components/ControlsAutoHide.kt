@@ -2,6 +2,7 @@ package llm.slop.spazradio.ui.components
 
 import android.app.Activity
 import android.content.Context
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -84,9 +85,16 @@ fun rememberControlsAutoHide(armed: Boolean): ControlsAutoHide {
     }
 
     state.pocketed = rememberPocketed(active)
+    // The window flag, not View.keepScreenOn: the view flag reaches the window only through the view root's
+    // attribute recompute, which can miss a change made mid-traversal and leave the screen on for good.
     DisposableEffect(active, state.pocketed) {
-        view.keepScreenOn = active && !state.pocketed
-        onDispose { view.keepScreenOn = false }
+        val window = (view.context as? Activity)?.window
+        if (active && !state.pocketed) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
     BackHandler(enabled = hidden) { state.reveal() }
