@@ -68,6 +68,11 @@
 
     <string name="playback_settings">Wiedergabe</string>
     <string name="autoplay_radio">Radiostream automatisch starten</string>
+    <string name="audio_quality">Audioqualität</string>
+    <string name="audio_quality_auto">Auto</string>
+    <string name="audio_quality_low">Niedrig</string>
+    <string name="audio_quality_high">Hoch</string>
+    <string name="audio_quality_help">Auto nutzt „Niedrig“ bei mobilen Daten und anderen getakteten Verbindungen.</string>
     <string name="visuals_settings">Visuals</string>
     <string name="visuals_fallback">Animierte Visuals sind auf diesem Gerät nicht verfügbar; es wird das einfache Oszilloskop gezeigt.</string>
     <string name="visuals_quality">Qualität</string>

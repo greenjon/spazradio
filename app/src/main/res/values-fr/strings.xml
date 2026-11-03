@@ -68,6 +68,11 @@
 
     <string name="playback_settings">Lecture</string>
     <string name="autoplay_radio">Lancer la radio automatiquement</string>
+    <string name="audio_quality">Qualité audio</string>
+    <string name="audio_quality_auto">Auto</string>
+    <string name="audio_quality_low">Basse</string>
+    <string name="audio_quality_high">Haute</string>
+    <string name="audio_quality_help">Auto utilise « Basse » sur les données mobiles et les autres connexions limitées.</string>
     <string name="visuals_settings">Visuels</string>
     <string name="visuals_fallback">Les visuels animés ne sont pas disponibles sur cet appareil ; l\'oscilloscope simple est affiché.</string>
     <string name="visuals_quality">Qualité</string>

@@ -3,6 +3,10 @@ package llm.slop.spazradio
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
@@ -10,9 +14,11 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -56,7 +62,11 @@ class RadioService : MediaSessionService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
     private lateinit var okHttpClient: OkHttpClient
     
-    private val liveMediaID = "spaz_radio_stream"
+    private val liveMediaID = LiveStream.MEDIA_ID
+    private var connectivityManager: ConnectivityManager? = null
+    private var prefs: SharedPreferences? = null
+    private var metered = false
+    private var lowMountMissing = false
     private var lastPlayingTitle: String? = null
     private var lastListenerCount: Int? = null
 
@@ -152,23 +162,71 @@ class RadioService : MediaSessionService() {
             .setCallback(MediaSessionCallback())
             .build()
 
-        val mediaItem = MediaItem.Builder()
-            .setUri("https://radio.spaz.org:8060/radio.ogg")
-            .setMediaId(liveMediaID)
-            .setMimeType(MimeTypes.AUDIO_OGG)
-            .build()
-            
-        player?.setMediaItem(mediaItem)
-        
+        player?.setMediaItem(LiveStream.mediaItem(this))
+
         player?.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
                     _waveformFlow.value = null
                 }
             }
+
+            override fun onPlayerError(error: PlaybackException) {
+                // The low mount is a separate source and can be down while the main one is fine: stay on air.
+                val notFound = (error.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 404
+                val onLowMount = player?.currentMediaItem?.localConfiguration?.uri?.toString() == LiveStream.URL_LOW
+                if (notFound && onLowMount) {
+                    Log.w("RadioService", "Low-bandwidth mount missing, using the normal stream")
+                    lowMountMissing = true
+                    switchLiveStream(LiveStream.URL_HIGH, resume = true)
+                }
+            }
         })
 
+        connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        metered = connectivityManager?.isActiveNetworkMetered ?: false
+        connectivityManager?.registerDefaultNetworkCallback(networkCallback)
+        prefs = getSharedPreferences(LiveStream.PREFS, MODE_PRIVATE)
+        prefs?.registerOnSharedPreferenceChangeListener(qualityListener)
+
         startMetadataPolling()
+    }
+
+    /** Fires on connect and on every capability change; switching only happens when the mount would differ. */
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+            val nowMetered = !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+            serviceScope.launch {
+                metered = nowMetered
+                applyQuality()
+            }
+        }
+    }
+
+    // SharedPreferences holds its listeners weakly, so this one has to be a field.
+    private val qualityListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == LiveStream.QUALITY_PREF) {
+            lowMountMissing = false // a fresh choice gets a fresh try
+            applyQuality()
+        }
+    }
+
+    private fun applyQuality() {
+        val exoPlayer = player ?: return
+        val savedPrefs = prefs ?: return
+        val url = if (lowMountMissing) LiveStream.URL_HIGH else LiveStream.urlFor(LiveStream.savedQuality(savedPrefs), metered)
+        // A stopped player (e.g. the Archives tab) must stay silent, so only a live, prepared one resumes.
+        switchLiveStream(url, resume = exoPlayer.playWhenReady && exoPlayer.playbackState != Player.STATE_IDLE)
+    }
+
+    /** Points the live item at [url], if it isn't already. Paused, it reconnects only when played again. */
+    private fun switchLiveStream(url: String, resume: Boolean) {
+        val exoPlayer = player ?: return
+        val current = exoPlayer.currentMediaItem ?: return
+        if (current.mediaId != LiveStream.MEDIA_ID || current.localConfiguration?.uri?.toString() == url) return
+        if (!resume) exoPlayer.stop()
+        exoPlayer.setMediaItem(current.buildUpon().setUri(url).build())
+        if (resume) exoPlayer.prepare()
     }
 
     private inner class MediaSessionCallback : MediaSession.Callback {
@@ -239,6 +297,8 @@ class RadioService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        connectivityManager?.unregisterNetworkCallback(networkCallback)
+        prefs?.unregisterOnSharedPreferenceChangeListener(qualityListener)
         serviceJob.cancel()
         mediaSession?.run {
             player?.release()

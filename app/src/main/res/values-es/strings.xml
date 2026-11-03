@@ -68,6 +68,11 @@
 
     <string name="playback_settings">Reproducción</string>
     <string name="autoplay_radio">Iniciar radio automáticamente</string>
+    <string name="audio_quality">Calidad de audio</string>
+    <string name="audio_quality_auto">Auto</string>
+    <string name="audio_quality_low">Baja</string>
+    <string name="audio_quality_high">Alta</string>
+    <string name="audio_quality_help">Auto usa «Baja» con datos móviles y otras conexiones de uso medido.</string>
     <string name="visuals_settings">Visuales</string>
     <string name="visuals_fallback">Los visuales animados no están disponibles en este dispositivo; se muestra el osciloscopio simple.</string>
     <string name="visuals_quality">Calidad</string>

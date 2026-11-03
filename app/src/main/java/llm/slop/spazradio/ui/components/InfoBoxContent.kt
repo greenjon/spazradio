@@ -54,6 +54,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import llm.slop.spazradio.AudioQuality
 import llm.slop.spazradio.AppTheme
 import llm.slop.spazradio.ChatViewModel
 import llm.slop.spazradio.R
@@ -182,6 +183,29 @@ fun SettingsContent(
                         checkedThumbColor = MaterialTheme.colorScheme.primary,
                         checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                     )
+                )
+            }
+
+            val audioQuality by radioViewModel.audioQuality.collectAsState()
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Text(
+                    text = stringResource(R.string.audio_quality),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                ChipRow(
+                    options = listOf(
+                        AudioQuality.AUTO to stringResource(R.string.audio_quality_auto),
+                        AudioQuality.LOW to stringResource(R.string.audio_quality_low),
+                        AudioQuality.HIGH to stringResource(R.string.audio_quality_high),
+                    ),
+                    selected = audioQuality,
+                    onSelect = { radioViewModel.setAudioQuality(it) },
+                )
+                Text(
+                    text = stringResource(R.string.audio_quality_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
 

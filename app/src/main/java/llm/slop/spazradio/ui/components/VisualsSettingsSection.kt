@@ -176,7 +176,7 @@ private fun Label(text: String, color: androidx.compose.ui.graphics.Color) {
 }
 
 @Composable
-private fun <T> ChipRow(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
+internal fun <T> ChipRow(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
         options.forEach { (value, label) ->
             FilterChip(selected = value == selected, onClick = { onSelect(value) }, label = { Text(label) })

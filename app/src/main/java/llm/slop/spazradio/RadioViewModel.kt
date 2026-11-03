@@ -29,9 +29,8 @@ import llm.slop.spazradio.visuals.VisualsSettings
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
-    private val prefs = context.getSharedPreferences("spaz_radio_prefs", Context.MODE_PRIVATE)
-    private val liveStreamUrl = "https://radio.spaz.org:8060/radio.ogg"
-    private val liveStreamId = "spaz_radio_stream"
+    private val prefs = context.getSharedPreferences(LiveStream.PREFS, Context.MODE_PRIVATE)
+    private val liveStreamId = LiveStream.MEDIA_ID
 
     // --- Playback State ---
     private val _playbackUiState = MutableStateFlow<PlaybackUiState>(PlaybackUiState.Idle)
@@ -90,7 +89,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             quality = enumPref("visuals_quality", VisualQuality.AUTO),
             reactivity = migratedReactivity(),
             reducedMotion = enumPref("visuals_reduced_motion", ReducedMotion.AUTO),
-            live = prefs.getBoolean("visuals_live", false),
+            live = migratedLive(),
             syncMs = prefs.getInt("visuals_sync_ms", VisualsSettings.DEFAULT_SYNC_MS),
             contentUpdates = prefs.getBoolean("visuals_content_updates", true),
         )
@@ -128,6 +127,9 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     private val _autoPlayEnabled = MutableStateFlow(prefs.getBoolean("autoplay_enabled", true))
     val autoPlayEnabled: StateFlow<Boolean> = _autoPlayEnabled.asStateFlow()
 
+    private val _audioQuality = MutableStateFlow(LiveStream.savedQuality(prefs))
+    val audioQuality: StateFlow<AudioQuality> = _audioQuality.asStateFlow()
+
     private val _appTheme = MutableStateFlow(
         AppTheme.valueOf(prefs.getString("app_theme", AppTheme.NEON.name) ?: AppTheme.NEON.name)
     )
@@ -153,11 +155,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                         // Switch to live stream item but do not start playback
                         val isAlreadyLive = controller.currentMediaItem?.mediaId == liveStreamId
                         if (!isAlreadyLive) {
-                            val mediaItem = MediaItem.Builder()
-                                .setUri(liveStreamUrl)
-                                .setMediaId(liveStreamId)
-                                .build()
-                            controller.setMediaItem(mediaItem)
+                            controller.setMediaItem(LiveStream.mediaItem(context))
                         }
                         controller.playWhenReady = false
                         updateState(controller)
@@ -336,11 +334,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         val isAlreadyLive = controller.currentMediaItem?.mediaId == liveStreamId
         
         if (!isAlreadyLive) {
-            val mediaItem = MediaItem.Builder()
-                .setUri(liveStreamUrl)
-                .setMediaId(liveStreamId)
-                .build()
-            controller.setMediaItem(mediaItem)
+            controller.setMediaItem(LiveStream.mediaItem(context))
             controller.prepare()
             controller.play()
         } else if (!controller.isPlaying) {
@@ -378,11 +372,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             if (!isAlreadyLive) {
                 // If we're not already on Radio stream, stop any playing archive
                 stopPlayback()
-                val mediaItem = MediaItem.Builder()
-                    .setUri(liveStreamUrl)
-                    .setMediaId(liveStreamId)
-                    .build()
-                controller.setMediaItem(mediaItem)
+                controller.setMediaItem(LiveStream.mediaItem(context))
             }
 
             if (_autoPlayEnabled.value) {
@@ -452,6 +442,16 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         return clamped
     }
 
+    /**
+     * Following live broadcasts is on by default. It used to default to off, and any settings change saved that
+     * off, so a saved off can't be told from a choice: everyone is turned on once, and an off after that sticks.
+     */
+    private fun migratedLive(): Boolean {
+        if (prefs.getBoolean("visuals_live_default_on", false)) return prefs.getBoolean("visuals_live", true)
+        prefs.edit().putBoolean("visuals_live", true).putBoolean("visuals_live_default_on", true).apply()
+        return true
+    }
+
     fun updateVisuals(change: (VisualsSettings) -> VisualsSettings) {
         val old = _visuals.value
         val v = change(old)
@@ -465,6 +465,12 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             .putInt("visuals_sync_ms", v.syncMs)
             .putBoolean("visuals_content_updates", v.contentUpdates)
             .apply()
+    }
+
+    /** RadioService watches this pref and moves a playing stream to the new mount. */
+    fun setAudioQuality(quality: AudioQuality) {
+        _audioQuality.value = quality
+        prefs.edit().putString(LiveStream.QUALITY_PREF, quality.name).apply()
     }
 
     fun setAutoPlayEnabled(enabled: Boolean) {

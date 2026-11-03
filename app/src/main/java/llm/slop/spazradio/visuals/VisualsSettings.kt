@@ -12,7 +12,7 @@ data class VisualsSettings(
     val reactivity: Float = DEFAULT_REACTIVITY,
     val reducedMotion: ReducedMotion = ReducedMotion.AUTO,
     /** Follow a live broadcast from the Liquid LSD desktop app (needs the network). */
-    val live: Boolean = false,
+    val live: Boolean = true,
     /** Milliseconds the picture is held back so it lines up with what is heard (the audio sink buffers ahead). */
     val syncMs: Int = DEFAULT_SYNC_MS,
     /** Fetch new scenes and playlists from the Liquid LSD server in the background (small downloads). */
