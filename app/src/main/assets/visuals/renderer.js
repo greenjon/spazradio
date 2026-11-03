@@ -1,11 +1,12 @@
 import { cvState, tick, suspendAudio, resumeAudio } from './dsp.js';
 import { powerState, viewerState } from './ui.js';
-import { autopilotState, autopilotSettings, tickAutopilot, startAutopilot, handleRelayMessage, advanceForeground, setPrewarm, setHeavyAllowed } from './autopilot.js';
+import { autopilotState, autopilotSettings, tickAutopilot, startAutopilot, handleRelayMessage, advanceForeground, setPrewarm, setHeavyAllowed, setSteppedLookup } from './autopilot.js';
 import { evaluateParameter, makeEvalContext, paramSpec } from './evaluator.js';
 import { lookupParam } from './isf.js';
 import { AudioTextures, audioFrame } from './audiotex.js';
 import { Library, DeckPipeline, MixerPipeline } from './graph.js';
 import { MandalaRecipes } from './mandala.js';
+import { Gallery } from './gallery.js';
 import { heardBeats, DelayLine } from './sync.js';
 import { DropEnvelope } from './energy.js';
 import { installEmbedApi } from './embed.js';
@@ -272,9 +273,15 @@ async function init() {
   }
   // Shader prewarm for scenes the autopilot has queued (Library.get starts the fetch and compile).
   setPrewarm((deck, transition) => {
-    if (deck?.source && deck.source !== 'mandala') ctx.library.get('sources', deck.source.toLowerCase());
+    if (deck?.source && !['mandala', 'gallery'].includes(deck.source)) ctx.library.get('sources', deck.source.toLowerCase());
     for (const slot of deck?.fx ?? []) if (slot?.id) ctx.library.get('filters', slot.id);
     if (transition?.transition) ctx.library.get('transitions', transition.transition);
+  });
+  // ROLL snaps stepped inputs (STEP, long, VALUES) instead of gliding them through every step.
+  setSteppedLookup((kind, id, name) => {
+    const prog = ctx.library.get(kind, kind === 'sources' ? String(id).toLowerCase() : id);
+    const input = prog?.header.INPUTS.find((i) => i.NAME === name || i.LABEL === name);
+    return (input && paramSpec(input)?.steps > 1) || false;
   });
   // GPU probe, once, at the first power-on: render the heaviest source a few times with gl.finish() and let
   // the heavy sources (settings.json heavySources) into the rotation only if it is fast enough. Integrated
@@ -345,6 +352,7 @@ async function init() {
     pipe.blank = false;
     const srcType = (deckData.source || 'mandala').toLowerCase();
     if (srcType === 'mandala') renderMandala(deckData, pipe.clean);
+    else if (srcType === 'gallery') gallery.render(pipe.clean, { dt: frameDt, bpm: evalCtx.bpm, beats: evalCtx.beats, calm: viewerState.reducedNow });
     else if (!ctx.library.has('sources', srcType)) pipe.clean.clear(); // a source the web cannot draw
     else if (!pipe.renderSource(deckData, frameInfo())) return null; // still loading
     return pipe.renderFx(deckData, frameInfo());
@@ -357,6 +365,7 @@ async function init() {
   };
   const UNIT_SPEC = { min: 0, max: 1, steps: null };
   const mandalaRecipes = new MandalaRecipes(mandalaTable);
+  const gallery = new Gallery(gl, quadVAO);   // the Spaz Radio photo gallery (gallery.js); loads on first use
 
   function renderMandala(deckData, target) {
     target.bind();

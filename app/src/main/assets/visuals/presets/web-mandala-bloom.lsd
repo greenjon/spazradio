@@ -4,43 +4,31 @@
   "visualSourceType": "mandala",
   "parameters": {
     "Lobes": {
-      "baseValue": 12,
+      "baseValue": 4,
       "baseMin": 3,
       "baseMax": 26,
-      "randomizeBase": false,
+      "randomizeBase": true,
       "modulators": []
     },
     "Recipe Select": {
-      "baseValue": 0.6,
+      "baseValue": 0.0,
       "baseMin": 0.0,
       "baseMax": 1.0,
-      "randomizeBase": false,
-      "modulators": [
-        {
-          "sourceId": "lfo",
-          "operator": "ADD",
-          "depth": 0.1,
-          "dcOffset": 0.1,
-          "waveform": "SQUARE",
-          "genUnit": "BEAT",
-          "subdivision": 8.0,
-          "slope": 0.5,
-          "phaseOffset": 0.0
-        }
-      ]
+      "randomizeBase": true,
+      "modulators": []
     },
     "L1": {
       "baseValue": 0.45,
-      "baseMin": 0.0,
-      "baseMax": 1.0,
-      "randomizeBase": false,
+      "baseMin": 0.3,
+      "baseMax": 0.6,
+      "randomizeBase": true,
       "modulators": []
     },
     "L2": {
       "baseValue": 0.25,
-      "baseMin": 0.0,
-      "baseMax": 1.0,
-      "randomizeBase": false,
+      "baseMin": 0.125,
+      "baseMax": 0.375,
+      "randomizeBase": true,
       "modulators": [
         {
           "sourceId": "lfo",
@@ -57,9 +45,9 @@
     },
     "L3": {
       "baseValue": 0.2,
-      "baseMin": 0.0,
-      "baseMax": 1.0,
-      "randomizeBase": false,
+      "baseMin": 0.1,
+      "baseMax": 0.3,
+      "randomizeBase": true,
       "modulators": [
         {
           "sourceId": "lfo",
@@ -76,16 +64,16 @@
     },
     "L4": {
       "baseValue": 0.1,
-      "baseMin": 0.0,
-      "baseMax": 1.0,
-      "randomizeBase": false,
+      "baseMin": 0.05,
+      "baseMax": 0.15,
+      "randomizeBase": true,
       "modulators": []
     },
     "Thickness": {
       "baseValue": 0.35,
-      "baseMin": 0.0,
-      "baseMax": 1.0,
-      "randomizeBase": false,
+      "baseMin": 0.35,
+      "baseMax": 0.5,
+      "randomizeBase": true,
       "modulators": [
         {
           "sourceId": "audio_flux_high",
@@ -101,8 +89,8 @@
     "Hue Offset": {
       "baseValue": 0.15,
       "baseMin": 0.0,
-      "baseMax": 1.0,
-      "randomizeBase": false,
+      "baseMax": 0.45,
+      "randomizeBase": true,
       "modulators": [
         {
           "sourceId": "lfo",
@@ -119,16 +107,16 @@
     },
     "Hue Sweep": {
       "baseValue": 0.7,
-      "baseMin": 0.0,
+      "baseMin": 0.4,
       "baseMax": 1.0,
-      "randomizeBase": false,
+      "randomizeBase": true,
       "modulators": []
     },
     "Depth": {
       "baseValue": 0.5,
-      "baseMin": 0.0,
-      "baseMax": 1.0,
-      "randomizeBase": false,
+      "baseMin": 0.35,
+      "baseMax": 0.65,
+      "randomizeBase": true,
       "modulators": [
         {
           "sourceId": "lfo",
@@ -150,7 +138,7 @@
     "bar",
     "high"
   ],
-  "presetNotes": "Twelve-lobed mandala whose arm pulses on the beat and whose line thickens on every hi-hat.",
+  "presetNotes": "A random mandala whose arm pulses on the beat and whose line thickens on every hi-hat.",
   "globalAlpha": {
     "baseValue": 1.0,
     "baseMin": 0.0,

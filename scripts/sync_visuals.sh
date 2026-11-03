@@ -16,5 +16,8 @@ rsync -a --delete --checksum \
   --exclude 'checks/' --exclude 'tools/' --exclude 'sw.js' --exclude 'manifest.webmanifest' \
   --exclude '*.png' --exclude '*.jpg' --exclude '*.ico' --exclude 'fonts/' \
   "$web/" "$dest/"
+# The photo gallery background (gallery.js): liquid-lsd's built web/gallery/ at phone size (768 px), bundled so it
+# works offline. The rsync above leaves *.jpg alone; this writes gallery/ and gallery.json and drops stale photos.
+python3 "$src/scripts/gallery_curate.py" export "$dest" 768
 git -C "$src" rev-parse HEAD > "$dest/VERSION"
 echo "synced $(find "$dest" -type f | wc -l) files, $(du -sh "$dest" | cut -f1), liquid-lsd $(cut -c1-9 "$dest/VERSION")"

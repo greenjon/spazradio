@@ -9,6 +9,7 @@
 export function createMenu(screen, rows, { version = '', onOpen = () => {}, onClose = () => {} } = {}) {
   const el = document.createElement('div');
   el.id = 'tv-menu';
+  el.title = ''; // no inherited cabinet/picture hover help; rows carry their own
   el.setAttribute('role', 'menu');
   el.hidden = true;
   screen.appendChild(el);
@@ -57,6 +58,7 @@ export function createMenu(screen, rows, { version = '', onOpen = () => {}, onCl
     hint.textContent = rows[sel].help ?? '↑↓ SELECT  ←→ CHANGE  ENTER OK  M CLOSE';
     if (rows[sel].help) hint.classList.add('help');
     el.appendChild(hint);
+    el.querySelector('.menu-row.sel')?.scrollIntoView?.({ block: 'nearest' }); // a long menu scrolls with the keys
   }
 
   function change(dir) {

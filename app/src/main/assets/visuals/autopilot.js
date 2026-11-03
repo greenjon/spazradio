@@ -5,6 +5,7 @@ import { embed } from './embedmode.js';
 import { parseDeckPreset, parseFxChain, parseTransition } from './preset.js';
 import { BeatFlywheel } from './beatclock.js';
 import { chainFits, chainAnswers, dominantBand } from './pairing.js';
+import { MandalaRecipes } from './mandala.js';
 
 const RELAY_URL = 'wss://spaz.org/lsd-relay';
 let relayEnabled = !embed;   // embed mode starts with it off (the host app turns it on with the `live` option)
@@ -22,6 +23,8 @@ export const autopilotSettings = {
   fgHoldBars: 16,
   fgFadeBeats: 4,
   fgPlaybackOrder: 'sequential',
+  // AUTO ROLL (MENU): reroll the scene on air every this many bars of its hold; 0 = off.
+  autoRollBars: 0,
   // FX chain / transition preset ids (web/catalog.json) the autopilot rotates through; a
   // playlist line `preset | chain` pins a chain to one preset. Empty = no FX / plain crossfade.
   fxChains: [],
@@ -82,11 +85,14 @@ const HISTORY_MAX = 50;
 
 let bgPlaylist = [];
 let bgPlaylistIdx = 0;
+let bgOnAir = '';               // the background playlist line on screen (nowShowing, the OSD)
 let bgTransitionState = 'hold'; // 'hold' | 'fade_out' | 'fade_in'
 let bgSwitchAt = 0;
 let bgFadeStart = 0;
 let bgNext = null;
 let bgPreparing = false;
+let bgPicked = null;            // the line BACKGROUND / B asked for, until it is on air (steps go on from it)
+let bgResume = '';              // the line on air when BG CHANGES went OFF: it comes back with the next mode
 
 /** Beat the next change starts on: `fadeBeats` before the first bar line at least `holdBars` from `beats`. */
 export function nextSwitchBeat(beats, holdBars, fadeBeats) {
@@ -157,6 +163,7 @@ function getNextIndex(currentIdx, length, order) {
 
 // Content catalog (web/catalog.json): FX chain and transition presets by id.
 let catalog = { fxChains: [], transitionPresets: [] };
+let mandalaRecipes = null; // MandalaRecipes, loaded at startup for the recipe roll
 const contentCache = new Map();
 let fxIdx = -1;
 let transitionIdx = -1;
@@ -184,13 +191,17 @@ async function fetchContent(list, id) {
 async function buildDeck(line) {
   const [presetName, pinned] = line.split('|').map((p) => p.trim());
   const raw = await fetchPreset(presetName);
-  const deck = parseDeckPreset(raw);
+  const deck = parseDeckPreset(raw, Math.random, { mandalaRecipes });
+  deck.raw = raw;    // the preset as stored, for ROLL
   deck.tags = raw?.tags ?? [];
   deck.dominant = dominantBand(raw); // the band the scene mostly follows (pairing.js)
+  deck.pinned = pinned ?? null;
   let dto = null;
-  if (pinned && pinned !== 'none') dto = await fetchContent(catalog.fxChains, pinned);
+  if (!effectsOn) dto = null;
+  else if (pinned && pinned !== 'none') dto = await fetchContent(catalog.fxChains, pinned);
   else if (!pinned) dto = await pickChain(deck.tags, deck.dominant);
   applyChain(deck, dto);
+  deck.fxStripped = !effectsOn;   // EFFECTS OFF: gets its chain when they come back on
   return deck;
 }
 
@@ -226,6 +237,7 @@ const FLASH_TRANSITIONS = ['luminous_flash', 'cyber_datamosh', 'film_burn'];
 function applyChain(deck, dto) {
   Object.assign(deck, dto ? parseFxChain(dto) : { fx: [], fxDryWet: undefined });
   deck.chainName = dto?.name ?? null;
+  deck.chainDto = dto ?? null;   // the chain as stored, for ROLL
 }
 
 /** Picks the transition for the next foreground crossfade from the settings rotation. */
@@ -248,7 +260,9 @@ export function tickAutopilot(dt, beats, music = {}) {
   if (autopilotState.isLiveBroadcast) return;
   lastBeats = beats;
   lastMusic = music;
-  followSections(beats, music);
+  if (followMusic) followSections(beats, music);
+  tickRoll(beats);
+  tickAutoRoll(beats);
   if (fgSwitchAt === null) fgSwitchAt = nextSwitchBeat(beats, 0, 0);
   if (bgSwitchAt === null) bgSwitchAt = nextSwitchBeat(beats, 0, 0);
 
@@ -270,17 +284,46 @@ export function tickAutopilot(dt, beats, music = {}) {
 
   // 2. Background dip to black: out over the first half of the fade, the swap, in over the second
   if (bgPlaylist.length > 0) {
-    const half = Math.max(0.25, autopilotSettings.bgFadeBeats * 0.5);
+    const half = Math.max(0.25, bgFadeLen * 0.5);
     switch (bgTransitionState) {
       case 'hold':
         prepareBackground();
-        if (beats >= bgSwitchAt && bgNext) { bgTransitionState = 'fade_out'; bgFadeStart = beats; }
+        if (bgMode === 'scenes' && beats >= bgSwitchAt && bgNext) startBackgroundChange(beats, autopilotSettings.bgFadeBeats);
+        break;
+      case 'off':
+        // BG CHANGES back on: the next background fades in from black.
+        if (bgMode === 'off') break;
+        if (!bgNext && !bgPreparing) {
+          const back = bgPlaylist.indexOf(bgResume);
+          prepareBackground(back >= 0 ? back : null);
+        }
+        if (bgNext) {
+          autopilotState.deckBG = bgNext.deck;
+          bgOnAir = bgNext.line;
+          if (bgPicked === bgOnAir) bgPicked = null;
+          bgNext = null;
+          bgFadeLen = 4;
+          bgTransitionState = 'fade_in';
+          bgFadeStart = beats;
+          announceBackground();
+        }
         break;
       case 'fade_out':
         autopilotState.bgAlpha = Math.max(0.0, 1.0 - (beats - bgFadeStart) / half);
         if (autopilotState.bgAlpha <= 0.0) {
+          if (bgMode === 'off' || !bgNext) {   // BG CHANGES OFF: stays black, and is not rendered
+            autopilotState.deckBG = null;
+            if (bgOnAir) bgResume = bgOnAir;
+            bgOnAir = '';
+            bgNext = null;
+            bgTransitionState = 'off';
+            break;
+          }
           autopilotState.deckBG = bgNext.deck;
+          bgOnAir = bgNext.line;
+          if (bgPicked === bgOnAir) bgPicked = null;
           console.log(`[autopilot] Background: ${bgNext.line}`);
+          announceBackground();
           bgNext = null;
           bgTransitionState = 'fade_in';
           bgFadeStart = beats;
@@ -314,7 +357,7 @@ function prepareForeground(line = null) {
   fgPreparing = true;
   if (!line) {
     const order = autopilotSettings.fgPlaybackOrder;
-    const tempo = lastMusic.locked && lastMusic.bpm && (order === 'random' || order === 'shuffle');
+    const tempo = followMusic && lastMusic.locked && lastMusic.bpm && (order === 'random' || order === 'shuffle');
     const weights = tempo ? fgPlaylist.map((l) => (playable(l) ? tempoWeight(presetTags.get(l) ?? [], lastMusic.bpm) : 0)) : null;
     const pick = weights ? weightedPick(fgPlaylist, weights, fgPlaylistIdx) : -1;
     fgPlaylistIdx = pick >= 0 ? pick : nextPlayable(fgPlaylistIdx, fgPlaylist, order);
@@ -344,8 +387,10 @@ const presetSource = new Map(); // playlist line -> source id
 // Heavy sources stay out until the GPU probe says this machine can take them (setHeavyAllowed).
 let heavyAllowed = false;
 export function setHeavyAllowed(on) { heavyAllowed = !!on; }
-const playable = (line) => (heavyAllowed || !autopilotSettings.heavySources.includes(presetSource.get(line)))
+const runnable = (line) => (heavyAllowed || !autopilotSettings.heavySources.includes(presetSource.get(line)))
   && !(reducedMotion && (presetTags.get(line) ?? []).some((t) => CALM_SKIP_LOOK_TAGS.includes(t)));
+const playable = (line) => runnable(line) && !skipped.has(presetName(line));
+const presetName = (line) => (line ?? '').split('|')[0].trim();
 
 // -------------------------------------------------------
 // Tempo-aware picks: with a locked beat, a random pick leans towards scenes that suit the tempo (slow:
@@ -458,16 +503,35 @@ async function loadPresetTags() {
   }));
 }
 
-function prepareBackground() {
-  if (bgNext || bgPreparing || bgPlaylist.length === 0) return;
+let bgPrepareToken = 0;
+function prepareBackground(idx = null) {
+  if (idx === null && (bgNext || bgPreparing || bgPlaylist.length === 0)) return null;
+  const token = ++bgPrepareToken;
   bgPreparing = true;
-  bgPlaylistIdx = nextPlayable(bgPlaylistIdx, bgPlaylist, autopilotSettings.bgPlaybackOrder);
+  bgPlaylistIdx = idx ?? nextPlayable(bgPlaylistIdx, bgPlaylist, autopilotSettings.bgPlaybackOrder);
   const line = bgPlaylist[bgPlaylistIdx];
-  buildDeck(line).then((deck) => { bgNext = { line, deck }; prewarm(deck, null); }).finally(() => { bgPreparing = false; });
+  return buildDeck(line).then((deck) => {
+    if (token !== bgPrepareToken) return false;
+    bgNext = { line, deck };
+    prewarm(deck, null);
+    return true;
+  }).finally(() => { if (token === bgPrepareToken) bgPreparing = false; });
+}
+
+let bgFadeLen = 8;          // beats this background change takes (a dip to black and back)
+function startBackgroundChange(beats, fadeBeats) {
+  bgFadeLen = fadeBeats;
+  bgTransitionState = 'fade_out';
+  bgFadeStart = beats;
+}
+
+function announceBackground() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('lsd-background', { detail: nowShowing() }));
 }
 
 let fgFadeLen = 4;          // beats this crossfade takes
 function startForegroundCrossfade(beats, fadeBeats = autopilotSettings.fgFadeBeats) {
+  finishRoll();
   fgFadeLen = reducedMotion ? fadeBeats * 2 : fadeBeats;
   const { line, deck, transition } = fgNext;
   fgNext = null;
@@ -496,6 +560,7 @@ function finishForegroundCrossfade(beats) {
   fgTransitionState = 'hold';
   fgHoldStart = beats;
   fgSwitchAt = nextSwitchBeat(beats, autopilotSettings.fgHoldBars, autopilotSettings.fgFadeBeats);
+  planAutoRoll(beats);
 }
 
 /** The next change after the current hold, or the next bar line if that has already passed. */
@@ -509,7 +574,10 @@ export function nowShowing() {
   const deck = fgActiveDeck === 'A' ? autopilotState.deckA : autopilotState.deckB;
   const line = fgHistory.at(-1)?.line ?? fgPlaylist[fgPlaylistIdx] ?? '';
   const name = line.split('|')[0].trim();
-  return { name, chain: deck?.chainName ?? null, channel: fgPlaylist.indexOf(line) + 1, channels: fgPlaylist.length };
+  const background = bgOnAir.split('|')[0].trim() || null;
+  const backgroundPicked = (bgPicked ?? bgOnAir).split('|')[0].trim() || null;   // BACKGROUND's row: where a step is going
+  return { name, chain: deck?.chainName ?? null, background, backgroundPicked, channel: fgPlaylist.indexOf(line) + 1, channels: fgPlaylist.length,
+    skipped: skipped.has(name), effects: effectsOn, bgMode };
 }
 
 function announce() {
@@ -530,7 +598,7 @@ function settleCrossfade() {
  * to), in playlist order, now. A scene that was on air before comes back with the chain it had.
  */
 let fgTuning = null;       // the line a channel change is building, so quick presses keep counting
-async function changeChannel(dir) {
+function changeChannel(dir) {
   const n = fgPlaylist.length;
   if (autopilotState.isLiveBroadcast || n === 0) return;
   const from = fgPlaylist.indexOf(fgTuning ?? fgHistory.at(-1)?.line);
@@ -539,6 +607,22 @@ async function changeChannel(dir) {
     idx = (idx + dir + n) % n;
     if (playable(fgPlaylist[idx])) break;
   }
+  return tuneChannel(idx);
+}
+
+/** R: a playable channel picked at random, never the one on air (or being tuned to). */
+function randomChannel(rand = Math.random) {
+  const n = fgPlaylist.length;
+  if (autopilotState.isLiveBroadcast || n === 0) return;
+  const current = fgTuning ?? fgHistory.at(-1)?.line;
+  const choices = [];
+  for (let i = 0; i < n; i++) if (fgPlaylist[i] !== current && playable(fgPlaylist[i])) choices.push(i);
+  if (!choices.length) return;
+  return tuneChannel(choices[Math.floor(rand() * choices.length)]);
+}
+
+/** Puts playlist line `idx` on air now (shared by CH up / down and R). */
+async function tuneChannel(idx) {
   const line = fgPlaylist[idx];
   fgPlaylistIdx = idx;
   fgNext = null;
@@ -550,7 +634,10 @@ async function changeChannel(dir) {
   if (line === fgHistory.at(-1)?.line) return; // back to the one on air (or the only channel)
   const seen = fgHistory.findLast((h) => h.line === line);
   if (seen) {
-    fgNext = { ...seen };
+    // Back with the chain it had, but a fresh transition (reduced motion may have come on since).
+    fgNext = { ...seen, transition: await pickTransition() };
+    if (effectsOn && seen.deck.fxStripped) await rechain(seen.deck);
+    if (fgTuning) return; // a newer press is building another channel
   } else {
     fgTuning = line;
     await prepareForeground(line);
@@ -563,12 +650,15 @@ async function changeChannel(dir) {
 
 export const advanceForeground = () => changeChannel(1);
 export const previousForeground = () => changeChannel(-1);
+export const randomForeground = () => randomChannel();
 
 /** Puts the next suitable FX chain on the scene on air, now. */
 export async function nextFxChain() {
   if (autopilotState.isLiveBroadcast) return;
+  if (!effectsOn) return 'off';
   const deck = fgActiveDeck === 'A' ? autopilotState.deckA : autopilotState.deckB;
   if (!deck) return;
+  finishRoll();
   applyChain(deck, await pickChain(deck.tags ?? [], deck.dominant));
   prewarm(deck, null);
   announce();
@@ -587,6 +677,217 @@ export function setHoldBars(bars) {
   autopilotSettings.fgHoldBars = bars;
   autopilotSettings.bgHoldBars = bars * 2;
   replanForeground();
+}
+
+// -------------------------------------------------------
+// ROLL: the scene on air rerolls its random parameters (the preset's and its FX chain's). Continuous
+// values glide to the new ones and land on the next bar line at least 2 beats away; stepped ones (a
+// colour mode, a petal count, Mandala's recipe) snap there. Gliding keeps feedback simulations (Lenia,
+// Reaction Diffusion) from breaking on a jump. The deck is changed in place, so its history entry (CH
+// back to it) keeps the rolled version.
+// -------------------------------------------------------
+// renderer.js registers how to tell a stepped parameter: (source or filter id, kind, name) -> bool.
+let isStepped = () => false;
+export function setSteppedLookup(fn) { isStepped = fn; }
+const MANDALA_STEPPED = new Set(['Lobes', 'Recipe Select']);
+
+let roll = null;   // {deck, items: [{param, from, to, step}], start, end}
+
+/** The glide for one parameter bag: every parameter whose settled base differs in `fresh`. */
+function rollItems(bag, fresh, stepped) {
+  const items = [];
+  for (const [name, param] of Object.entries(bag ?? {})) {
+    const next = fresh?.[name];
+    if (!param || typeof param !== 'object' || !next || typeof next !== 'object') continue;
+    const from = param.baseValue ?? 0, to = next.baseValue ?? 0;
+    if (from === to) continue;
+    // Mandala's recipe also clears modulators on Lobes / Recipe Select; take the fresh dto whole at the snap.
+    items.push({ param, from, to, step: stepped(name), next });
+  }
+  return items;
+}
+
+/** Rerolls the scene on air (ROLL). Returns false when it has nothing that rolls (or during a broadcast). */
+export function rollScene() {
+  if (autopilotState.isLiveBroadcast) return false;
+  settleCrossfade();
+  finishRoll();
+  const deck = fgActiveDeck === 'A' ? autopilotState.deckA : autopilotState.deckB;
+  if (!deck?.raw) return false;
+  const fresh = parseDeckPreset(deck.raw, Math.random, { mandalaRecipes });
+  const source = deck.source;
+  const items = rollItems(deck.params, fresh.params,
+    (n) => (source === 'mandala' ? MANDALA_STEPPED.has(n) : isStepped('sources', source, n)));
+  if (deck.chainDto) {
+    const chain = parseFxChain(deck.chainDto);
+    deck.fx?.forEach((slot, i) => {
+      const next = chain.fx[i];
+      if (slot && next && slot.id === next.id) items.push(...rollItems(slot.params, next.params, (n) => isStepped('filters', slot.id, n)));
+    });
+  }
+  if (!items.length) return false;
+  const start = lastBeats;
+  roll = { deck, items, start, end: Math.ceil((start + 2) / 4) * 4 };
+  planAutoRoll(roll.end);
+  return true;
+}
+
+function tickRoll(beats) {
+  if (!roll) return;
+  const p = Math.min(1, Math.max(0, (beats - roll.start) / Math.max(0.25, roll.end - roll.start)));
+  if (p >= 1) { finishRoll(); return; }
+  const t = p * p * (3 - 2 * p);
+  for (const it of roll.items) if (!it.step) it.param.baseValue = it.from + (it.to - it.from) * t;
+}
+
+/** Lands a roll in progress at once (a crossfade or another control is about to act on the deck). */
+function finishRoll() {
+  if (!roll) return;
+  for (const it of roll.items) {
+    if (it.step && it.next.modulators) it.param.modulators = it.next.modulators;
+    it.param.baseValue = it.to;
+  }
+  roll = null;
+}
+
+// AUTO ROLL: every `autoRollBars` bars of a hold, on the bar line, never while a change is due within a bar.
+let autoRollAt = null;
+function planAutoRoll(from) {
+  const bars = autopilotSettings.autoRollBars;
+  autoRollAt = bars > 0 ? Math.ceil(from / 4) * 4 + bars * 4 : null;
+}
+function tickAutoRoll(beats) {
+  if (autoRollAt === null || beats < autoRollAt || fgTransitionState !== 'hold') return;
+  const changeSoon = !autopilotState.hold && fgSwitchAt - beats < 4;
+  if (changeSoon || !rollScene()) planAutoRoll(beats);
+}
+export function setAutoRollBars(bars) {
+  autopilotSettings.autoRollBars = bars;
+  planAutoRoll(lastBeats);
+}
+
+// -------------------------------------------------------
+// EFFECTS (MENU): AUTO puts FX chains on the scenes and backgrounds, OFF plays the sources clean.
+// -------------------------------------------------------
+let effectsOn = true;
+function stripChain(deck) {
+  if (!deck || deck.empty) return;
+  if (roll?.deck === deck) finishRoll();
+  applyChain(deck, null);
+  deck.fxStripped = true;
+}
+async function rechain(deck) {
+  if (!deck || deck.empty) return;
+  const dto = deck.pinned && deck.pinned !== 'none' ? await fetchContent(catalog.fxChains, deck.pinned)
+    : deck.pinned === 'none' ? null : await pickChain(deck.tags ?? [], deck.dominant);
+  applyChain(deck, dto);
+  deck.fxStripped = false;
+  prewarm(deck, null);
+}
+export async function setEffects(on) {
+  if (!!on === effectsOn) return;
+  effectsOn = !!on;
+  const onAir = [fgActiveDeck === 'A' ? autopilotState.deckA : autopilotState.deckB, autopilotState.deckBG];
+  const queued = [fgNext?.deck, dropLook?.deck, bgNext?.deck];
+  if (!effectsOn) {
+    for (const d of [autopilotState.deckA, autopilotState.deckB, ...onAir, ...queued]) stripChain(d);
+  } else if (!autopilotState.isLiveBroadcast) {
+    await Promise.all([...new Set([...onAir, ...queued])].map((d) => rechain(d)));
+  }
+  announce();
+}
+
+// FOLLOW MUSIC (MENU): off = no calm scene in a breakdown, no cut on the drop, no tempo-weighted picks.
+let followMusic = true;
+export function setFollowMusic(on) {
+  followMusic = !!on;
+  if (!followMusic) { dropLook = null; calmForBreakdown = false; lastSection = 'normal'; }
+}
+
+// -------------------------------------------------------
+// Background: B or MENU › BACKGROUND changes it now; BG CHANGES picks 'scenes' (every 2x TIME), 'hold'
+// (stays until changed by hand) or 'off' (faded out and not rendered).
+// -------------------------------------------------------
+let bgMode = 'hold';      // the default: the gallery (first background line) stays
+export function setBackgroundMode(mode) {
+  if (!['scenes', 'hold', 'off'].includes(mode) || mode === bgMode) return;
+  bgMode = mode;
+  if (mode === 'off' && bgTransitionState !== 'off' && autopilotState.deckBG) {
+    bgPrepareToken++; bgPreparing = false; bgNext = null; bgPicked = null;
+    startBackgroundChange(lastBeats, 4);
+    if (autopilotState.bgAlpha < 1) bgFadeStart = lastBeats - (1 - autopilotState.bgAlpha) * 2; // carry on from a fade in progress
+  }
+  if (mode === 'scenes') bgSwitchAt = nextSwitchBeat(lastBeats, autopilotSettings.bgHoldBars, autopilotSettings.bgFadeBeats);
+}
+
+/** The background `dir` (+1 / -1) along the background playlist, now: a 2-beat dip. Returns its line, or a reason. */
+export async function stepBackground(dir = 1) {
+  if (autopilotState.isLiveBroadcast) return 'live';
+  if (bgMode === 'off') return 'off';
+  const n = bgPlaylist.length;
+  if (n === 0) return 'none';
+  // From the one on screen (or the one a step is already fading to), not the one the rotation has queued.
+  let idx = bgPlaylist.indexOf(bgPicked ?? bgOnAir);
+  if (idx < 0) idx = bgPlaylistIdx;
+  for (let tries = 0; tries < n; tries++) {
+    idx = (idx + dir + n) % n;
+    if (playable(bgPlaylist[idx])) break;
+  }
+  const line = bgPicked = bgPlaylist[idx];
+  const ok = await Promise.resolve(prepareBackground(idx)).catch(() => false);
+  if (!ok && bgPicked === line) bgPicked = null;
+  if (!ok || bgMode === 'off' || autopilotState.isLiveBroadcast) return 'superseded';
+  if (bgTransitionState === 'hold' || bgTransitionState === 'fade_in') startBackgroundChange(lastBeats, 2);
+  return bgNext?.line ?? bgOnAir;
+}
+
+// -------------------------------------------------------
+// Channel skip, like an old TV's: a skipped channel keeps its number but never comes up by itself (the
+// rotation, R, CH up / down, the breakdown and drop picks). Typing its number tunes to it. Kept by preset
+// name, so a playlist change can't move a skip; ui.js stores the list. At least SKIP_FLOOR channels stay.
+// -------------------------------------------------------
+const skipped = new Set();
+export const SKIP_FLOOR = 8;
+export function setSkipped(names) { skipped.clear(); for (const n of names ?? []) skipped.add(n); }
+/** The skipped channels in this playlist, in channel order: [{channel, name}]. */
+export function skippedChannels() {
+  return fgPlaylist.map((l, i) => ({ channel: i + 1, name: presetName(l) })).filter((c) => skipped.has(c.name));
+}
+/** Names stored as skipped that this playlist still has (the rest are dropped). */
+export function prunedSkips() { const live = new Set(fgPlaylist.map(presetName)); return [...skipped].filter((n) => live.has(n)); }
+
+/**
+ * X: skips the channel on air and tunes to the next one, or restores it if it is skipped.
+ * Returns {action: 'skipped' | 'restored' | 'floor' | 'none', channel, name}.
+ */
+export function toggleSkip() {
+  if (autopilotState.isLiveBroadcast) return { action: 'none' };
+  const line = fgTuning ?? fgHistory.at(-1)?.line;
+  if (!line) return { action: 'none' };
+  const name = presetName(line), channel = fgPlaylist.indexOf(line) + 1;
+  if (skipped.has(name)) { skipped.delete(name); announce(); return { action: 'restored', channel, name }; }
+  const left = fgPlaylist.filter((l) => playable(l) && presetName(l) !== name).length;
+  if (left < SKIP_FLOOR) return { action: 'floor', channel, name };
+  skipped.add(name);
+  changeChannel(1);
+  return { action: 'skipped', channel, name };
+}
+/** Takes `name` off the skip list (the SKIPPED page, undo); with `tune`, also tunes to it. */
+export function restoreChannel(name, tune = false) {
+  skipped.delete(name);
+  if (tune) { const idx = fgPlaylist.findIndex((l) => presetName(l) === name); if (idx >= 0) return tuneTo(idx + 1); }
+  announce();
+}
+export function restoreAllChannels() { skipped.clear(); announce(); }
+
+/** Direct tuning (digits, the SKIPPED page): channel `n`, skipped or not. Returns 'ok', 'live', 'range' or 'heavy'. */
+export function tuneTo(n) {
+  if (autopilotState.isLiveBroadcast) return 'live';
+  const idx = n - 1;
+  if (!(idx >= 0 && idx < fgPlaylist.length)) return 'range';
+  if (!runnable(fgPlaylist[idx])) return 'heavy';
+  tuneChannel(idx);
+  return 'ok';
 }
 
 /** Applies one relay message (state_full / state_delta / broadcaster_offline) to the live state. */
@@ -720,6 +1021,14 @@ export async function startAutopilot() {
     console.warn('[autopilot] Could not load settings.json, using defaults.');
   }
 
+  // 1a. Mandala's recipe table, so each mandala scene rolls one recipe as it loads (preset.js)
+  try {
+    const res = await fetch('mandala_recipes.json');
+    if (res.ok) mandalaRecipes = new MandalaRecipes(await res.json());
+  } catch (e) {
+    console.warn('[autopilot] Could not load mandala_recipes.json; mandala scenes keep their stored recipe.');
+  }
+
   // 1b. Load the content catalog (FX chain and transition presets)
   try {
     const res = await fetch('catalog.json');
@@ -765,6 +1074,7 @@ export async function startAutopilot() {
   if (bgPlaylist.length > 0) {
     bgPlaylistIdx = 0;
     autopilotState.deckBG = await buildDeck(bgPlaylist[0]);
+    bgOnAir = bgPlaylist[0];
     autopilotState.bgAlpha = 1.0;
     bgSwitchAt = nextSwitchBeat(lastBeats, autopilotSettings.bgHoldBars, autopilotSettings.bgFadeBeats);
   }
