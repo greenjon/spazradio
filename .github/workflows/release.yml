@@ -8,6 +8,9 @@ on:
 
 jobs:
   release:
+    # Only pre-release tags (v2.0.1-beta1) build here. CI has no signing key, so a full release is built and
+    # published by hand with the master key: gh release create vX.Y.Z app-release.apk --notes-file ... --verify-tag --latest
+    if: github.ref_type == 'tag' && contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     permissions:
       contents: write
