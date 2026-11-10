@@ -1,4 +1,4 @@
-package llm.slop.spazradio.visuals
+package org.liquidlsd.visuals
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

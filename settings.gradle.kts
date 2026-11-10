@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "spazradio"
 include(":app")
+include(":lsd-visuals") // the Liquid LSD visuals; a copy made by liquid-lsd scripts/sync_lsd_visuals.sh
  

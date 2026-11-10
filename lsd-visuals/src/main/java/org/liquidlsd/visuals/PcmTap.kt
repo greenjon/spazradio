@@ -1,4 +1,4 @@
-package llm.slop.spazradio.visuals
+package org.liquidlsd.visuals
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -41,9 +41,9 @@ class PcmMonoChunker(private val chunkMs: Int = 40) {
 }
 
 /**
- * The audio the web visuals listen to: RadioService's audio sink pushes every decoded buffer in, and while a
- * listener is set (the visuals are on screen and playing) it is handed on as mono chunks. With no listener
- * the sink does no work at all.
+ * The audio the web visuals listen to: the app's audio source (a player's audio sink, a microphone, a system
+ * audio capture) pushes every buffer of 16-bit PCM in, and while a listener is set (the visuals are on screen
+ * and running, see [LsdVisuals]) it is handed on as mono chunks. With no listener the source does no work at all.
  */
 object PcmTap {
     @Volatile
@@ -51,10 +51,10 @@ object PcmTap {
 
     private val chunker = PcmMonoChunker()
 
-    /** Playback thread: the sink's format changed. */
+    /** Audio thread: the source's format changed. */
     fun configure(sampleRateHz: Int, channelCount: Int) = chunker.configure(sampleRateHz, channelCount)
 
-    /** Playback thread: a buffer of decoded audio. */
+    /** Audio thread: a buffer of 16-bit PCM in native byte order, interleaved. */
     fun onBuffer(buffer: ByteBuffer) {
         val l = listener ?: return
         chunker.push(buffer, l)

@@ -20,11 +20,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import llm.slop.spazradio.data.ArchiveShow
-import llm.slop.spazradio.visuals.ContentUpdater
-import llm.slop.spazradio.visuals.ContentUpdates
-import llm.slop.spazradio.visuals.ReducedMotion
-import llm.slop.spazradio.visuals.VisualQuality
-import llm.slop.spazradio.visuals.VisualsSettings
+import org.liquidlsd.visuals.ContentUpdater
+import org.liquidlsd.visuals.ContentUpdates
+import org.liquidlsd.visuals.ReducedMotion
+import org.liquidlsd.visuals.VisualQuality
+import org.liquidlsd.visuals.VisualsSettings
 
 class RadioViewModel(application: Application) : AndroidViewModel(application) {
 

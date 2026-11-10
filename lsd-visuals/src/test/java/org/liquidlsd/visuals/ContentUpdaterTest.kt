@@ -1,4 +1,4 @@
-package llm.slop.spazradio.visuals
+package org.liquidlsd.visuals
 
 import com.google.gson.JsonObject
 import org.junit.Assert.assertEquals

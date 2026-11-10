@@ -1,11 +1,11 @@
-package llm.slop.spazradio.visuals
+package org.liquidlsd.visuals
 
 import java.io.File
 
 /**
  * The downloaded copy of the visuals' data files (presets, playlists, shaders, ...), laid out as
  * `<root>/v<version>/<path>` plus `<root>/current` naming the live version. It overlays the bundled
- * assets/visuals: a path found here wins, anything else comes from the APK, so the app always works offline
+ * assets/visuals (this module's assets): a path found here wins, anything else comes from the APK, so the app always works offline
  * and with no download at all. Content downloaded by an older or newer app build is ignored ([appVersion]
  * is recorded) because the bundled files of a new build can be newer than what was downloaded.
  */

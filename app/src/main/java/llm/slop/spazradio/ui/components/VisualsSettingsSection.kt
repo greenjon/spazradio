@@ -29,9 +29,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import llm.slop.spazradio.R
 import llm.slop.spazradio.RadioViewModel
-import llm.slop.spazradio.visuals.ReducedMotion
-import llm.slop.spazradio.visuals.VisualQuality
-import llm.slop.spazradio.visuals.VisualsSettings
+import org.liquidlsd.visuals.ReducedMotion
+import org.liquidlsd.visuals.VisualQuality
+import org.liquidlsd.visuals.VisualsSettings
 import kotlin.math.roundToInt
 
 /** Settings > Visuals: how the web visuals behind the radio look and move. */

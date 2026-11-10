@@ -53,7 +53,7 @@ import llm.slop.spazradio.ui.components.ControlsAutoHide
 import llm.slop.spazradio.ui.components.FooterToolbar
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
-import llm.slop.spazradio.ui.components.VisualizerView
+import org.liquidlsd.visuals.LsdVisuals
 import llm.slop.spazradio.ui.components.rememberControlsAutoHide
 import llm.slop.spazradio.ui.components.restartsAutoHide
 import llm.slop.spazradio.ui.components.PlayerHeader
@@ -240,7 +240,7 @@ fun RadioApp(
                     modifier = modifier
                 )
             } else {
-                VisualizerView(
+                LsdVisuals(
                     settings = visuals,
                     active = isPlaying && !controls.pocketed, // nobody watches a pocketed screen
                     onFailed = { radioViewModel.webVisualsFailed.value = true },

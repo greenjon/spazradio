@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import llm.slop.spazradio.visuals.PcmTap
+import org.liquidlsd.visuals.PcmTap
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 

@@ -1,4 +1,4 @@
-package llm.slop.spazradio.visuals
+package org.liquidlsd.visuals
 
 import android.content.Context
 import android.util.Base64
@@ -20,7 +20,9 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "ContentUpdates"
-private const val WORK_NAME = "visuals-content-update"
+private const val WORK_NAME = "lsd-visuals-content-update"
+/** The name Spaz Radio 2.0 scheduled the check under, when this code lived in the app; cancelled so it never runs a class that is gone. */
+private const val OLD_WORK_NAME = "visuals-content-update"
 private const val BASE_URL = "https://spaz.org/tv/"
 private const val MAX_FETCH_BYTES = 6L * 1024 * 1024
 
@@ -28,7 +30,10 @@ private const val MAX_FETCH_BYTES = 6L * 1024 * 1024
 private const val PUBLIC_KEY =
     "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAErmxnLpUXX3Gl7akMm6qQL7D2wVsSntTKsVNknMXW3DHLmaS6V060eZWHg23Tmxfz4uQ3MWdaGV7xFYEb6tc4rQ=="
 
-/** Wires [ContentUpdater] to the app: the store folder, the server, a daily background check. */
+/**
+ * Wires [ContentUpdater] to the app: the store folder (`files/visuals-content`), the server (the web TV's
+ * `/tv/update/`), a daily background check. Call [schedule] at startup and whenever the user's setting changes.
+ */
 object ContentUpdates {
     fun store(context: Context): ContentStore {
         val appVersion = PackageInfoCompat.getLongVersionCode(context.packageManager.getPackageInfo(context.packageName, 0)).toInt()
@@ -52,6 +57,7 @@ object ContentUpdates {
 
     fun schedule(context: Context, enabled: Boolean) {
         val wm = WorkManager.getInstance(context)
+        wm.cancelUniqueWork(OLD_WORK_NAME)
         if (!enabled) { wm.cancelUniqueWork(WORK_NAME); return }
         val request = PeriodicWorkRequestBuilder<Worker>(1, TimeUnit.DAYS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build())

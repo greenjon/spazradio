@@ -1,4 +1,4 @@
-package llm.slop.spazradio.visuals
+package org.liquidlsd.visuals
 
 /** How hard the picture may work. Auto lets the web app's GPU probe and adaptive resolution decide. */
 enum class VisualQuality(val js: String) { AUTO("auto"), LOW("low"), HIGH("high") }
