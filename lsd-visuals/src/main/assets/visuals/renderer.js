@@ -173,7 +173,8 @@ async function init() {
 
   const evalCtx = makeEvalContext();
   const audioDelay = new DelayLine();
-  const AUDIO_KEYS = ['audio_amp', 'audio_bass', 'audio_mid', 'audio_high', 'audio_flux_amp', 'audio_flux_bass', 'audio_flux_mid', 'audio_flux_high', 'audio_energy'];
+  const AUDIO_KEYS = ['audio_amp', 'audio_bass', 'audio_mid', 'audio_himid', 'audio_high', 'audio_flux_amp', 'audio_flux_bass', 'audio_flux_mid', 'audio_flux_himid', 'audio_flux_high',
+    'audio_energy', 'audio_energy_bass', 'audio_energy_mid', 'audio_energy_himid', 'audio_energy_high'];
   const drop = new DropEnvelope();
   function updateEvalContext() {
     // Live broadcast: the desktop's beat clock (phase-locked flywheel). Standalone: the web's own
@@ -197,11 +198,12 @@ async function init() {
     const r = (v) => Math.min(1, v * k);
     evalCtx.cv = {
       audio_amp: r(heard.audio_amp), audio_bass: r(heard.audio_bass),
-      audio_mid: r(heard.audio_mid), audio_high: r(heard.audio_high),
+      audio_mid: r(heard.audio_mid), audio_himid: r(heard.audio_himid), audio_high: r(heard.audio_high),
       audio_flux_amp: r(heard.audio_flux_amp), audio_flux_bass: r(heard.audio_flux_bass),
-      audio_flux_mid: r(heard.audio_flux_mid), audio_flux_high: r(heard.audio_flux_high),
+      audio_flux_mid: r(heard.audio_flux_mid), audio_flux_himid: r(heard.audio_flux_himid), audio_flux_high: r(heard.audio_flux_high),
       // Song sections are not scaled by REACT (like Audio Response on the desktop); reduced motion softens the hit.
-      audio_energy: heard.audio_energy ?? 0, audio_drop: drop.value(beats) * (viewerState.reducedNow ? 0.6 : 1),
+      audio_energy: heard.audio_energy ?? 0, audio_energy_bass: heard.audio_energy_bass ?? 0, audio_energy_mid: heard.audio_energy_mid ?? 0,
+      audio_energy_himid: heard.audio_energy_himid ?? 0, audio_energy_high: heard.audio_energy_high ?? 0, audio_drop: drop.value(beats) * (viewerState.reducedNow ? 0.6 : 1),
       beatSine: Math.sin(beats * 2 * Math.PI), bpm,
     };
   }
@@ -283,7 +285,7 @@ async function init() {
     const input = prog?.header.INPUTS.find((i) => i.NAME === name || i.LABEL === name);
     return (input && paramSpec(input)?.steps > 1) || false;
   });
-  // GPU probe, once, at the first power-on: render the heaviest source a few times with gl.finish() and let
+  // GPU probe, once, at the first power-on: render the heaviest source a few times and wait for the GPU and let
   // the heavy sources (settings.json heavySources) into the rotation only if it is fast enough. Integrated
   // GPUs and phones keep the light scenes; discrete GPUs, Apple Silicon and fast integrated chips get all.
   // ?heavy=1 / ?heavy=0 overrides it. The result is window.LSD.gpu.
@@ -309,14 +311,22 @@ async function init() {
     const pipe = new DeckPipeline(ctx, probe.width, probe.height);
     const deck = { source: probe.source, params: {} };
     const frame = (i) => ({ time: 10 + i / 60, dt: 1 / 60, index: i });
+    // Reading a pixel waits for the GPU. gl.finish() doesn't, in Chromium: it returned in 0.3 ms on an Intel iGPU and a Pixel 7a alike.
+    const finish = () => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, pipe.clean.fbo); // the target itself: the driver only has to finish what it reads
+      const type = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE);
+      const px = type === gl.UNSIGNED_BYTE ? new Uint8Array(4) : type === gl.FLOAT ? new Float32Array(4) : new Uint16Array(4);
+      gl.readPixels(0, 0, 1, 1, gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT), type, px);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    };
     pipe.renderSource(deck, frame(0)); pipe.renderSource(deck, frame(1)); // warm up
-    gl.finish();
+    finish();
     // Up to 4 timed frames; a slow GPU is obvious after one, so it stops there (the probe stays ~100 ms).
     let total = 0, n = 0;
     while (n < 4 && !(n > 0 && total / n > 2 * probe.maxMs)) {
       const t0 = performance.now();
       pipe.renderSource(deck, frame(2 + n));
-      gl.finish();
+      finish();
       total += performance.now() - t0;
       n++;
     }
@@ -477,7 +487,9 @@ async function init() {
     gl.uniform1f(crtUniforms.uWarmupProgress,      powerState.warmupProgress);
     gl.uniform1f(crtUniforms.uShutdownProgress,    powerState.shutdownProgress);
     // Snow fades in over ~1 s when the stream drops (not during a live broadcast: the picture comes from the desktop).
-    noSignal += ((cvState.noSignal && !autopilotState.isLiveBroadcast ? 1 : 0) - noSignal) * Math.min(1, dt * 2);
+    // A tape going in or out rolls the picture through the same snow, briefly (cvState.glitchUntil).
+    const snow = (cvState.noSignal && !autopilotState.isLiveBroadcast) || performance.now() < cvState.glitchUntil;
+    noSignal += ((snow ? 1 : 0) - noSignal) * Math.min(1, dt * (performance.now() < cvState.glitchUntil ? 8 : 2));
     gl.uniform1f(crtUniforms.uNoSignal,            noSignal);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

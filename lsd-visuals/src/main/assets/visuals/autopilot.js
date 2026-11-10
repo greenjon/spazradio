@@ -188,7 +188,7 @@ async function fetchContent(list, id) {
  * A playlist line `preset` or `preset | fxchain` -> deck state: the preset's source and
  * parameters plus an FX chain (the pinned one, else the next in the settings rotation).
  */
-async function buildDeck(line) {
+async function buildDeck(line, background = false) {
   const [presetName, pinned] = line.split('|').map((p) => p.trim());
   const raw = await fetchPreset(presetName);
   const deck = parseDeckPreset(raw, Math.random, { mandalaRecipes });
@@ -196,8 +196,10 @@ async function buildDeck(line) {
   deck.tags = raw?.tags ?? [];
   deck.dominant = dominantBand(raw); // the band the scene mostly follows (pairing.js)
   deck.pinned = pinned ?? null;
+  deck.background = background; // a locked chain (lockChain) is for the scenes, not the backgrounds
   let dto = null;
   if (!effectsOn) dto = null;
+  else if (lockedChain && !background) dto = await fetchContent(catalog.fxChains, lockedChain);
   else if (pinned && pinned !== 'none') dto = await fetchContent(catalog.fxChains, pinned);
   else if (!pinned) dto = await pickChain(deck.tags, deck.dominant);
   applyChain(deck, dto);
@@ -242,6 +244,10 @@ function applyChain(deck, dto) {
 
 /** Picks the transition for the next foreground crossfade from the settings rotation. */
 async function pickTransition() {
+  if (lockedTransition) {
+    const dto = await fetchContent(catalog.transitionPresets, lockedTransition);
+    if (dto) return parseTransition(dto);
+  }
   const n = autopilotSettings.transitions.length;
   if (n === 0) return { transition: 'linear_crossfade', transitionParams: {} };
   for (let tries = 0; tries < n; tries++) {
@@ -440,6 +446,7 @@ function pickLine(tags) {
 }
 
 let calmForBreakdown = false;  // the scene on air (or queued) was brought in by a breakdown
+let calmWaiting = false;       // ...and is queued, not yet fading in: a fade already running must not push it back 16 bars
 function followSections(beats, { section = 'normal', drops = 0 }) {
   if (section !== lastSection) {
     lastSection = section;
@@ -450,6 +457,7 @@ function followSections(beats, { section = 'normal', drops = 0 }) {
         prepareForeground(calm);
         fgSwitchAt = nextSwitchBeat(beats, 0, autopilotSettings.fgFadeBeats);
         calmForBreakdown = true;
+        calmWaiting = true;
       }
       const hard = pickLine(DROP_TAGS);
       dropLook = null;
@@ -510,7 +518,7 @@ function prepareBackground(idx = null) {
   bgPreparing = true;
   bgPlaylistIdx = idx ?? nextPlayable(bgPlaylistIdx, bgPlaylist, autopilotSettings.bgPlaybackOrder);
   const line = bgPlaylist[bgPlaylistIdx];
-  return buildDeck(line).then((deck) => {
+  return buildDeck(line, true).then((deck) => {
     if (token !== bgPrepareToken) return false;
     bgNext = { line, deck };
     prewarm(deck, null);
@@ -532,6 +540,7 @@ function announceBackground() {
 let fgFadeLen = 4;          // beats this crossfade takes
 function startForegroundCrossfade(beats, fadeBeats = autopilotSettings.fgFadeBeats) {
   finishRoll();
+  calmWaiting = false;
   fgFadeLen = reducedMotion ? fadeBeats * 2 : fadeBeats;
   const { line, deck, transition } = fgNext;
   fgNext = null;
@@ -559,7 +568,7 @@ function finishForegroundCrossfade(beats) {
   autopilotState.mixer.balance = fgFadeTargetBalance;
   fgTransitionState = 'hold';
   fgHoldStart = beats;
-  fgSwitchAt = nextSwitchBeat(beats, autopilotSettings.fgHoldBars, autopilotSettings.fgFadeBeats);
+  fgSwitchAt = nextSwitchBeat(beats, calmWaiting ? 0 : autopilotSettings.fgHoldBars, autopilotSettings.fgFadeBeats);
   planAutoRoll(beats);
 }
 
@@ -636,7 +645,8 @@ async function tuneChannel(idx) {
   if (seen) {
     // Back with the chain it had, but a fresh transition (reduced motion may have come on since).
     fgNext = { ...seen, transition: await pickTransition() };
-    if (effectsOn && seen.deck.fxStripped) await rechain(seen.deck);
+    // A locked chain (lockChain) wins over the chain it had.
+    if (effectsOn && (seen.deck.fxStripped || (lockedChain && seen.deck.chainName !== lockedChainName()))) await rechain(seen.deck);
     if (fgTuning) return; // a newer press is building another channel
   } else {
     fgTuning = line;
@@ -778,7 +788,7 @@ function stripChain(deck) {
 }
 async function rechain(deck) {
   if (!deck || deck.empty) return;
-  const dto = deck.pinned && deck.pinned !== 'none' ? await fetchContent(catalog.fxChains, deck.pinned)
+  const dto = lockedChain && !deck.background ? await fetchContent(catalog.fxChains, lockedChain) : deck.pinned && deck.pinned !== 'none' ? await fetchContent(catalog.fxChains, deck.pinned)
     : deck.pinned === 'none' ? null : await pickChain(deck.tags ?? [], deck.dominant);
   applyChain(deck, dto);
   deck.fxStripped = false;
@@ -833,12 +843,89 @@ export async function stepBackground(dir = 1) {
     idx = (idx + dir + n) % n;
     if (playable(bgPlaylist[idx])) break;
   }
+  return changeBackground(idx);
+}
+
+/** Background line `idx` of the background playlist, now (a 2-beat dip). Same returns as stepBackground. */
+export async function tuneBackground(idx) {
+  if (autopilotState.isLiveBroadcast) return 'live';
+  if (bgMode === 'off') return 'off';
+  if (!(idx >= 0 && idx < bgPlaylist.length)) return 'range';
+  return changeBackground(idx);
+}
+
+async function changeBackground(idx) {
   const line = bgPicked = bgPlaylist[idx];
   const ok = await Promise.resolve(prepareBackground(idx)).catch(() => false);
   if (!ok && bgPicked === line) bgPicked = null;
   if (!ok || bgMode === 'off' || autopilotState.isLiveBroadcast) return 'superseded';
   if (bgTransitionState === 'hold' || bgTransitionState === 'fade_in') startBackgroundChange(lastBeats, 2);
   return bgNext?.line ?? bgOnAir;
+}
+
+// -------------------------------------------------------
+// Host controls (embed.js: an app driving the picture). A chosen FX chain or transition can be locked:
+// every scene that comes on air takes it instead of the rotation's pick, until unlocked (null).
+// -------------------------------------------------------
+let lockedChain = null;
+let lockedTransition = null;
+const lockedChainName = () => catalog.fxChains.find((c) => c.id === lockedChain)?.name ?? null;
+
+/** Puts FX chain `id` (catalog.json fxChains) on the scene on air now; null = none. Returns 'ok', 'off', 'live' or 'unknown'. */
+export async function setChain(id) {
+  if (autopilotState.isLiveBroadcast) return 'live';
+  if (!effectsOn) return 'off';
+  const deck = fgActiveDeck === 'A' ? autopilotState.deckA : autopilotState.deckB;
+  if (!deck) return 'unknown';
+  const dto = id ? await fetchContent(catalog.fxChains, id) : null;
+  if (id && !dto) return 'unknown';
+  finishRoll();
+  applyChain(deck, dto);
+  prewarm(deck, null);
+  announce();
+  return 'ok';
+}
+
+/** Locks FX chain `id` for every scene from now on (and puts it on now); null unlocks. */
+export async function lockChain(id) {
+  if (id && !catalog.fxChains.some((c) => c.id === id)) return 'unknown';
+  lockedChain = id || null;
+  fgPrepareToken++; fgPreparing = false; fgNext = null; // the queued scene was built with the old pick
+  const r = lockedChain ? await setChain(lockedChain) : 'ok';
+  announce();
+  return r;
+}
+
+/** Locks transition preset `id` (catalog.json transitionPresets) for every change from now on; null unlocks. */
+export function lockTransition(id) {
+  if (id && !catalog.transitionPresets.some((t) => t.id === id)) return 'unknown';
+  lockedTransition = id || null;
+  fgPrepareToken++; fgPreparing = false; fgNext = null;
+  announce();
+  return 'ok';
+}
+
+/** What a host can choose from: scenes (by channel), backgrounds, FX chains, transitions. */
+export function contentCatalog() {
+  const scene = (line, i) => {
+    const name = presetName(line);
+    return { channel: i + 1, name, tags: presetTags.get(line) ?? [], source: presetSource.get(line) ?? null,
+      pinnedChain: line.split('|')[1]?.trim() || null, skipped: skipped.has(name), runnable: runnable(line) };
+  };
+  const rotation = new Set(autopilotSettings.fxChains);
+  return {
+    scenes: fgPlaylist.map(scene),
+    backgrounds: bgPlaylist.map((line, i) => ({ index: i, name: presetName(line), source: presetSource.get(line) ?? null, tags: presetTags.get(line) ?? [] })),
+    fxChains: catalog.fxChains.map((c) => ({ id: c.id, name: c.name, inRotation: rotation.has(c.id) })),
+    transitions: catalog.transitionPresets.map((t) => ({ id: t.id, name: t.name, inRotation: autopilotSettings.transitions.includes(t.id) })),
+  };
+}
+
+/** The controls' settings, for a host's display (nowShowing has what is on air). */
+export function controlState() {
+  return { hold: autopilotState.hold, holdBars: autopilotSettings.fgHoldBars, autoRollBars: autopilotSettings.autoRollBars,
+    follow: followMusic, effects: effectsOn, bgMode, lockedChain, lockedTransition,
+    live: autopilotState.isLiveBroadcast, broadcaster: autopilotState.broadcaster ?? null };
 }
 
 // -------------------------------------------------------
@@ -892,6 +979,7 @@ export function tuneTo(n) {
 
 /** Applies one relay message (state_full / state_delta / broadcaster_offline) to the live state. */
 export function handleRelayMessage(msg) {
+  if (tapeHold) { noteStationAir(msg); return; }
   switch (msg.type) {
     case 'state_full':
       if (msg.v !== PROTOCOL_VERSION) {
@@ -934,6 +1022,45 @@ export function handleRelayMessage(msg) {
         bgSwitchAt = null;
       }
       break;
+  }
+}
+
+// A tape in the deck (tapedeck.js): a broadcast's picture follows the live sound, not the tape, so it does not
+// take over. The relay is still listened to, so the LIVE button can pulse, and the viewer's controls stay theirs.
+export const stationAir = { onAir: false, broadcaster: null };
+let tapeHold = false;
+
+function noteStationAir(msg) {
+  if (msg.type === 'state_full' && msg.v === PROTOCOL_VERSION) {
+    stationAir.onAir = true;
+    if (msg.preset) stationAir.broadcaster = typeof msg.preset.broadcaster === 'string' ? msg.preset.broadcaster : null;
+  } else if (msg.type === 'state_delta') {
+    stationAir.onAir = true;
+    if (typeof msg.patch?.broadcaster === 'string') stationAir.broadcaster = msg.patch.broadcaster;
+  } else if (msg.type === 'broadcaster_offline') {
+    stationAir.onAir = false;
+    stationAir.broadcaster = null;
+  }
+}
+
+export function setTapeHold(on) {
+  if (!!on === tapeHold) return;
+  if (on) {
+    stationAir.onAir = autopilotState.isLiveBroadcast;
+    stationAir.broadcaster = autopilotState.broadcaster;
+    if (stationAir.onAir) handleRelayMessage({ type: 'broadcaster_offline' }); // back to the autopilot's picture
+    tapeHold = true;
+    return;
+  }
+  tapeHold = false;
+  const wasOnAir = stationAir.onAir;
+  stationAir.onAir = false;
+  stationAir.broadcaster = null;
+  // The deltas we ignored are gone. A new connection gets the relay's cached snapshot and the broadcast takes over.
+  if (wasOnAir && relayEnabled) {
+    relaySocket?.close();
+    relaySocket = null;
+    connectRelay();
   }
 }
 
@@ -1076,7 +1203,7 @@ export async function startAutopilot() {
   }
   if (bgPlaylist.length > 0) {
     bgPlaylistIdx = 0;
-    autopilotState.deckBG = await buildDeck(bgPlaylist[0]);
+    autopilotState.deckBG = await buildDeck(bgPlaylist[0], true);
     bgOnAir = bgPlaylist[0];
     autopilotState.bgAlpha = 1.0;
     bgSwitchAt = nextSwitchBeat(lastBeats, autopilotSettings.bgHoldBars, autopilotSettings.bgFadeBeats);

@@ -53,7 +53,7 @@ import llm.slop.spazradio.ui.components.ControlsAutoHide
 import llm.slop.spazradio.ui.components.FooterToolbar
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
-import org.liquidlsd.visuals.LsdVisuals
+import lsd.liquid.visuals.LsdVisuals
 import llm.slop.spazradio.ui.components.rememberControlsAutoHide
 import llm.slop.spazradio.ui.components.restartsAutoHide
 import llm.slop.spazradio.ui.components.PlayerHeader

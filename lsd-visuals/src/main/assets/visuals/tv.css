@@ -1,22 +1,109 @@
 /* tv.css — Retro CRT Television Shell */
 
+/* Two themes, one set of materials: moulded grainy plastic on a cabinet in a softly lit room, turned controls,
+   a metal nameplate, a framed blackboard. MENU › THEME sets data-theme on <html> (index.html does it before the
+   first paint). Only the room and the cabinet change: the screen and its surround are dark glass in both, and
+   everything on the picture stays phosphor on black. Kiosk and embed have no cabinet. */
 :root {
+  color-scheme:      dark;
+  --room:            #141210;   /* the wall behind the TV */
+  --room-glow:       #25211c;   /* the pool of light on it */
   --tv-bg:           #2a2520;   /* dark warm charcoal plastic body */
   --tv-highlight:    #3d3830;   /* lighter bevel edge */
   --tv-shadow:       #18140f;   /* darker bevel edge */
+  --tv-sheen:        rgba(255,255,255,0.04);
+  --tv-drop:         0 8px 40px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.6);
+  --grain:           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .05 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --ink:             #b9b0a2;   /* lettering on the cabinet */
+  --ink-shadow:      0 1px 0 rgba(0,0,0,0.6);
+  --ink-off:         #6f685d;   /* lettering that waits for the power */
+  --well:            #18140f;   /* what the power switch sits in */
+  --well-edge:       #333;
+  --switch-off:      #1c1c1c;
+  --switch-edge:     #444;
+  --switch-on:       #cc2200;
+  --cap-hi:          #3a3530;   /* dials and buttons: lit side */
+  --cap-lo:          #1a1510;   /* and shaded side */
+  --cap-edge:        #222;
+  --cap-seam:        #111;      /* between the rocker's two halves */
+  --cap-ink:         #888;
+  --cap-marker:      #aaa;
+  --cap-lift:        0 2px 4px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.08);
+  --cap-pressed:     0 1px 1px rgba(0,0,0,0.6), inset 0 1px 3px rgba(0,0,0,0.6);
+  --btn-led-off:     #2a1a00;
+  --focus:           #7a7;
+  --badge-bg:        rgba(0,0,0,0.4);
+  --badge-edge:      #222;
+  --badge-ink:       #888;
+  --badge-ink-off:   #444;
+  --plate-hi:        #4a443c;   /* nameplate */
+  --plate-lo:        #26221d;
+  --plate-lift:      inset 0 1px 0 rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.7);
+  --plate-name:      linear-gradient(180deg, #f4f4f4 0%, #9a9a9a 45%, #e8e8e8 55%, #7a7a7a 100%);
+  --plate-by:        #8a8378;
+  --plate-by-hover:  #c8bfb2;
+  --wood-a:          #6b4428;   /* the blackboard's frame: walnut */
+  --wood-b:          #74492b;
+  --wood-c:          #643f25;
+  --tray-hi:         #7a4f30;
+  --tray-lo:         #4e321d;
   --tv-screen-bg:    #050a05;   /* deep screen surround — slight green tint */
   --tv-screen-w:     min(72vw, 128vh);  /* screen width, respects both axes */
   --tv-aspect:       calc(9 / 16);      /* 16:9 screen */
   --led-off:         #1a0000;
   --led-on:          #ff2200;
-  --switch-off:      #1c1c1c;
-  --switch-on:       #cc2200;
+}
+
+/* Light: an almond set in a sunlit room, ivory caps, an aluminium plate, an oak-framed board */
+:root[data-theme="light"] {
+  color-scheme:      light;
+  --room:            #e4dece;
+  --room-glow:       #f8f5ec;
+  --tv-bg:           #d6ccb6;
+  --tv-highlight:    #f3ecdc;
+  --tv-shadow:       #a2967e;
+  --tv-sheen:        rgba(255,255,255,0.35);
+  --tv-drop:         0 10px 36px rgba(70,55,30,0.38), 0 2px 8px rgba(70,55,30,0.28);
+  --grain:           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .25 0 0 0 0 .25 0 0 0 0 .25 .07 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --ink:             #463e31;
+  --ink-shadow:      0 1px 0 rgba(255,255,255,0.45);
+  --ink-off:         #6e6451;
+  --well:            #b2a78f;
+  --well-edge:       #8f846d;
+  --switch-off:      #efe9db;
+  --switch-edge:     #8f846d;
+  --switch-on:       #d22a08;
+  --cap-hi:          #fbf8f0;
+  --cap-lo:          #c9bfaa;
+  --cap-edge:        #8f846d;
+  --cap-seam:        #8f846d;
+  --cap-ink:         #463e31;
+  --cap-marker:      #3a332a;
+  --cap-lift:        0 2px 4px rgba(70,55,30,0.45), inset 0 1px 1px rgba(255,255,255,0.8);
+  --cap-pressed:     0 1px 1px rgba(70,55,30,0.45), inset 0 1px 3px rgba(70,55,30,0.45);
+  --btn-led-off:     #a3967a;
+  --focus:           #2f6f3f;
+  --badge-bg:        #f1ebdc;
+  --badge-edge:      #8f846d;
+  --badge-ink:       #2c2822;
+  --badge-ink-off:   #6e6451;
+  --plate-hi:        #f1ede3;
+  --plate-lo:        #bdb4a1;
+  --plate-lift:      inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 2px rgba(70,55,30,0.5);
+  --plate-name:      linear-gradient(180deg, #2c2822 0%, #5b5347 100%);
+  --plate-by:        #5e5546;
+  --plate-by-hover:  #2c2822;
+  --wood-a:          #b58a58;
+  --wood-b:          #bf9563;
+  --wood-c:          #a97f4e;
+  --tray-hi:         #c49a68;
+  --tray-lo:         #8f6a3f;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  background: #111;
+  background: radial-gradient(ellipse 90% 80% at 50% 38%, var(--room-glow), var(--room) 75%) var(--room);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -42,13 +129,12 @@ body {
     inset 0 -2px 1px var(--tv-shadow),
     inset 2px 0 1px var(--tv-highlight),
     inset -2px 0 1px var(--tv-shadow),
-    0 8px 40px rgba(0,0,0,0.85),
-    0 2px 8px rgba(0,0,0,0.6);
+    var(--tv-drop);
 
-  /* Subtle plastic texture via gradient */
-  background-image: radial-gradient(
+  /* Moulded plastic: a fine grain, and the room's light across the top */
+  background-image: var(--grain), radial-gradient(
     ellipse at 30% 20%,
-    rgba(255,255,255,0.04) 0%,
+    var(--tv-sheen) 0%,
     transparent 60%
   );
 }
@@ -118,13 +204,13 @@ body {
 }
 
 .control-label {
-  color: #b9b0a2;
+  color: var(--ink);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+  text-shadow: var(--ink-shadow);
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
@@ -133,8 +219,8 @@ body {
 .power-switch {
   width: 32px;
   height: 48px;
-  background: var(--tv-shadow);
-  border: 2px solid #333;
+  background: var(--well);
+  border: 2px solid var(--well-edge);
   border-radius: 6px 6px 4px 4px;
   cursor: pointer;
   position: relative;
@@ -151,7 +237,7 @@ body {
   height: 22px;
   background: var(--switch-off);
   border-radius: 3px;
-  border: 1px solid #444;
+  border: 1px solid var(--switch-edge);
   transition: background 0.2s, transform 0.15s;
   box-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
@@ -168,13 +254,11 @@ body {
   height: 40px;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 35% 35%, #3a3530, #1a1510);
-  border: 2px solid #222;
+    radial-gradient(circle at 35% 35%, var(--cap-hi), var(--cap-lo));
+  border: 2px solid var(--cap-edge);
   cursor: ns-resize;
   position: relative;
-  box-shadow:
-    0 2px 6px rgba(0,0,0,0.7),
-    inset 0 1px 2px rgba(255,255,255,0.1);
+  box-shadow: var(--cap-lift);
   user-select: none;
   transition: transform 0s;  /* transform is set directly, no transition */
 }
@@ -187,7 +271,7 @@ body {
   transform: translateX(-50%);
   width: 2px;
   height: 10px;
-  background: #aaa;
+  background: var(--cap-marker);
   border-radius: 1px;
 }
 
@@ -196,18 +280,53 @@ body {
   display: flex;
   align-items: center;
   gap: 20px;
-  margin-left: auto;
+  flex-grow: 1;              /* takes the row's spare width and sets the toggles against the right edge */
+  justify-content: flex-end;
 }
 
-/* --- Station Badge --- */
+/* --- Station Badge, with the count of who else is tuned in under it --- */
+#station-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;         /* stays on the right when it wraps to a row of its own */
+}
+
+#listeners {
+  min-height: 1.3em;   /* room kept while there is no count, so the row never shifts */
+  color: var(--ink);
+  font-size: 0.62rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--ink-shadow);
+  user-select: none;
+}
+#tv-body:not(.powered-on) #listeners { visibility: hidden; }
+
+#source-badge {
+  align-self: stretch;
+  padding: 2px 10px;
+  background: var(--badge-bg);
+  border-radius: 4px;
+  border: 1px solid var(--badge-edge);
+  color: var(--badge-ink);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+  user-select: none;
+}
+#tv-body:not(.powered-on) #source-badge { visibility: hidden; } /* off, nothing is playing */
+
 #station-badge {
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 4px 10px;
-  background: rgba(0,0,0,0.4);
+  background: var(--badge-bg);
   border-radius: 4px;
-  border: 1px solid #222;
+  border: 1px solid var(--badge-edge);
 }
 
 .led {
@@ -225,7 +344,7 @@ body {
 }
 
 .station-text {
-  color: #444;
+  color: var(--badge-ink-off);
   font-size: 0.6rem;
   letter-spacing: 0.08em;
   font-variant-numeric: tabular-nums; /* the channel number keeps its width */
@@ -234,17 +353,17 @@ body {
 }
 
 #tv-body.powered-on .station-text {
-  color: #888;
+  color: var(--badge-ink);
 }
 
 /* --- Push buttons (FX, HOLD) and the channel rocker --- */
 .push-btn, .rocker-btn {
-  background: radial-gradient(circle at 35% 30%, #3a3530, #1a1510);
-  border: 2px solid #222;
-  color: #888;
+  background: radial-gradient(circle at 35% 30%, var(--cap-hi), var(--cap-lo));
+  border: 2px solid var(--cap-edge);
+  color: var(--cap-ink);
   font: inherit;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.08);
+  box-shadow: var(--cap-lift);
   transition: transform 0.06s, box-shadow 0.06s, opacity 0.2s;
 }
 
@@ -259,7 +378,7 @@ body {
 
 .push-btn:active, .rocker-btn:active, .push-btn.pressed, .rocker-btn.pressed {
   transform: translateY(1px);
-  box-shadow: 0 1px 1px rgba(0,0,0,0.6), inset 0 1px 3px rgba(0,0,0,0.6);
+  box-shadow: var(--cap-pressed);
 }
 
 .rocker {
@@ -267,7 +386,7 @@ body {
   flex-direction: column;
   border-radius: 6px;
   overflow: hidden;
-  border: 2px solid #222;
+  border: 2px solid var(--cap-edge);
 }
 
 .rocker-btn {
@@ -279,13 +398,13 @@ body {
   line-height: 1;
 }
 
-.rocker-btn + .rocker-btn { border-top: 1px solid #111; }
+.rocker-btn + .rocker-btn { border-top: 1px solid var(--cap-seam); }
 
 .btn-led {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #2a1a00;
+  background: var(--btn-led-off);
   transition: background 0.2s, box-shadow 0.2s;
 }
 
@@ -295,7 +414,7 @@ body {
 }
 
 .push-btn:focus-visible, .rocker-btn:focus-visible, .rotary-dial:focus-visible {
-  outline: 1px solid #7a7;
+  outline: 1px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -391,7 +510,8 @@ body {
   #tv-body { padding: 12px 10px 10px 10px; border-radius: 12px; }
   #tv-screen-border { padding: 6px; }
   #tv-controls { gap: 12px; justify-content: center; }
-  #toggle-group { gap: 12px; margin-left: 0; }
+  #toggle-group { gap: 12px; flex-grow: 0; justify-content: center; }
+  #station-block { margin-left: 0; }
 }
 
 /* --- Kiosk (?kiosk): no TV body, the picture fills the window; keyboard and swipe still work --- */
@@ -400,16 +520,15 @@ body.kiosk #tv-body { padding: 0; border-radius: 0; box-shadow: none; background
 body.kiosk #tv-screen-border { width: 100vw; padding: 0; border-radius: 0; box-shadow: none; background: #000; }
 body.kiosk #tv-screen-area { padding-bottom: 0; width: 100vw; height: 100vh; border-radius: 0; }
 body.kiosk #tv-controls { display: none; }
-body.kiosk.idle, body.kiosk.idle canvas { cursor: none; }
+body.kiosk.idle, body.kiosk.idle #tv-screen-area canvas { cursor: none; }
 
 /* --- Service menu (menu.js): phosphor-green rows over a darkened picture --- */
 #tv-menu {
   position: absolute;
   inset: 0;
   z-index: 4;
-  padding: 3% 8% 2.5%;
+  padding: 3% 14% 2.5%;
   background: rgba(0, 8, 0, 0.72);
-  overflow-y: auto;
   color: #8cff8c;
   font-family: "VT323", "Courier New", monospace;
   font-weight: bold;
@@ -418,18 +537,28 @@ body.kiosk.idle, body.kiosk.idle canvas { cursor: none; }
   font-size: clamp(10px, 1.45vw, 21px);
   display: flex;
   flex-direction: column;
-  gap: 0.12em;
 }
 #tv-menu[hidden] { display: none; }
+@media (max-width: 700px) { #tv-menu { padding-inline: 6%; } }
 .menu-open #osd, .card-up #osd, .card-up #bumper { visibility: hidden; }
-#tv-menu .menu-title { font-size: 1.3em; margin-bottom: 0.2em; display: flex; justify-content: space-between; align-items: baseline; }
-#tv-menu .menu-version { font-size: 0.55em; opacity: 0.6; }
-#tv-menu .menu-row { display: flex; justify-content: space-between; align-items: center; padding: 0.1em 0.5em; cursor: pointer; }
+#tv-menu .menu-title { flex: none; font-size: 1.3em; margin-bottom: 0.3em; display: flex; align-items: center; gap: 0.6em; }
+#tv-menu .menu-tabs { display: flex; gap: 0.3em; }
+#tv-menu .menu-version { margin-left: auto; font-size: 0.55em; opacity: 0.6; }
+/* The rows scroll on their own in a short window, so the help line under them always shows */
+#tv-menu .menu-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(140,255,140,0.4) transparent; }
+#tv-menu .menu-row { display: flex; justify-content: space-between; align-items: center; padding: 0.16em 0.5em; cursor: pointer; }
+/* Faint stripes, and a brighter one under the cursor, carry the eye from a label across to its value */
+#tv-menu .menu-row:nth-child(even) { background: rgba(140,255,140,0.08); }
+#tv-menu .menu-row:hover { background: rgba(140,255,140,0.22); }
 #tv-menu .menu-row.sel { background: #8cff8c; color: #021; text-shadow: none; }
-#tv-menu .menu-row.locked { opacity: 0.4; }
+#tv-menu .menu-row.locked { opacity: 0.4; cursor: default; }
 #tv-menu .menu-value { display: flex; align-items: center; gap: 0.6em; }
 #tv-menu button { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 0 0.2em; }
-#tv-menu .menu-hint { margin-top: auto; padding-top: 0.4em; min-height: 2.6em; font-size: 0.7em; opacity: 0.7; }
+#tv-menu .menu-tab, #tv-menu .menu-close { font-size: 0.75em; padding: 0.05em 0.5em; border: 1px solid transparent; }
+#tv-menu .menu-tab.on { border-color: #8cff8c; }
+#tv-menu .menu-tab:hover, #tv-menu .menu-close:hover { background: rgba(140,255,140,0.22); }
+#tv-menu .menu-tab.sel { background: #8cff8c; color: #021; text-shadow: none; }
+#tv-menu .menu-hint { flex: none; box-sizing: border-box; margin-top: 0.3em; padding-top: 0.3em; min-height: 4.3em; border-top: 1px solid rgba(140,255,140,0.3); font-size: 0.8em; line-height: 1.3; opacity: 0.7; }
 
 /* --- LIVE title card: a station ident that rolls in over the picture when the desktop goes on air --- */
 #title-card {
@@ -482,21 +611,21 @@ body.kiosk.idle, body.kiosk.idle canvas { cursor: none; }
   text-decoration: none;
   font-family: "Courier New", monospace;
   font-weight: bold;
-  background: linear-gradient(180deg, #4a443c, #26221d);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.7);
+  background: linear-gradient(180deg, var(--plate-hi), var(--plate-lo));
+  box-shadow: var(--plate-lift);
   cursor: pointer;
 }
 #nameplate .np-logo { width: 18px; height: 18px; }
 #nameplate .np-name {
   font-size: 0.8rem;
   letter-spacing: 0.3em;
-  background: linear-gradient(180deg, #f4f4f4 0%, #9a9a9a 45%, #e8e8e8 55%, #7a7a7a 100%);
+  background: var(--plate-name);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
-#nameplate .np-by { font-size: 0.55rem; color: #8a8378; letter-spacing: 0.12em; }
-#nameplate:hover .np-by { color: #c8bfb2; }
+#nameplate .np-by { font-size: 0.55rem; color: var(--plate-by); letter-spacing: 0.12em; }
+#nameplate:hover .np-by { color: var(--plate-by-hover); }
 body.kiosk #nameplate { display: none; }
 
 /* Power-on ident: logo and name fade in over the warm-up, once per visit */
@@ -612,7 +741,6 @@ body.kiosk #nameplate { display: none; }
 #schedule .sc-empty { margin-top: 1em; opacity: 0.8; }
 #schedule .sc-hint { margin-top: auto; padding-top: 0.6em; font-size: 0.7em; opacity: 0.7; }
 #tv-screen-area:has(#schedule:not([hidden])) #osd { visibility: hidden; }
-#tv-body:not(.powered-on) #schedule { display: none; }
 @media (max-width: 700px) { #schedule .sc-time { min-width: 0; } #schedule .sc-show { flex-direction: column; gap: 0; } }
 
 /* ? : the keyboard shortcuts, and MENU › SKIPPED: the same page as SCHEDULE */
@@ -637,13 +765,16 @@ body.kiosk #nameplate { display: none; }
 }
 #keys[hidden], #skipped[hidden] { display: none; }
 #keys .ky-name, #skipped .ky-name { font-size: 1.4em; letter-spacing: 0.2em; color: #d9c2ff; text-shadow: 0 0 10px rgba(160,90,255,0.9); }
-#keys .ky-list { display: grid; grid-template-columns: auto 1fr; column-gap: 2em; row-gap: 0.1em; margin: 0.4em 0 0; }
+#keys .ky-groups { columns: 2; column-gap: 1.5em; font-size: 0.8em; }
+#keys .ky-group { break-inside: avoid; margin-bottom: 0.5em; }
+#keys .ky-head { font-size: 0.8em; letter-spacing: 0.2em; opacity: 0.65; }
+#keys .ky-list { display: grid; grid-template-columns: 6em 1fr; column-gap: 0.8em; margin: 0; }
+#keys dd b { font-weight: inherit; color: #d9c2ff; text-shadow: 0 0 8px rgba(160,90,255,0.8); }
 #keys dt { color: #d9c2ff; text-shadow: 0 0 8px rgba(160,90,255,0.8); white-space: nowrap; }
 #keys dd { margin: 0; }
 #keys .sc-hint, #skipped .sc-hint { margin-top: auto; padding-top: 0.6em; font-size: 0.7em; opacity: 0.7; }
 body.kiosk #keys .ky-chat { display: none; }
 #tv-screen-area:has(#keys:not([hidden])) #osd, #tv-screen-area:has(#skipped:not([hidden])) #osd { visibility: hidden; }
-#tv-body:not(.powered-on) #keys, #tv-body:not(.powered-on) #skipped { display: none; }
 #skipped .sk-list { display: flex; flex-direction: column; margin: 0.4em 0 0; }
 #skipped .sk-row { all: unset; display: flex; gap: 1.5em; padding: 0.05em 0.3em; cursor: pointer; }
 #skipped .sk-row:hover, #skipped .sk-row:focus-visible, #skipped .sk-row.sel { background: rgba(140,255,140,0.18); }
@@ -651,7 +782,7 @@ body.kiosk #keys .ky-chat { display: none; }
 #skipped .sk-empty { opacity: 0.7; }
 #skipped .sk-all { margin-top: 0.5em; color: #d9c2ff; text-shadow: 0 0 8px rgba(160,90,255,0.8); }
 
-#tv-menu .menu-hint.help { opacity: 0.9; font-size: 0.8em; line-height: 1.3; text-transform: none; letter-spacing: 0.02em; }
+#tv-menu .menu-hint.help { opacity: 0.9; text-transform: none; letter-spacing: 0.02em; }
 
 /* --- CHAT (chatboard.js): the Spaz Radio chat on a blackboard hung beside the TV ---------------------------
    Caveat (OFL, web/fonts/OFL.txt), served from here so it works offline. Name, line and time are styled apart:
@@ -694,9 +825,9 @@ body.chat-open:not(.kiosk) #chalkboard {
   /* the wooden frame */
   background:
     linear-gradient(90deg, rgba(255,255,255,0.05), transparent 30%, rgba(0,0,0,0.12) 70%, rgba(255,255,255,0.04)),
-    repeating-linear-gradient(88deg, #6b4428 0 7px, #74492b 7px 11px, #643f25 11px 19px);
+    repeating-linear-gradient(88deg, var(--wood-a) 0 7px, var(--wood-b) 7px 11px, var(--wood-c) 11px 19px);
   box-shadow: inset 0 2px 1px rgba(255,220,180,0.25), inset 0 -2px 2px rgba(0,0,0,0.5),
-    0 8px 40px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.6);
+    var(--tv-drop);
 }
 /* Narrow or portrait: the board hangs under the TV, and the page scrolls to it. */
 @media (max-width: 1000px), (orientation: portrait) {
@@ -778,7 +909,7 @@ body.chat-open:not(.kiosk) #chalkboard {
 
 /* The chalk tray along the bottom of the frame: one stick of chalk and the eraser */
 .cb-tray { position: absolute; left: 8px; right: 8px; bottom: 6px; height: 14px; border-radius: 2px;
-  background: linear-gradient(#7a4f30, #4e321d); box-shadow: 0 2px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,220,180,0.25); }
+  background: linear-gradient(var(--tray-hi), var(--tray-lo)); box-shadow: 0 2px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,220,180,0.25); }
 .cb-chalk { position: absolute; left: 22%; top: -3px; width: 34px; height: 7px; border-radius: 3px;
   background: linear-gradient(#fbf9f0, #d8d4c4); box-shadow: 0 1px 1px rgba(0,0,0,0.5); transform: rotate(-4deg); }
 .cb-eraser { position: absolute; right: 16%; top: -9px; width: 54px; height: 13px; border-radius: 2px;
@@ -797,3 +928,133 @@ body.embed * { pointer-events: none; }
 body.embed #tv-screen-area { position: fixed; inset: 0; width: auto; height: auto; padding: 0; }
 body.embed #osd, body.embed #title-card, body.embed #ident, body.embed #bumper,
 body.embed #about, body.embed #schedule, body.embed #keys, body.embed #tv-menu, body.embed #nameplate { display: none !important; }
+
+/* --- TAPES (tapedeck.js): the archive list, the page SCHEDULE is, with a search and rows that pick --- */
+#tapes {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  padding: 4% 6% 3%;
+  background: rgba(0, 8, 0, 0.92);
+  color: #8cff8c;
+  font-family: "VT323", "Courier New", monospace;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 6px rgba(80,255,80,0.7);
+  font-size: clamp(11px, 1.45vw, 21px);
+}
+#tapes[hidden] { display: none; }
+#tv-screen-area:has(#tapes:not([hidden])) #osd { visibility: hidden; }
+.tp-head { display: flex; justify-content: space-between; align-items: center; gap: 1em; }
+.tp-name { font-size: 1.4em; letter-spacing: 0.2em; color: #d9c2ff; text-shadow: 0 0 10px rgba(160,90,255,0.9); }
+.tp-close { flex: none; min-width: 2em; min-height: 2em; background: none; border: 1px solid rgba(140,255,140,0.45); color: inherit; font: inherit; cursor: pointer; }
+.tp-close:hover, .tp-close:focus-visible { background: #8cff8c; color: #021; text-shadow: none; }
+.tp-search {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.2em 0.5em;
+  background: rgba(0, 40, 0, 0.6);
+  border: 1px solid rgba(140,255,140,0.45);
+  border-radius: 0;
+  color: inherit;
+  font: inherit;
+  text-shadow: inherit;
+  outline: none;
+}
+.tp-search:focus { border-color: #8cff8c; box-shadow: 0 0 6px rgba(80,255,80,0.6); }
+.tp-search::placeholder { color: rgba(140,255,140,0.55); }
+.tp-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; position: relative; scrollbar-width: thin; scrollbar-color: rgba(140,255,140,0.4) transparent; }
+.tp-sizer { position: relative; min-height: 100%; }
+.tp-rows { position: absolute; top: 0; left: 0; right: 0; }
+.tp-row {
+  display: flex;
+  width: 100%;
+  gap: 1em;
+  align-items: center;
+  height: 1.6em;
+  box-sizing: border-box;
+  padding: 0 0.5em;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-shadow: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tp-row:hover { background: rgba(140,255,140,0.15); }
+.tp-row.sel { background: #8cff8c; color: #021; text-shadow: none; }
+.tp-row.tp-action { color: #d9c2ff; text-shadow: 0 0 8px rgba(160,90,255,0.8); }
+.tp-row.tp-action.sel { background: #d9c2ff; color: #102; text-shadow: none; }
+.tp-date { flex: 0 0 7.5em; white-space: nowrap; overflow: hidden; }
+.tp-title { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-len { flex: none; white-space: nowrap; opacity: 0.85; }
+.tp-empty { margin-top: 1em; opacity: 0.8; }
+.tp-hint { flex: none; padding-top: 0.3em; font-size: 0.7em; opacity: 0.7; }
+@media (pointer: coarse) {
+  #tapes { font-size: clamp(13px, 1.45vw, 21px); }
+  .tp-row { height: 2.2em; }
+  .tp-hint { display: none; }
+}
+@media (max-width: 700px) {
+  .tp-date { flex-basis: 6.5em; font-size: 0.85em; }
+}
+
+/* The transport strip: along the bottom of the picture while the tape's info is up */
+#tv-screen-area { --strip-h: clamp(34px, 5.5vw, 50px); }
+#tape-strip {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 3%;
+  z-index: 4;
+  height: var(--strip-h);
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(0, 8, 0, 0.72);
+  border: 1px solid rgba(140,255,140,0.35);
+  color: #8cff8c;
+  font-family: "VT323", "Courier New", monospace;
+  font-weight: bold;
+  font-size: clamp(11px, 1.45vw, 20px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+#tape-strip.show { opacity: 1; visibility: visible; transition: opacity 0.1s; }
+#tv-body:not(.powered-on) #tape-strip, .menu-open #tape-strip, .card-up #tape-strip { display: none; }
+#tv-screen-area:has(#tapes:not([hidden])) #tape-strip, #tv-screen-area:has(#schedule:not([hidden])) #tape-strip,
+#tv-screen-area:has(#about:not([hidden])) #tape-strip, #tv-screen-area:has(#keys:not([hidden])) #tape-strip,
+#tv-screen-area:has(#skipped:not([hidden])) #tape-strip { display: none; }
+#tv-screen-area:has(#tape-strip.show) #osd-info { bottom: calc(var(--strip-h) + 5%); }
+.ts-btn { flex: none; min-width: 2.6em; padding: 0 0.3em; background: none; border: 1px solid rgba(140,255,140,0.35); color: inherit; font: inherit; cursor: pointer; }
+.ts-btn:hover, .ts-btn:focus-visible { background: #8cff8c; color: #021; }
+#tape-strip .ts-wave { position: static; display: block; flex: 1 1 0; min-width: 40px; width: 0; height: 100%; cursor: pointer; touch-action: none; }
+.ts-clock { flex: none; align-self: center; padding: 0 0.3em; white-space: nowrap; }
+@media (max-width: 700px) {
+  .ts-eject { min-width: 0; }
+  .ts-btn { min-width: 2.2em; }
+  .ts-clock { font-size: 0.85em; }
+}
+
+/* LIVE: lit while the radio plays (aria-pressed); on a tape it pulses when a live show is on */
+#liveBtn[aria-disabled="true"] { cursor: default; }
+#liveBtn.pulsing .btn-led { background: #ff4d4d; box-shadow: 0 0 10px rgba(255,70,70,0.95); animation: live-pulse 1.1s ease-in-out infinite; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; transform: scale(1.15); } 50% { opacity: 0.35; transform: scale(1); } }
+body.reduced-motion #liveBtn.pulsing .btn-led { animation: none; }
+/* A broadcast locks the viewer controls, but the archive is still there */
+#tv-body.live #tapesBtn { opacity: 1; cursor: pointer; }
+#tv-body.live #liveBtn { opacity: 1; } /* a broadcast dims the locked controls, not the light that says you're live */
+body.kiosk .kiosk-off { display: none; }
+
+/* The chat's note that the viewer is hearing a tape */
+.cb-tape { flex: none; margin: 0.1em 0 0.2em; font-size: 1.05rem; line-height: 1.1; opacity: 0.8; color: var(--chalk); }
+.cb-tape[hidden] { display: none; }

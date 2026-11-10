@@ -1,7 +1,7 @@
 // chatboard.js
 // The blackboard beside the TV that holds the Spaz Radio chat (chat.js): the room's lines in chalk, who is
 // here, and a line to write on. It is open on a first visit; its X closes it (remembered), and the CHAT
-// button, C or MENU › CHAT bring it back. While it is closed, the CHAT button's LED lights for new lines.
+// button or C brings it back. While it is closed, the CHAT button's LED lights for new lines.
 
 import { linkify, nameHash, MAX_NICK, MAX_TEXT } from './chat.js';
 
@@ -31,6 +31,9 @@ export function createChatboard({ chat, board, button, reduced = () => false, st
   const roster = el('button', 'cb-roster');
   roster.type = 'button';
   roster.title = 'Who is here (click for everyone)';
+  // On a tape the viewer hears an old show, and this room is talking about what is on now.
+  const tapeNote = el('div', 'cb-tape', "you're on a tape \u00B7 the chat is live");
+  tapeNote.hidden = true;
   const log = el('div', 'cb-log');
   log.setAttribute('role', 'log');
   log.setAttribute('aria-live', 'polite');
@@ -49,7 +52,7 @@ export function createChatboard({ chat, board, button, reduced = () => false, st
   const status = el('div', 'cb-status');
   status.setAttribute('aria-live', 'polite');
   form.append(me, input);
-  slate.append(close, title, roster, log, newer, form, status);
+  slate.append(close, title, roster, tapeNote, log, newer, form, status);
   const tray = el('div', 'cb-tray');
   tray.append(el('span', 'cb-chalk'), el('span', 'cb-eraser'));
   board.append(slate, tray);
@@ -216,5 +219,6 @@ export function createChatboard({ chat, board, button, reduced = () => false, st
     show(opts) { setOpen(true, opts); },
     hide() { setOpen(false); },
     toggle() { setOpen(!isOpen(), { focus: true }); },
+    setTape(on) { tapeNote.hidden = !on; if (atBottom()) stickToBottom(); },
   };
 }
