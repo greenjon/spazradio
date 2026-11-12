@@ -70,6 +70,9 @@ class RadioService : MediaSessionService() {
     private var lastPlayingTitle: String? = null
     private var lastListenerCount: Int? = null
 
+    private val eqProcessor = EqAudioProcessor()
+    private var systemEqSession = C.AUDIO_SESSION_ID_UNSET
+
     // THROTTLE: Only update waveform at ~30fps to save CPU/Main Thread
     private var lastWaveformUpdateTime = 0L
 
@@ -79,6 +82,10 @@ class RadioService : MediaSessionService() {
 
         private val _metaDataFlow = MutableStateFlow(RadioMetadata())
         val metaDataFlow = _metaDataFlow.asStateFlow()
+
+        /** The player's audio session, for the system equalizer panel. */
+        private val _audioSessionId = MutableStateFlow(C.AUDIO_SESSION_ID_UNSET)
+        val audioSessionId = _audioSessionId.asStateFlow()
     }
 
     private val audioBufferSink = object : TeeAudioProcessor.AudioBufferSink {
@@ -133,7 +140,7 @@ class RadioService : MediaSessionService() {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink {
                 return DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
-                    .setAudioProcessors(arrayOf(TeeAudioProcessor(audioBufferSink)))
+                    .setAudioProcessors(arrayOf(TeeAudioProcessor(audioBufferSink), eqProcessor))
                     .build()
             }
         }
@@ -171,6 +178,11 @@ class RadioService : MediaSessionService() {
                 }
             }
 
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                _audioSessionId.value = audioSessionId
+                applyEq()
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 // The low mount is a separate source and can be down while the main one is fine: stay on air.
                 val notFound = (error.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 404
@@ -188,6 +200,8 @@ class RadioService : MediaSessionService() {
         connectivityManager?.registerDefaultNetworkCallback(networkCallback)
         prefs = getSharedPreferences(LiveStream.PREFS, MODE_PRIVATE)
         prefs?.registerOnSharedPreferenceChangeListener(qualityListener)
+        _audioSessionId.value = player?.audioSessionId ?: C.AUDIO_SESSION_ID_UNSET
+        applyEq()
 
         startMetadataPolling()
     }
@@ -209,6 +223,19 @@ class RadioService : MediaSessionService() {
             lowMountMissing = false // a fresh choice gets a fresh try
             applyQuality()
         }
+        if (key in EqPrefs.KEYS) applyEq()
+    }
+
+    /** Built-in: our filters run. System: we announce the session and stay flat. Off: neither. */
+    private fun applyEq() {
+        val savedPrefs = prefs ?: return
+        val mode = EqPrefs.effectiveMode(this, savedPrefs)
+        eqProcessor.bands = if (mode == EqMode.BUILT_IN) EqPrefs.bands(savedPrefs) else null
+        val session = if (mode == EqMode.SYSTEM) player?.audioSessionId ?: C.AUDIO_SESSION_ID_UNSET else C.AUDIO_SESSION_ID_UNSET
+        if (session == systemEqSession) return
+        if (systemEqSession != C.AUDIO_SESSION_ID_UNSET) SystemEq.close(this, systemEqSession)
+        if (session != C.AUDIO_SESSION_ID_UNSET) SystemEq.open(this, session)
+        systemEqSession = session
     }
 
     private fun applyQuality() {
@@ -299,6 +326,7 @@ class RadioService : MediaSessionService() {
     override fun onDestroy() {
         connectivityManager?.unregisterNetworkCallback(networkCallback)
         prefs?.unregisterOnSharedPreferenceChangeListener(qualityListener)
+        if (systemEqSession != C.AUDIO_SESSION_ID_UNSET) SystemEq.close(this, systemEqSession)
         serviceJob.cancel()
         mediaSession?.run {
             player?.release()

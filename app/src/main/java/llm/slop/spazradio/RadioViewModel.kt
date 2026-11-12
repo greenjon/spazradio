@@ -473,6 +473,28 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit().putString(LiveStream.QUALITY_PREF, quality.name).apply()
     }
 
+    private val _eqMode = MutableStateFlow(EqPrefs.mode(prefs))
+    val eqMode: StateFlow<EqMode> = _eqMode.asStateFlow()
+
+    private val _eqBands = MutableStateFlow(EqPrefs.bands(prefs))
+    val eqBands: StateFlow<EqBands> = _eqBands.asStateFlow()
+
+    /** RadioService watches these prefs and applies them to the playing stream. */
+    fun setEqMode(mode: EqMode) {
+        _eqMode.value = mode
+        prefs.edit().putString(EqPrefs.MODE, mode.name).apply()
+    }
+
+    fun setEqBands(bands: EqBands) {
+        if (bands == _eqBands.value) return
+        _eqBands.value = bands
+        prefs.edit()
+            .putInt(EqPrefs.BASS, bands.bassDb)
+            .putInt(EqPrefs.MID, bands.midDb)
+            .putInt(EqPrefs.TREBLE, bands.trebleDb)
+            .apply()
+    }
+
     fun setAutoPlayEnabled(enabled: Boolean) {
         _autoPlayEnabled.value = enabled
         prefs.edit().putBoolean("autoplay_enabled", enabled).apply()

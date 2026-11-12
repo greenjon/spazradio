@@ -1,0 +1,3 @@
+SPAZ Radio 2.0.1: equalizer.
+- New Equalizer in Settings > Playback: bass, mid and treble, plus Flat to reset.
+- Phones with their own equalizer can pick Off, Built-in or System. System hands the sound to the phone's equalizer.
