@@ -79,8 +79,8 @@ configurations.all {
         applicationId = "llm.slop.spazradio"
         minSdk = 24
         targetSdk = 36
-        versionCode = 206
-        versionName = "2.0.0"
+        versionCode = 207
+        versionName = "2.0.1"
     }
 
     compileOptions {
