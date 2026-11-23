@@ -26,8 +26,9 @@ class DownloadTracker(private val application: Application) {
     private val _downloadingUrls = MutableStateFlow<Set<String>>(emptySet())
     val downloadingUrls: StateFlow<Set<String>> = _downloadingUrls.asStateFlow()
 
-    private val _downloadedUrls = MutableStateFlow<Set<String>>(emptySet())
-    val downloadedUrls: StateFlow<Set<String>> = _downloadedUrls.asStateFlow()
+    /** File names in Music/SPAZRadio; see [getFileName]. */
+    private val _downloadedFiles = MutableStateFlow<Set<String>>(emptySet())
+    val downloadedFiles: StateFlow<Set<String>> = _downloadedFiles.asStateFlow()
 
     private val activeDownloadIds = mutableMapOf<String, Long>()
 
@@ -36,9 +37,9 @@ class DownloadTracker(private val application: Application) {
     }
 
     fun startDownload(show: ArchiveShow) {
-        if (_downloadingUrls.value.contains(show.url) || _downloadedUrls.value.contains(show.url)) return
-
         val fileName = getFileName(show)
+        if (_downloadingUrls.value.contains(show.url) || _downloadedFiles.value.contains(fileName)) return
+
         val request = DownloadManager.Request(Uri.parse(show.url))
             .setTitle(show.title)
             .setDescription("Downloading Spaz Radio Archive")
@@ -101,17 +102,14 @@ class DownloadTracker(private val application: Application) {
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
                 "SPAZRadio"
             )
-            val filesOnDisk = directory.list()?.toSet() ?: emptySet()
-            
-            // This is a bit brute-force as we don't have the show list here, 
-            // but we can update this logic to be show-aware if needed.
-            // For now, we'll let the ViewModel map files back to URLs.
+            _downloadedFiles.value = directory.list()?.toSet() ?: emptySet()
         }
     }
 
     fun getFileName(show: ArchiveShow): String {
         val safeTitle = show.title.replace(Regex("[^a-zA-Z0-9.-]"), "_")
         val safeDate = show.originalDate.replace(Regex("[^a-zA-Z0-9.-]"), "_")
-        return "${safeTitle}_${safeDate}.ogg"
+        // A jukebox show that isn't in the archive feed has no date.
+        return if (safeDate.isEmpty()) "${safeTitle}.ogg" else "${safeTitle}_${safeDate}.ogg"
     }
 }

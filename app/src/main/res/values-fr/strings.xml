@@ -21,6 +21,12 @@
     <string name="label_pause">Pause</string>
     <string name="label_retry">Réessayer</string>
     <string name="label_download">Télécharger</string>
+    <string name="download_this_show">Télécharger cette émission</string>
+    <string name="download_metered_title">Télécharger avec les données mobiles ?</string>
+    <string name="download_metered_text">« %1$s » est une émission entière et peut être volumineuse.</string>
+    <string name="download_metered_size">« %1$s » fait environ %2$s.</string>
+    <string name="download_metered_dont_ask">Ne plus demander</string>
+    <string name="download_ask_metered">Demander avant de télécharger des émissions avec les données mobiles</string>
     <string name="label_downloaded">Téléchargé</string>
     <string name="error_archives">Connexion…</string>
 

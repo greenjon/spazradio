@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,7 +54,9 @@ fun PlayerHeader(
     appMode: AppMode,
     onPlayPause: () -> Unit,
     onSeek: (Long) -> Unit,
-    onModeChange: (AppMode) -> Unit
+    onModeChange: (AppMode) -> Unit,
+    download: HeaderDownload? = null,
+    onDownload: () -> Unit = {}
 ) {
     val tabRowBackgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.25f)
 
@@ -175,7 +181,30 @@ fun PlayerHeader(
                 }
             }
             
-            Box(modifier = Modifier.size(48.dp))
+            // Also balances the play button so the title stays centred when there is nothing to download.
+            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                when (download) {
+                    HeaderDownload.AVAILABLE -> IconButton(onClick = onDownload) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = stringResource(R.string.download_this_show),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    HeaderDownload.DOWNLOADING -> CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    HeaderDownload.DOWNLOADED -> Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = stringResource(R.string.label_downloaded),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    null -> {}
+                }
+            }
         }
 
         if (isArchivePlaying && playbackDuration > 0) {
@@ -188,6 +217,9 @@ fun PlayerHeader(
         }
     }
 }
+
+/** The download button beside the title, for the jukebox show on the stream. */
+enum class HeaderDownload { AVAILABLE, DOWNLOADING, DOWNLOADED }
 
 @Composable
 fun PlaybackControls(

@@ -21,6 +21,12 @@
     <string name="label_pause">Pausa</string>
     <string name="label_retry">Reintentar</string>
     <string name="label_download">Descargar</string>
+    <string name="download_this_show">Descargar este programa</string>
+    <string name="download_metered_title">¿Descargar con datos móviles?</string>
+    <string name="download_metered_text">«%1$s» es un programa completo y puede ocupar mucho.</string>
+    <string name="download_metered_size">«%1$s» ocupa unos %2$s.</string>
+    <string name="download_metered_dont_ask">No volver a preguntar</string>
+    <string name="download_ask_metered">Preguntar antes de descargar programas con datos móviles</string>
     <string name="label_downloaded">Descargado</string>
     <string name="error_archives">Conectando…</string>
 

@@ -21,6 +21,12 @@
     <string name="label_pause">Pause</string>
     <string name="label_retry">Wiederholen</string>
     <string name="label_download">Herunterladen</string>
+    <string name="download_this_show">Diese Sendung herunterladen</string>
+    <string name="download_metered_title">Über mobile Daten herunterladen?</string>
+    <string name="download_metered_text">„%1$s“ ist eine ganze Sendung und kann groß sein.</string>
+    <string name="download_metered_size">„%1$s“ ist etwa %2$s groß.</string>
+    <string name="download_metered_dont_ask">Nicht mehr fragen</string>
+    <string name="download_ask_metered">Vor dem Herunterladen über mobile Daten fragen</string>
     <string name="label_downloaded">Heruntergeladen</string>
     <string name="error_archives">Verbinden…</string>
 

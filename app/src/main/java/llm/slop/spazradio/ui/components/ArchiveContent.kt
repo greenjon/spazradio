@@ -1,9 +1,5 @@
 package llm.slop.spazradio.ui.components
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -75,9 +71,7 @@ fun ArchiveContent(
     val isRefreshing by archiveViewModel.isRefreshing.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { _ -> }
+    val download = rememberShowDownloader(archiveViewModel, radioViewModel)
 
     LaunchedEffect(Unit) {
         archiveViewModel.fetchArchivesIfNeeded()
@@ -148,12 +142,7 @@ fun ArchiveContent(
                                         radioViewModel.playArchive(show)
                                     }
                                 },
-                                onDownload = {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                    archiveViewModel.downloadArchive(show)
-                                }
+                                onDownload = { download(show) }
                             )
                         }
                     }

@@ -47,11 +47,6 @@ import lsd.liquid.visuals.PcmTap
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 
-data class RadioMetadata(
-    val title: String = "",
-    val listeners: Int = 0
-)
-
 @OptIn(UnstableApi::class)
 class RadioService : MediaSessionService() {
 
@@ -67,8 +62,7 @@ class RadioService : MediaSessionService() {
     private var prefs: SharedPreferences? = null
     private var metered = false
     private var lowMountMissing = false
-    private var lastPlayingTitle: String? = null
-    private var lastListenerCount: Int? = null
+    private var lastMetadata: RadioMetadata? = null
 
     private val eqProcessor = EqAudioProcessor()
     private var systemEqSession = C.AUDIO_SESSION_ID_UNSET
@@ -286,16 +280,12 @@ class RadioService : MediaSessionService() {
                 val body = response.body ?: return
                 val jsonStr = body.string()
                 
-                val jsonObject = JsonParser.parseString(jsonStr).asJsonObject
-                val playing = if (jsonObject.has("playing") && !jsonObject.get("playing").isJsonNull) jsonObject.get("playing").asString else "Radio Spaz"
-                val listeners = if (jsonObject.has("listeners") && !jsonObject.get("listeners").isJsonNull) {
-                    try { jsonObject.get("listeners").asInt } catch (_: Exception) { 0 }
-                } else { 0 }
-
-                if (playing == lastPlayingTitle && listeners == lastListenerCount) return
-                lastPlayingTitle = playing
-                lastListenerCount = listeners
-                _metaDataFlow.value = RadioMetadata(playing, listeners)
+                val metadata = NowPlaying.parse(JsonParser.parseString(jsonStr).asJsonObject)
+                if (metadata == lastMetadata) return
+                lastMetadata = metadata
+                _metaDataFlow.value = metadata
+                val playing = metadata.title
+                val listeners = metadata.listeners
 
                 withContext(Dispatchers.Main) {
                     player?.let { exoPlayer ->

@@ -1,0 +1,5 @@
+SPAZ Radio 2.0.2: download the show on the radio.
+- When the jukebox is playing a show from the archives, a download button sits beside its title. It isn't shown during a live show.
+- Downloading over mobile data now asks first and shows the size. Tick "Don't ask again" to skip it, or turn it back on in Settings > Playback.
+- Show titles with apostrophes and ampersands display properly.
+- Archive rows now switch to the check mark when a download finishes.

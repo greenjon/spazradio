@@ -18,6 +18,7 @@ import llm.slop.spazradio.data.ArchiveRepository
 import llm.slop.spazradio.data.ArchiveShow
 import llm.slop.spazradio.utils.DownloadTracker
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -78,7 +79,7 @@ class ArchiveViewModel(
             }
         }
         viewModelScope.launch {
-            downloadTracker.downloadedUrls.collectLatest {
+            downloadTracker.downloadedFiles.collectLatest {
                 refreshDownloadStatus()
             }
         }
@@ -362,6 +363,38 @@ class ArchiveViewModel(
 
     fun downloadArchive(show: ArchiveShow) {
         downloadTracker.startDownload(show)
+    }
+
+    val downloadingUrls: StateFlow<Set<String>> = downloadTracker.downloadingUrls
+    val downloadedFiles: StateFlow<Set<String>> = downloadTracker.downloadedFiles
+
+    fun fileNameFor(show: ArchiveShow): String = downloadTracker.getFileName(show)
+
+    /**
+     * The archive entry for the jukebox show on the stream, so the header and the Archives list share one
+     * download. Matched on the URL, then on the file name; a show missing from the feed gets an entry of its own.
+     */
+    fun showFor(file: JukeboxFile): ArchiveShow {
+        val name = file.url.substringAfterLast('/')
+        return allShows.firstOrNull { it.url == file.url }
+            ?: allShows.firstOrNull { it.url.substringAfterLast('/') == name }
+            ?: ArchiveShow(title = file.title, url = file.url, date = "", originalDate = "")
+    }
+
+    private val headClient = OkHttpClient.Builder()
+        .callTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    /** The file's size in bytes from a HEAD request, or null when the server doesn't say. */
+    suspend fun remoteSize(url: String): Long? = withContext(Dispatchers.IO) {
+        try {
+            headClient.newCall(Request.Builder().url(url).head().build()).execute().use { response ->
+                if (!response.isSuccessful) null
+                else response.header("Content-Length")?.toLongOrNull()?.takeIf { it > 0 }
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun getLocalFileIfDownloaded(show: ArchiveShow): File? {

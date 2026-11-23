@@ -21,6 +21,12 @@
     <string name="label_pause">Pause</string>
     <string name="label_retry">Retry</string>
     <string name="label_download">Download</string>
+    <string name="download_this_show">Download this show</string>
+    <string name="download_metered_title">Download over mobile data?</string>
+    <string name="download_metered_text">“%1$s” is a whole show and can be large.</string>
+    <string name="download_metered_size">“%1$s” is about %2$s.</string>
+    <string name="download_metered_dont_ask">Don\'t ask again</string>
+    <string name="download_ask_metered">Ask before downloading shows on mobile data</string>
     <string name="label_downloaded">Downloaded</string>
     <string name="error_archives">Connecting&#8230;</string>
 

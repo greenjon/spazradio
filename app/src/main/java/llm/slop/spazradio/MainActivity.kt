@@ -51,6 +51,8 @@ import llm.slop.spazradio.ui.components.CONTROLS_FADE_MS
 import llm.slop.spazradio.ui.components.ChatContent
 import llm.slop.spazradio.ui.components.ControlsAutoHide
 import llm.slop.spazradio.ui.components.FooterToolbar
+import llm.slop.spazradio.ui.components.HeaderDownload
+import llm.slop.spazradio.ui.components.rememberShowDownloader
 import llm.slop.spazradio.ui.components.InfoBox
 import llm.slop.spazradio.ui.components.Oscilloscope
 import lsd.liquid.visuals.LsdVisuals
@@ -142,6 +144,20 @@ fun RadioApp(
     val webVisualsFailed by radioViewModel.webVisualsFailed.collectAsState()
     val autoHideControls by radioViewModel.autoHideControls.collectAsState()
 
+    // The jukebox show on the stream, offered for download beside the title (never during a live show).
+    val jukeboxFile by radioViewModel.jukeboxFile.collectAsState()
+    val downloadingUrls by archiveViewModel.downloadingUrls.collectAsState()
+    val downloadedFiles by archiveViewModel.downloadedFiles.collectAsState()
+    val jukeboxShow = remember(jukeboxFile, archiveCount) { jukeboxFile?.let { archiveViewModel.showFor(it) } }
+    val headerDownload = jukeboxShow?.let { show ->
+        when {
+            show.url in downloadingUrls -> HeaderDownload.DOWNLOADING
+            archiveViewModel.fileNameFor(show) in downloadedFiles -> HeaderDownload.DOWNLOADED
+            else -> HeaderDownload.AVAILABLE
+        }
+    }
+    val downloadShow = rememberShowDownloader(archiveViewModel, radioViewModel)
+
     // Only worth hiding when there is a picture to watch and nothing open to read.
     val controls = rememberControlsAutoHide(
         armed = autoHideControls && lissajousMode && isPlaying && activeUtility == ActiveUtility.NONE
@@ -227,7 +243,10 @@ fun RadioApp(
                 appMode = appMode,
                 onPlayPause = { radioViewModel.togglePlayPause() },
                 onSeek = { radioViewModel.seekTo(it) },
-                onModeChange = { radioViewModel.setAppMode(it) }
+                onModeChange = { radioViewModel.setAppMode(it) },
+                download = headerDownload,
+                // Taken when tapped, so the next title poll can't swap the show mid-download.
+                onDownload = { jukeboxShow?.let(downloadShow) }
             )
         },
         oscilloscope = { modifier ->

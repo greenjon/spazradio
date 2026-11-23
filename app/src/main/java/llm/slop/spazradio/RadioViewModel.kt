@@ -43,6 +43,13 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     // Internal state for the current archive track
     private val _archiveTitle = MutableStateFlow("")
 
+    // The jukebox show's file on spaz.org, "" while a show is live
+    private var _liveDownload = ""
+
+    /** The jukebox show on the stream, when it can be downloaded: Radio tab, stream loaded, not a live show. */
+    private val _jukeboxFile = MutableStateFlow<JukeboxFile?>(null)
+    val jukeboxFile: StateFlow<JukeboxFile?> = _jukeboxFile.asStateFlow()
+
     // Expose live listener count for the RADIO tab in the header
     val trackListeners: StateFlow<String> = _liveListeners.asStateFlow()
 
@@ -174,6 +181,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             RadioService.metaDataFlow.collect { metadata ->
                 _liveTitle.value = metadata.title
+                _liveDownload = metadata.download
                 _liveListeners.value = if (metadata.listeners > 0) {
                     context.getString(R.string.listening_template, metadata.listeners)
                 } else {
@@ -263,6 +271,12 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
         val currentAppMode = _appMode.value
 
         _headerTitle.value = "SPAZ.Radio"
+
+        _jukeboxFile.value = if (currentAppMode == AppMode.RADIO && isLive && _liveDownload.isNotEmpty()) {
+            JukeboxFile(title = _liveTitle.value, url = _liveDownload)
+        } else {
+            null
+        }
         
         // Header subtitle always shows listener count in Radio mode, even if Archives screen is active
         _headerSubtitle.value = when {
@@ -493,6 +507,15 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
             .putInt(EqPrefs.MID, bands.midDb)
             .putInt(EqPrefs.TREBLE, bands.trebleDb)
             .apply()
+    }
+
+    /** Ask before downloading a show over mobile data (or another metered network). */
+    private val _askMeteredDownload = MutableStateFlow(prefs.getBoolean("download_ask_metered", true))
+    val askMeteredDownload: StateFlow<Boolean> = _askMeteredDownload.asStateFlow()
+
+    fun setAskMeteredDownload(ask: Boolean) {
+        _askMeteredDownload.value = ask
+        prefs.edit().putBoolean("download_ask_metered", ask).apply()
     }
 
     fun setAutoPlayEnabled(enabled: Boolean) {
