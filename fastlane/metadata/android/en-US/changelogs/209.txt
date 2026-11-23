@@ -1,0 +1,4 @@
+SPAZ Radio 2.0.3
+- Privacy policy published: https://github.com/greenjon/spazradio/blob/main/PRIVACY.md
+- New store screenshots.
+- No changes to how the app works.
