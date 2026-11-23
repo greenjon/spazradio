@@ -11,4 +11,4 @@ The visuals can also improve without an app release: once a day (and on "Check n
 
 Translated for EN, ES, FR, DE.
 
-We don't collect any info, serve any ads, want any money, etc.
+We don't collect any info, serve any ads, want any money, etc. See the [privacy policy](PRIVACY.md).
