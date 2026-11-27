@@ -1,31 +1,97 @@
 package llm.slop.spazradio.data
 
-import com.google.gson.Gson
+import com.google.gson.JsonParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ChatMessagesTest {
-    private val gson = Gson()
     private fun msg(user: String, text: String, t: Long) = ChatMessage(user, text, t)
+
+    private fun live(json: String, now: Long) = ChatMessages.parse(JsonParser.parseString(json), now, trustTime = false)
+    private fun logged(json: String, now: Long) = ChatMessages.parse(JsonParser.parseString(json), now, trustTime = true)
+    private val now = 1_793_509_809_767L
 
     @Test
     fun liveMessageWithoutTimeGetsTheReceiveTime() {
         // Exactly what the broker relays: no time_received.
-        val raw = gson.fromJson("""{"user":"gj","message":"hi"}""", ChatMessage::class.java)
-        assertEquals(msg("gj", "hi", 1_793_509_809L), ChatMessages.normalize(raw, 1_793_509_809_767L))
+        assertEquals(msg("gj", "hi", 1_793_509_809L), live("""{"user":"gj","message":"hi"}""", now))
+    }
+
+    @Test
+    fun liveMessageIgnoresATimeOnTheWire() {
+        assertEquals(1_793_509_809L, live("""{"user":"gj","message":"hi","time_received":99999999999999999}""", now)!!.timeReceived)
+        assertEquals(1_793_509_809L, live("""{"user":"gj","message":"hi","time_received":1}""", now)!!.timeReceived)
     }
 
     @Test
     fun historyTimeInMillisBecomesSeconds() {
-        val raw = gson.fromJson("""{"user":"gj","message":"hi","time_received":1793509809767}""", ChatMessage::class.java)
-        assertEquals(1_793_509_809L, ChatMessages.normalize(raw, 0L)!!.timeReceived)
+        assertEquals(1_793_509_800L, logged("""{"user":"gj","message":"hi","time_received":1793509800000}""", now)!!.timeReceived)
+    }
+
+    @Test
+    fun unbelievableHistoryTimesGetTheReceiveTime() {
+        for (t in listOf("1e20", "99999999999999999", "0", "-5", "\"soon\"", "Infinity", "NaN", "null", "{}")) {
+            assertEquals(t, 1_793_509_809L, logged("""{"user":"gj","message":"hi","time_received":$t}""", now)!!.timeReceived)
+        }
+        // Up to a day ahead is a clock difference, believed.
+        val ahead = now + 86_000_000L
+        assertEquals(ahead / 1000, logged("""{"user":"gj","message":"hi","time_received":$ahead}""", now)!!.timeReceived)
     }
 
     @Test
     fun payloadWithoutUserOrMessageIsDropped() {
-        assertNull(ChatMessages.normalize(gson.fromJson("""{"user":"gj"}""", ChatMessage::class.java), 1L))
-        assertNull(ChatMessages.normalize(gson.fromJson("""{"message":"hi"}""", ChatMessage::class.java), 1L))
+        assertNull(live("""{"user":"gj"}""", 1L))
+        assertNull(live("""{"message":"hi"}""", 1L))
+        assertNull(live("""{"user":null,"message":"hi"}""", 1L))
+        assertNull(live("""{"user":{"x":1},"message":"hi"}""", 1L))
+        assertNull(live("""{"user":"gj","message":["hi"]}""", 1L))
+        assertNull(live("""[1,2]""", 1L))
+        assertNull(live(""""just a string"""", 1L))
+        assertNull(ChatMessages.parse(null, 1L, trustTime = false))
+    }
+
+    @Test
+    fun oversizedNamesAndTextsAreCut() {
+        val m = live("""{"user":"${"n".repeat(500)}","message":"${"x".repeat(50_000)}"}""", now)!!
+        assertEquals(ChatMessages.MAX_NAME, m.user.length)
+        assertEquals(ChatMessages.MAX_TEXT, m.message.length)
+    }
+
+    @Test
+    fun oneBadHistoryEntryCostsOnlyItself() {
+        val body = """{"status":"OK","history":[
+            {"user":"a","message":"1","time_received":1793509700000},
+            {"user":"b","message":"2","time_received":Infinity},
+            {"user":"c","message":"3","time_received":1e20},
+            {"user":"d"},
+            "junk",
+            {"user":"e","message":"5","time_received":1793509800000}]}"""
+        val history = ChatMessages.parseHistory(body, now)!!
+        assertEquals(listOf("a", "b", "c", "e"), history.map { it.user })
+        assertEquals(listOf(1_793_509_700L, 1_793_509_809L, 1_793_509_809L, 1_793_509_800L), history.map { it.timeReceived })
+    }
+
+    @Test
+    fun historyThatIsNotOneFails() {
+        assertNull(ChatMessages.parseHistory("<html>502</html>", now))
+        assertNull(ChatMessages.parseHistory("""{"status":"OK"}""", now))
+        assertNull(ChatMessages.parseHistory("""[]""", now))
+    }
+
+    @Test
+    fun presenceNamesAreTrimmedAndCut() {
+        assertEquals("gj", ChatMessages.presenceName("  gj \n"))
+        assertEquals(ChatMessages.MAX_NAME, ChatMessages.presenceName("n".repeat(100_000)).length)
+        assertEquals("", ChatMessages.presenceName("   "))
+    }
+
+    @Test
+    fun mergeKeepsTheNewest() {
+        val shown = (1..400L).map { msg("u", "$it", it * 1000) }
+        val merged = ChatMessages.merge(shown, listOf(msg("u", "new", 999_999)))
+        assertEquals(ChatMessages.MAX_MESSAGES, merged.size)
+        assertEquals("new", merged.last().message)
     }
 
     @Test

@@ -53,6 +53,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
             launch {
                 repository.observeMessages().collect { message ->
                     messages.add(message)
+                    // A flood trims the oldest instead of growing the board without end.
+                    if (messages.size > ChatMessages.MAX_MESSAGES) {
+                        messages.removeRange(0, messages.size - ChatMessages.MAX_MESSAGES)
+                    }
                 }
             }
 

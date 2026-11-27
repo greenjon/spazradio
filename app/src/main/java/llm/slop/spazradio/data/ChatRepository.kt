@@ -2,6 +2,7 @@ package llm.slop.spazradio.data
 
 import android.util.Log
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -47,10 +48,8 @@ class ChatRepository(
                     if (response.isSuccessful) {
                         val body = response.body
                         if (body != null) {
-                            val json = body.string()
-                            val historyResponse = gson.fromJson(json, HistoryResponse::class.java)
-                            val now = System.currentTimeMillis()
-                            return@withContext historyResponse.history.mapNotNull { ChatMessages.normalize(it, now) }
+                            ChatMessages.parseHistory(body.string(), System.currentTimeMillis())
+                                ?.let { return@withContext it }
                         }
                     }
                 }
@@ -87,16 +86,13 @@ class ChatRepository(
             override fun messageArrived(topic: String?, message: MqttMessage?) {
                 val payload = message?.payload?.let { String(it) } ?: ""
                 if (topic == "spazradio") {
-                    try {
-                        // Live messages carry no time (only the server's log stamps one): use the moment it arrived.
-                        val rawMsg = gson.fromJson(payload, ChatMessage::class.java)
-                        ChatMessages.normalize(rawMsg, System.currentTimeMillis())?.let { _incomingMessages.tryEmit(it) }
-                    } catch (e: Exception) {
-                        Log.e("ChatRepo", "JSON parse error")
-                    }
+                    // Live messages carry no time (only the server's log stamps one): use the moment it arrived.
+                    val json = try { JsonParser.parseString(payload) } catch (_: Exception) { null }
+                    val msg = ChatMessages.parse(json, System.currentTimeMillis(), trustTime = false)
+                    if (msg != null) _incomingMessages.tryEmit(msg) else Log.w("ChatRepo", "Dropped a malformed chat message")
                 } else if (topic?.startsWith("presence/") == true) {
                     val id = topic.substringAfter("presence/")
-                    val name = payload
+                    val name = ChatMessages.presenceName(payload)
                     val current = _onlineUsers.value.toMutableMap()
                     // If payload is empty, the user is offline (graceful or LWT)
                     if (name.isEmpty() || name == "offline") {
