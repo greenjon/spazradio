@@ -1,0 +1,4 @@
+SPAZ Radio 2.0.4
+- Visuals updated from the web TV: the Spaz logos are back as their own layer, backgrounds change with the scenes, and effects are picked at random.
+- The download button beside the title hides when the jukebox show's file can't be found, instead of downloading an error.
+- The chat copes with malformed messages: odd names, huge texts and bad times no longer break it or empty the history.
