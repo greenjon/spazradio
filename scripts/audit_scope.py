@@ -46,9 +46,9 @@ LANES = {
     "A9": ("Build and release", [
         "*build.gradle.kts", "settings.gradle.kts", "gradle/*", "gradlew*", "*.lockfile", "*proguard-rules.pro",
         "*consumer-rules.pro", "gradle.properties", ".github/*", "fastlane/Appfile", "fastlane/Fastfile", "Gemfile",
-        "fdroid.yml", "metadata/*", "key.properties.example", "app/release/*", ".gitignore", "*/.gitignore"]),
+        "key.properties.example", "app/release/*", ".gitignore", "*/.gitignore"]),
     "A10": ("Docs, store text, tracking", [
-        "README.md", "CONTRIBUTING.md", "LICENSE", "fastlane/metadata/*", "fastlane/release_notes*", "docs/*",
+        "README.md", "CONTRIBUTING.md", "LICENSE", "fastlane/metadata/*", "docs/*",
         "scripts/audit_scope.py"]),
 }
 

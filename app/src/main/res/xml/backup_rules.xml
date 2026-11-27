@@ -3,5 +3,4 @@
      leaves out the downloaded visuals content (tens of MB, rebuilt by the updater) and caches. -->
 <full-backup-content>
     <exclude domain="file" path="visuals-content/" />
-    <exclude domain="cache" path="." />
 </full-backup-content>
