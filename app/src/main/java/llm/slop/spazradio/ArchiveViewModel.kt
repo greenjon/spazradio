@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -325,22 +326,23 @@ class ArchiveViewModel(
     // --- End Search Engine DSL Logic ---
 
     private fun refreshDownloadStatus() {
-        val currentState = _uiState.value
-        if (currentState is ArchiveUiState.Success) {
+        if (_uiState.value is ArchiveUiState.Success) {
             viewModelScope.launch {
                 val downloaded = getDownloadedUrls(allShows)
-                _uiState.value = currentState.copy(
-                    downloadedUrls = downloaded,
-                    downloadingUrls = downloadTracker.downloadingUrls.value
-                )
+                // Apply to whatever state is current after the scan, so a newer search result is kept.
+                _uiState.update { state ->
+                    (state as? ArchiveUiState.Success)?.copy(
+                        downloadedUrls = downloaded,
+                        downloadingUrls = downloadTracker.downloadingUrls.value
+                    ) ?: state
+                }
             }
         }
     }
 
     private fun updateUiWithDownloads(downloading: Set<String>) {
-        val currentState = _uiState.value
-        if (currentState is ArchiveUiState.Success) {
-            _uiState.value = currentState.copy(downloadingUrls = downloading)
+        _uiState.update { state ->
+            (state as? ArchiveUiState.Success)?.copy(downloadingUrls = downloading) ?: state
         }
     }
 
@@ -367,6 +369,9 @@ class ArchiveViewModel(
 
     val downloadingUrls: StateFlow<Set<String>> = downloadTracker.downloadingUrls
     val downloadedFiles: StateFlow<Set<String>> = downloadTracker.downloadedFiles
+
+    /** Titles of shows whose download failed to start or failed; see [DownloadTracker.failures]. */
+    val downloadFailures = downloadTracker.failures
 
     fun fileNameFor(show: ArchiveShow): String = downloadTracker.getFileName(show)
 
@@ -426,7 +431,17 @@ class ArchiveViewModel(
 
 /** The feed entry for a jukebox file: the same URL, else the same file name (any folder), else null. */
 fun findInArchive(file: JukeboxFile, shows: List<ArchiveShow>): ArchiveShow? {
-    val name = file.url.substringAfterLast('/')
+    val name = fileNameOf(file.url)
     return shows.firstOrNull { it.url == file.url }
-        ?: shows.firstOrNull { name.isNotEmpty() && it.url.substringAfterLast('/') == name }
+        ?: shows.firstOrNull { name.isNotEmpty() && fileNameOf(it.url) == name }
+}
+
+/** The last path segment of a URL, percent-decoded so `%20` and a raw space compare equal. */
+internal fun fileNameOf(url: String): String {
+    val raw = url.substringBefore('?').substringAfterLast('/')
+    return try {
+        java.net.URLDecoder.decode(raw.replace("+", "%2B"), "UTF-8")
+    } catch (_: Exception) {
+        raw
+    }
 }
