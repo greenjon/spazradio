@@ -4,13 +4,6 @@ Items left open by audits, plus owner decisions. Strike or delete them as they a
 
 ## Before the 2.0.4 release
 
-- **A0 emulator pass.** It is not done yet. KVM cannot start while the Whonix-Gateway VirtualBox VM is running.
-  Stop the VM, then run the release APK on `lsd_test`:
-  - launch, play live, switch to low bitrate
-  - open chat, open archives, download a show
-  - background the app, use the notification controls, rotate
-  - force-stop and relaunch
-  - check `logcat`
 - **Real-phone checks** (A1-10, A5-3, A6-4, A7-7, A7-9):
   - unplugging headphones pauses playback
   - lock-screen and Bluetooth controls
@@ -19,9 +12,7 @@ Items left open by audits, plus owner decisions. Strike or delete them as they a
   - light theme over the visuals
   - 200% font
   - the pocket sensor
-- **Merge liquid-lsd `fix/content-updater-audit-2026-11-26` (e6901b3) into liquid-lsd main.** The worktree is
-  `~/projects/liquid-lsd-audit-fix`. spazradio's `lsd-visuals/VERSION` already names e6901b3. Resync
-  liquid-lsd-android after merging.
+- **Resync liquid-lsd-android** to liquid-lsd e6901b3 (merged to liquid-lsd main 2026-11-26).
 - **Play Console Data safety (A8-11).** Re-check it against the rewritten `PRIVACY.md`.
 
 ## After the 2.0.4 release
@@ -31,10 +22,6 @@ Items left open by audits, plus owner decisions. Strike or delete them as they a
 
 ## Owner decisions
 
-- **A9-6.** Should nightly keep publishing a public pre-release on every push to main? Its versionCode and
-  versionName equal the release's (210/2.0.4) because `build.gradle.kts` ignores `-PVERSION_*`.
-- **A7-2.** Language picker: the `AppLanguage` enum and the `lang_*` strings exist, but there is no UI and no
-  `localeConfig`. Deferred.
 - **A9-9.** The `app-release.apk` asset name is a convention, enforced only by docs.
 - **A10-6.** MIT repo vs the licensing intent for liquid-lsd content. Licensing is on hold.
 

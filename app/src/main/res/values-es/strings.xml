@@ -57,12 +57,6 @@
 
     <string name="debug_settings">Depuración y Soporte</string>
     <string name="send_debug_logs">Enviar Registros de Depuración</string>
-    <string name="label_language">Idioma</string>
-    <string name="lang_system">Predeterminado del Sistema</string>
-    <string name="lang_en">Inglés</string>
-    <string name="lang_es">Español</string>
-    <string name="lang_de">Alemán</string>
-    <string name="lang_fr">Francés</string>
     <string name="action_change">CAMBIAR</string>
     <string name="action_close_caps">CERRAR</string>
     <string name="search_no_results">No se encontraron archivos para \"%s\"</string>

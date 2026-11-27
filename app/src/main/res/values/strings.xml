@@ -57,12 +57,6 @@
 
     <string name="debug_settings">Debug &amp; Support</string>
     <string name="send_debug_logs">Send Debug Logs</string>
-    <string name="label_language">Language</string>
-    <string name="lang_system">System Default</string>
-    <string name="lang_en">English</string>
-    <string name="lang_es">Español</string>
-    <string name="lang_de">Deutsch</string>
-    <string name="lang_fr">Français</string>
     <string name="action_change">CHANGE</string>
     <string name="action_close_caps">CLOSE</string>
     <string name="search_no_results">No archives found for \"%s\"</string>

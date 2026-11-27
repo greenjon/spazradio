@@ -13,6 +13,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -143,7 +144,10 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private suspend fun loadScheduleSync() {
+    // keepFresh() runs on the main thread (a LaunchedEffect), so the fetch moves itself to IO.
+    private suspend fun loadScheduleSync(): Unit = withContext(Dispatchers.IO) { fetchSchedule() }
+
+    private suspend fun fetchSchedule() {
         if (!fetching.compareAndSet(false, true)) return
         try {
             if (_schedule.value.isEmpty()) {
