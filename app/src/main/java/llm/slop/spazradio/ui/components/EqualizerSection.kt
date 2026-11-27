@@ -1,5 +1,6 @@
 package llm.slop.spazradio.ui.components
 
+import android.content.ActivityNotFoundException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -92,7 +93,13 @@ fun EqualizerSection(radioViewModel: RadioViewModel) {
             EqMode.SYSTEM -> {
                 Text(stringResource(R.string.eq_system_help), style = MaterialTheme.typography.bodySmall, color = muted)
                 OutlinedButton(
-                    onClick = { panel.launch(SystemEq.panelIntent(context, sessionId)) },
+                    onClick = {
+                        try {
+                            panel.launch(SystemEq.panelIntent(context, sessionId))
+                        } catch (e: ActivityNotFoundException) {
+                            radioViewModel.setEqMode(EqMode.OFF) // the EQ app went away while Settings was open
+                        }
+                    },
                     modifier = Modifier.padding(top = 4.dp),
                 ) { Text(stringResource(R.string.eq_open_system)) }
             }

@@ -34,6 +34,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,6 +64,10 @@ class RadioService : MediaSessionService() {
     private var metered = false
     private var lowMountMissing = false
     private var lastMetadata: RadioMetadata? = null
+    private var retryJob: Job? = null
+    private var retryAttempt = 0
+    private var retryGaveUp = false
+    private var pauseTimeoutJob: Job? = null
 
     private val eqProcessor = EqAudioProcessor()
     private var systemEqSession = C.AUDIO_SESSION_ID_UNSET
@@ -76,6 +81,9 @@ class RadioService : MediaSessionService() {
 
         private val _metaDataFlow = MutableStateFlow(RadioMetadata())
         val metaDataFlow = _metaDataFlow.asStateFlow()
+
+        /** How long a paused service lingers with no UI before it stops itself. */
+        private const val PAUSE_TIMEOUT_MS = 10 * 60 * 1000L
 
         /** The player's audio session, for the system equalizer panel. */
         private val _audioSessionId = MutableStateFlow(C.AUDIO_SESSION_ID_UNSET)
@@ -148,6 +156,8 @@ class RadioService : MediaSessionService() {
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(dataSourceFactory))
             .setLoadControl(loadControl)
             .setAudioAttributes(audioAttributes, true)
+            .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         
         player?.playWhenReady = false
@@ -169,7 +179,24 @@ class RadioService : MediaSessionService() {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
                     _waveformFlow.value = null
+                    scheduleLiveRetry()
                 }
+                if (playbackState == Player.STATE_READY) resetRetry()
+            }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                pauseTimeoutJob?.cancel()
+                if (playWhenReady) {
+                    applyLiveMetadata()
+                } else {
+                    resetRetry()
+                    schedulePauseTimeout()
+                }
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                if (mediaItem?.mediaId != liveMediaID) resetRetry()
+                applyLiveMetadata()
             }
 
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
@@ -185,6 +212,8 @@ class RadioService : MediaSessionService() {
                     Log.w("RadioService", "Low-bandwidth mount missing, using the normal stream")
                     lowMountMissing = true
                     switchLiveStream(LiveStream.URL_HIGH, resume = true)
+                } else {
+                    scheduleLiveRetry()
                 }
             }
         })
@@ -200,8 +229,64 @@ class RadioService : MediaSessionService() {
         startMetadataPolling()
     }
 
+    private fun liveWanted(): Boolean {
+        val exoPlayer = player ?: return false
+        return exoPlayer.playWhenReady && exoPlayer.currentMediaItem?.mediaId == liveMediaID
+    }
+
+    private fun resetRetry() {
+        retryJob?.cancel()
+        retryJob = null
+        retryAttempt = 0
+        retryGaveUp = false
+    }
+
+    /** After a network error or the end of the live stream, re-prepare with a capped backoff. Archives are left alone. */
+    private fun scheduleLiveRetry() {
+        if (!liveWanted() || retryJob?.isActive == true) return
+        val wait = RetryPolicy.delayMs(retryAttempt)
+        if (wait == null) {
+            retryGaveUp = true
+            return
+        }
+        retryAttempt++
+        retryJob = serviceScope.launch {
+            delay(wait)
+            retryNow()
+        }
+    }
+
+    private fun retryNow() {
+        retryJob = null
+        val exoPlayer = player ?: return
+        if (!liveWanted()) return
+        if (exoPlayer.playbackState == Player.STATE_IDLE || exoPlayer.playbackState == Player.STATE_ENDED) {
+            exoPlayer.stop() // ENDED ignores prepare() until the player is idle again
+            exoPlayer.prepare()
+        }
+    }
+
+    /** Stops a service that has sat paused, with no app screen open, for a while. */
+    private fun schedulePauseTimeout() {
+        pauseTimeoutJob?.cancel()
+        pauseTimeoutJob = serviceScope.launch {
+            delay(PAUSE_TIMEOUT_MS)
+            if (player?.playWhenReady == false && _metaDataFlow.subscriptionCount.value == 0) stopSelf()
+        }
+    }
+
     /** Fires on connect and on every capability change; switching only happens when the mount would differ. */
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            // A network is back: don't wait out the backoff.
+            serviceScope.launch {
+                if (retryJob != null || retryGaveUp) {
+                    resetRetry()
+                    retryNow()
+                }
+            }
+        }
+
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
             val nowMetered = !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
             serviceScope.launch {
@@ -266,9 +351,27 @@ class RadioService : MediaSessionService() {
             fetchAndUpdateMetadata()
             while (isActive) {
                 delay(10000)
+                // Paused in the background with no app screen open: nobody sees the title.
+                val watched = withContext(Dispatchers.Main) {
+                    player?.playWhenReady == true || _metaDataFlow.subscriptionCount.value > 0
+                }
+                if (!watched) continue
                 try { fetchAndUpdateMetadata() } catch (e: Exception) { Log.e("RadioService", "Error", e) }
             }
         }
+    }
+
+    /** Writes the latest title into the live item once it is audible, so the notification never stays blank. */
+    private fun applyLiveMetadata() {
+        val metadata = lastMetadata ?: return
+        val exoPlayer = player ?: return
+        val item = exoPlayer.currentMediaItem ?: return
+        val isCurrentlyAudible = exoPlayer.playWhenReady || exoPlayer.playbackState == Player.STATE_BUFFERING
+        if (item.mediaId != liveMediaID || !isCurrentlyAudible) return
+        val artist = getString(R.string.listening_template, metadata.listeners)
+        if (item.mediaMetadata.title?.toString() == metadata.title && item.mediaMetadata.artist?.toString() == artist) return
+        val newMetadata = MediaMetadata.Builder().setTitle(metadata.title).setArtist(artist).build()
+        exoPlayer.replaceMediaItem(exoPlayer.currentMediaItemIndex, item.buildUpon().setMediaMetadata(newMetadata).build())
     }
 
     private suspend fun fetchAndUpdateMetadata() {
@@ -284,23 +387,7 @@ class RadioService : MediaSessionService() {
                 if (metadata == lastMetadata) return
                 lastMetadata = metadata
                 _metaDataFlow.value = metadata
-                val playing = metadata.title
-                val listeners = metadata.listeners
-
-                withContext(Dispatchers.Main) {
-                    player?.let { exoPlayer ->
-                        val isLiveActive = exoPlayer.currentMediaItem?.mediaId == liveMediaID
-                        val isCurrentlyAudible = exoPlayer.playWhenReady || exoPlayer.playbackState == Player.STATE_BUFFERING
-                        if (isLiveActive && isCurrentlyAudible) {
-                            val newMetadata = MediaMetadata.Builder()
-                                .setTitle(playing)
-                                .setArtist(getString(R.string.listening_template, listeners))
-                                .build()
-                            val newItem = exoPlayer.currentMediaItem!!.buildUpon().setMediaMetadata(newMetadata).build()
-                            exoPlayer.replaceMediaItem(exoPlayer.currentMediaItemIndex, newItem)
-                        }
-                    }
-                }
+                withContext(Dispatchers.Main) { applyLiveMetadata() }
             }
         } catch (e: Exception) { Log.e("RadioService", "Metadata error", e) }
     }
