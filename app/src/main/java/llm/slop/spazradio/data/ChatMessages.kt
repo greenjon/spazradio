@@ -20,6 +20,8 @@ object ChatMessages {
     /** The broker has no login, so anyone can publish anything: names and texts are cut to these lengths... */
     const val MAX_NAME = 32
     const val MAX_TEXT = 1000
+    /** ...the presence roster keeps at most this many ids (retained topics are free to publish)... */
+    const val MAX_ROSTER = 200
     /** ...the board keeps the last this many messages (a flood can't grow it without end)... */
     const val MAX_MESSAGES = 300
     /** ...and a history time more than a day ahead of the phone's clock is not believed. */
@@ -39,7 +41,11 @@ object ChatMessages {
         val message = o.string("message") ?: return null
         val wireTime = if (trustTime) o.millis("time_received") else null
         val millis = wireTime?.takeIf { it > 0 && it <= nowMillis + MAX_TIME_SKEW_MILLIS } ?: nowMillis
-        return ChatMessage(user.take(MAX_NAME), message.take(MAX_TEXT), millis / 1000L)
+        return ChatMessage(
+            cleanText(user.take(MAX_NAME * 4)).take(MAX_NAME),
+            cleanText(message.take(MAX_TEXT * 2)).take(MAX_TEXT),
+            millis / 1000L
+        )
     }
 
     /** The history body's entries, each parsed on its own so one bad entry costs only itself; null if it isn't one. */
@@ -52,8 +58,46 @@ object ChatMessages {
         return entries.mapNotNull { parse(it, nowMillis, trustTime = true) }.takeLast(MAX_MESSAGES)
     }
 
-    /** A presence name as shown: trimmed and cut to [MAX_NAME]; empty means gone. */
-    fun presenceName(payload: String): String = payload.take(MAX_NAME * 4).trim().take(MAX_NAME)
+    /** A presence name as shown: plain text, trimmed and cut to [MAX_NAME]; empty means gone. */
+    fun presenceName(payload: String): String = cleanText(payload.take(MAX_NAME * 4)).trim().take(MAX_NAME)
+
+    /** A nickname as typed: plain text, whitespace collapsed, trimmed, cut to [MAX_NAME]. */
+    fun cleanNick(name: String): String = cleanText(name).replace(Regex("\\s+"), " ").trim().take(MAX_NAME)
+
+    /** Outgoing text: trimmed and cut to [MAX_TEXT]; empty means nothing to send. */
+    fun outgoingText(text: String): String = text.trim().take(MAX_TEXT)
+
+    private val TAG = Regex("</?[a-zA-Z][^>]*>")
+    private val ENTITY = Regex("&(#x[0-9a-fA-F]+|#\\d+|[a-zA-Z]+);")
+    private val NAMED = mapOf("amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'", "nbsp" to " ")
+
+    /**
+     * A line as plain text: tags dropped and entities decoded, the way the web TV shows it (chat.js cleanText).
+     * The result is only ever shown as text, never parsed as markup.
+     */
+    fun cleanText(s: String): String =
+        s.replace(TAG, "").replace(ENTITY) { m ->
+            val e = m.groupValues[1]
+            if (e[0] == '#') {
+                val n = (if (e[1] == 'x' || e[1] == 'X') e.substring(2).toIntOrNull(16) else e.substring(1).toIntOrNull())
+                if (n != null && n > 0 && n <= 0x10ffff && n !in 0xD800..0xDFFF) String(Character.toChars(n)) else m.value
+            } else NAMED[e.lowercase()] ?: m.value
+        }
+
+    /**
+     * The roster after a presence message for [id]: an empty or "offline" [name] removes it; a new id past
+     * [MAX_ROSTER], or an id that isn't a single topic level, is ignored.
+     */
+    fun updateRoster(roster: Map<String, String>, id: String, name: String): Map<String, String> {
+        if (id.isEmpty() || id.contains('/')) return roster
+        if (name.isEmpty() || name == "offline") return if (id in roster) roster - id else roster
+        if (id !in roster && roster.size >= MAX_ROSTER) return roster
+        return roster + (id to name)
+    }
+
+    /** The distinct names, "Bob" and "bob" counting once, sorted without regard to case. */
+    fun rosterNames(roster: Map<String, String>): List<String> =
+        roster.values.distinctBy { it.lowercase() }.sortedWith(String.CASE_INSENSITIVE_ORDER)
 
     private fun JsonObject.string(key: String): String? =
         (get(key) as? JsonPrimitive)?.takeIf { it.isString }?.asString

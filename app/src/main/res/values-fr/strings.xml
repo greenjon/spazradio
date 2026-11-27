@@ -117,4 +117,10 @@
     <string name="visuals_updates_current">Les scènes sont à jour.</string>
     <string name="visuals_updates_newer_app">Ces scènes nécessitent une version plus récente de l\'app.</string>
     <string name="visuals_updates_failed">Serveur injoignable.</string>
+
+    <!-- chat (audit 2026-11-26) -->
+    <string name="chat_error_connection">Problème de connexion au chat. Nouvelle tentative&#8230;</string>
+    <string name="chat_not_sent">Non envoyé. Vérifiez votre connexion et réessayez.</string>
+    <string name="chat_connecting">Connexion&#8230;</string>
+    <string name="chat_send">Envoyer</string>
 </resources>

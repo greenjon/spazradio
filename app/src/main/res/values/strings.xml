@@ -117,4 +117,10 @@
     <string name="visuals_updates_current">Scenes are up to date.</string>
     <string name="visuals_updates_newer_app">These scenes need a newer version of the app.</string>
     <string name="visuals_updates_failed">Couldn\'t reach the server.</string>
+
+    <!-- chat (audit 2026-11-26) -->
+    <string name="chat_error_connection">Chat connection problem. Retrying&#8230;</string>
+    <string name="chat_not_sent">Not sent. Check your connection and try again.</string>
+    <string name="chat_connecting">Connecting&#8230;</string>
+    <string name="chat_send">Send</string>
 </resources>

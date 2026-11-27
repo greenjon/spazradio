@@ -138,4 +138,51 @@ class ChatMessagesTest {
         val history = listOf(msg("a", "hello", 100 + ChatMessages.MATCH_WINDOW_SECONDS + 1000))
         assertEquals(shown + history, ChatMessages.merge(shown, history))
     }
+
+    @Test
+    fun parseStripsTagsAndDecodesEntities() {
+        val m = live("""{"user":"<b>gj</b>","message":"<font color=\"#000\">hi</font> &lt;3 &amp; &#65;&#x42; <img src=x>"}""", now)!!
+        assertEquals("gj", m.user)
+        assertEquals("hi <3 & AB ", m.message)
+    }
+
+    @Test
+    fun cleanTextLeavesBareAngleBracketsAndUnknownEntities() {
+        assertEquals("1 < 2 and &bogus; &#0;", ChatMessages.cleanText("1 < 2 and &bogus; &#0;"))
+    }
+
+    @Test
+    fun parseCapsAfterDecoding() {
+        val m = live("""{"user":"${"u".repeat(100)}","message":"${"x".repeat(5000)}"}""", now)!!
+        assertEquals(ChatMessages.MAX_NAME, m.user.length)
+        assertEquals(ChatMessages.MAX_TEXT, m.message.length)
+    }
+
+    @Test
+    fun nicknameAndOutgoingTextAreTrimmedAndCapped() {
+        assertEquals("a b", ChatMessages.cleanNick("  a \t  b  "))
+        assertEquals(ChatMessages.MAX_NAME, ChatMessages.cleanNick("n".repeat(80)).length)
+        assertEquals("", ChatMessages.cleanNick("   "))
+        assertEquals("hi", ChatMessages.outgoingText("  hi \n"))
+        assertEquals(ChatMessages.MAX_TEXT, ChatMessages.outgoingText("x".repeat(3000)).length)
+    }
+
+    @Test
+    fun rosterIsBoundedAndIgnoresNestedTopics() {
+        var roster = emptyMap<String, String>()
+        for (i in 0 until ChatMessages.MAX_ROSTER + 50) roster = ChatMessages.updateRoster(roster, "id$i", "n$i")
+        assertEquals(ChatMessages.MAX_ROSTER, roster.size)
+        // known ids still update and clear past the cap
+        roster = ChatMessages.updateRoster(roster, "id0", "renamed")
+        assertEquals("renamed", roster["id0"])
+        roster = ChatMessages.updateRoster(roster, "id1", "")
+        assertEquals(ChatMessages.MAX_ROSTER - 1, roster.size)
+        assertEquals(roster, ChatMessages.updateRoster(roster, "a/b", "x"))
+    }
+
+    @Test
+    fun rosterNamesDedupeAndSortWithoutCase() {
+        val roster = mapOf("1" to "bob", "2" to "Bob", "3" to "alice", "4" to "Zed")
+        assertEquals(listOf("alice", "bob", "Zed"), ChatMessages.rosterNames(roster))
+    }
 }

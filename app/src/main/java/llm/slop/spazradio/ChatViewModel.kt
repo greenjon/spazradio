@@ -37,7 +37,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
     private val _onlineNames = MutableStateFlow<List<String>>(emptyList())
     val onlineNames: StateFlow<List<String>> = _onlineNames
 
-    private val _username = mutableStateOf(sharedPrefs.getString("username", "") ?: "")
+    private val _username = mutableStateOf(ChatMessages.cleanNick(sharedPrefs.getString("username", "") ?: ""))
     val username: State<String> = _username
 
     val connectionError: StateFlow<String?> = repository.connectionError
@@ -81,11 +81,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
             // Centralized connection trigger: Network Online
             launch {
                 networkMonitor.isOnline.collectLatest { isOnline ->
-                    if (isOnline && _username.value.isNotEmpty()) {
-                        launch(Dispatchers.IO) {
-                            repository.connect(_username.value)
-                        }
-                    }
+                    // The repository ignores this while the app is in the background.
+                    if (isOnline && _username.value.isNotEmpty()) repository.connect(_username.value)
                 }
             }
         }
@@ -102,53 +99,42 @@ class ChatViewModel(application: Application) : AndroidViewModel(application), D
         }
     }
 
+    // The chat connection is open only while the app is in the foreground, whether or not the chat page is shown.
     override fun onStart(owner: LifecycleOwner) {
         super.onStart(owner)
-        // App came to foreground
-        if (_username.value.isNotEmpty()) {
-            Log.d("ChatViewModel", "App foregrounded - Publishing online status")
-            repository.publishPresence(_username.value, true)
-        }
+        repository.setForeground(true)
+        if (_username.value.isNotEmpty()) repository.connect(_username.value)
     }
 
     override fun onStop(owner: LifecycleOwner) {
         super.onStop(owner)
-        // App went to background
-        if (_username.value.isNotEmpty()) {
-            Log.d("ChatViewModel", "App backgrounded - Publishing offline status")
-            repository.publishPresence(_username.value, false)
-        }
+        // Clears our presence and closes the connection, so a reconnect can't mark us online in the background.
+        repository.setForeground(false)
+        repository.disconnect()
     }
 
     fun setUsername(name: String) {
-        _username.value = name
-        sharedPrefs.edit().putString("username", name).apply()
-        viewModelScope.launch(Dispatchers.IO) {
-            repository.connect(name)
-        }
+        val clean = ChatMessages.cleanNick(name)
+        if (clean.isEmpty()) return
+        _username.value = clean
+        sharedPrefs.edit().putString("username", clean).apply()
+        repository.connect(clean)
     }
 
     fun resetUsername() {
         _username.value = ""
         sharedPrefs.edit().remove("username").apply()
-        viewModelScope.launch(Dispatchers.IO) {
-            repository.disconnect()
-        }
+        repository.disconnect()
     }
 
-    fun sendMessage(text: String) {
-        if (_username.value.isNotEmpty()) {
-            viewModelScope.launch(Dispatchers.IO) {
-                repository.sendMessage(_username.value, text)
-            }
-        }
-    }
+    /** True when the message was sent; the caller keeps the draft otherwise. */
+    suspend fun sendMessage(text: String): Boolean =
+        _username.value.isNotEmpty() && repository.sendMessage(_username.value, text)
 
     override fun onCleared() {
         super.onCleared()
         ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
-        viewModelScope.launch(Dispatchers.IO) {
-            repository.disconnect()
-        }
+        // viewModelScope is already cancelled here; the repository disconnects on its own scope, then ends it.
+        repository.shutdown()
     }
 }

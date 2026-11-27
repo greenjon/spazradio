@@ -1,7 +1,5 @@
 package llm.slop.spazradio.ui.components
 
-import android.text.util.Linkify
-import android.widget.TextView
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -19,16 +17,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.text.HtmlCompat
 import llm.slop.spazradio.ChatViewModel
+import kotlinx.coroutines.launch
 import llm.slop.spazradio.R
+import llm.slop.spazradio.data.ChatMessages
 import java.text.DateFormat
 import java.util.*
 
@@ -49,7 +46,7 @@ fun ChatContent(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "Connection Error: $error",
+                    text = stringResource(R.string.chat_error_connection),
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.padding(8.dp),
                     style = MaterialTheme.typography.bodySmall
@@ -88,7 +85,7 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
         TextField(
             value = text,
-            onValueChange = { text = it },
+            onValueChange = { text = it.take(ChatMessages.MAX_NAME) },
             placeholder = { Text(stringResource(R.string.chat_name_hint)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
@@ -118,10 +115,12 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
 fun ChatLayout(
     messages: List<llm.slop.spazradio.data.ChatMessage>,
     onlineNames: List<String>,
-    onSendMessage: (String) -> Unit,
+    onSendMessage: suspend (String) -> Boolean,
     modifier: Modifier = Modifier
 ) {
     var messageText by remember { mutableStateOf("") }
+    var notSent by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var isInitialLoad by remember { mutableStateOf(true) }
     
@@ -173,7 +172,8 @@ fun ChatLayout(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (onlineNames.isEmpty()) "Connecting..." else "${onlineNames.size} online",
+                        text = if (onlineNames.isEmpty()) stringResource(R.string.chat_connecting)
+                        else stringResource(R.string.chat_online_count, onlineNames.size),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -216,7 +216,7 @@ fun ChatLayout(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (messages.isEmpty()) {
                 Text(
-                    text = "No messages yet...",
+                    text = stringResource(R.string.chat_no_messages),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.align(Alignment.Center),
@@ -244,7 +244,9 @@ fun ChatLayout(
         ) {
             TextField(
                 value = messageText,
-                onValueChange = { messageText = it },
+                onValueChange = { messageText = it.take(ChatMessages.MAX_TEXT); notSent = false },
+                isError = notSent,
+                supportingText = if (notSent) ({ Text(stringResource(R.string.chat_not_sent)) }) else null,
                 placeholder = { Text(stringResource(R.string.chat_hint), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
                 modifier = Modifier
                     .weight(1f)
@@ -264,15 +266,23 @@ fun ChatLayout(
             IconButton(
                 onClick = {
                     if (messageText.isNotBlank()) {
-                        onSendMessage(messageText)
-                        messageText = ""
+                        val draft = messageText
+                        scope.launch {
+                            // The draft is cleared only once the message is out; otherwise it stays, with a note.
+                            if (onSendMessage(draft)) {
+                                if (messageText == draft) messageText = ""
+                                notSent = false
+                            } else {
+                                notSent = true
+                            }
+                        }
                     }
                 },
                 enabled = messageText.isNotBlank()
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
+                    contentDescription = stringResource(R.string.chat_send),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -296,12 +306,8 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
         }
     }
 
-    // Capture theme colors into primitive integers inside the Composable context.
-    // This is necessary because factory/update lambdas in AndroidView are NOT composable contexts.
-    val primaryColorInt = MaterialTheme.colorScheme.primary.toArgb()
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    val onSurfaceColorInt = onSurfaceColor.toArgb()
 
     Column {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -328,21 +334,11 @@ fun ChatMessageItem(msg: llm.slop.spazradio.data.ChatMessage) {
             }
         }
         
-        AndroidView(
-            factory = { context ->
-                TextView(context).apply {
-                    setTextColor(onSurfaceColorInt)
-                    setTextSize(14f)
-                    autoLinkMask = Linkify.WEB_URLS
-                    setLinkTextColor(primaryColorInt)
-                }
-            },
-            update = { textView ->
-                val decoded = HtmlCompat.fromHtml(msg.message, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                textView.text = decoded
-                textView.setTextColor(onSurfaceColorInt)
-                textView.setLinkTextColor(primaryColorInt)
-            },
+        // Plain text only: ChatMessages.parse has already dropped tags and decoded entities, and nothing is linked.
+        Text(
+            text = msg.message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = onSurfaceColor,
             modifier = Modifier.fillMaxWidth()
         )
     }
