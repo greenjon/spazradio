@@ -5,36 +5,41 @@ import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.eclipse.paho.client.mqttv3.*
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import javax.net.ssl.SSLContext
-import kotlin.random.Random
 
 class ChatRepository(
     private val client: OkHttpClient,
     private val gson: Gson
 ) {
-    private val clientId = "mut${Random.nextInt(1, 1000000)}"
-    private var mqttClient: MqttClient? = null
-    private var currentUsername: String? = null
+    private val clientId = newClientId()
+    @Volatile private var mqttClient: MqttClient? = null
+    @Volatile private var currentUsername: String? = null
+    /** The connection exists only while the app is in the foreground (set by the ViewModel from the process lifecycle). */
+    @Volatile private var foreground = false
 
     private val _onlineUsers = MutableStateFlow<Map<String, String>>(emptyMap())
     private val _incomingMessages = MutableSharedFlow<ChatMessage>(extraBufferCapacity = 64)
     // One event per successful (re)connect, after the subscriptions: the chat then fetches the history again to
     // fill in whatever was sent while the connection was down.
     private val _connected = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
-    
+
     private val _connectionError = MutableStateFlow<String?>(null)
     val connectionError: StateFlow<String?> = _connectionError.asStateFlow()
 
-    private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    
-    private val connectionMutex = Mutex()
-    private var isConnecting = false
+    // One at a time, in the order launched: connect, disconnect and presence changes never overlap. Cancelled
+    // only by [shutdown], after its own disconnect has run.
+    private val serial = Dispatchers.IO.limitedParallelism(1)
+    private val repositoryScope = CoroutineScope(serial + SupervisorJob())
+    private var lastSend = 0L
+
+    private fun newClientId(): String {
+        val rnd = java.security.SecureRandom()
+        return "mut" + String(CharArray(6) { Character.forDigit(rnd.nextInt(36), 36) })
+    }
 
     suspend fun fetchHistory(): List<ChatMessage> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
@@ -69,10 +74,8 @@ class ChatRepository(
         client.setCallback(object : MqttCallbackExtended {
             override fun connectComplete(reconnect: Boolean, serverURI: String?) {
                 Log.d("ChatRepo", "MQTT Connect Complete. Reconnect: $reconnect")
-                repositoryScope.launch {
-                    connectionMutex.withLock { isConnecting = false }
-                    currentUsername?.let { publishPresence(it, true) }
-                }
+                // Announce only in the foreground: a reconnect in the background must not mark us online again.
+                if (foreground) currentUsername?.let { publishPresence(it, true) }
                 _connectionError.value = null
                 subscribeAll()
                 _connected.tryEmit(Unit)
@@ -93,14 +96,8 @@ class ChatRepository(
                 } else if (topic?.startsWith("presence/") == true) {
                     val id = topic.substringAfter("presence/")
                     val name = ChatMessages.presenceName(payload)
-                    val current = _onlineUsers.value.toMutableMap()
-                    // If payload is empty, the user is offline (graceful or LWT)
-                    if (name.isEmpty() || name == "offline") {
-                        current.remove(id)
-                    } else {
-                        current[id] = name
-                    }
-                    _onlineUsers.value = current
+                    // An empty payload means offline (graceful or LWT)
+                    _onlineUsers.update { ChatMessages.updateRoster(it, id, name) }
                 }
             }
 
@@ -111,23 +108,22 @@ class ChatRepository(
         return client
     }
 
+    /** Called from the process lifecycle: ON_START true (then [connect]), ON_STOP false (then [disconnect]). */
+    fun setForeground(value: Boolean) { foreground = value }
+
     fun connect(username: String) {
         currentUsername = username
-        val client = getOrCreateMqttClient()
-        
+        if (!foreground) return
         repositoryScope.launch {
-            connectionMutex.withLock {
-                if (client.isConnected || isConnecting) {
-                    Log.d("ChatRepo", "Connect attempt blocked: Busy or already connected")
-                    if (client.isConnected) publishPresence(username, true)
-                    return@launch
-                }
-                isConnecting = true
+            if (!foreground) return@launch
+            val client = getOrCreateMqttClient()
+            if (client.isConnected) {
+                publishPresence(username, true)
+                return@launch
             }
-
             try {
                 _connectionError.value = null
-                
+
                 val sslContext = SSLContext.getInstance("TLSv1.2")
                 sslContext.init(null, null, null)
 
@@ -137,19 +133,16 @@ class ChatRepository(
                     connectionTimeout = 30
                     keepAliveInterval = 60 // Broker checks every 60s
                     mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1
-                    
+
                     // LAST WILL: If we crash, the broker publishes an empty string to our presence topic
                     setWill("presence/$clientId", "".toByteArray(), 1, true)
-                    
+
                     socketFactory = sslContext.socketFactory
                 }
-                
+
                 Log.d("ChatRepo", "Starting MQTT connection sequence (TLS 1.2 forced)...")
-                withContext(Dispatchers.IO) {
-                    client.connect(options)
-                }
+                client.connect(options)
             } catch (e: Exception) {
-                connectionMutex.withLock { isConnecting = false }
                 Log.e("ChatRepo", "MQTT Connect Failed: ${e.message}")
                 _connectionError.value = e.cause?.message ?: e.message ?: "Connect failed"
             }
@@ -167,66 +160,78 @@ class ChatRepository(
     }
 
     fun publishPresence(username: String, isOnline: Boolean) {
-        val client = mqttClient ?: return
-        if (client.isConnected) {
-            repositoryScope.launch(Dispatchers.IO) {
-                try {
-                    val topic = "presence/$clientId"
-                    val payload = if (isOnline) username else ""
-                    val message = MqttMessage(payload.toByteArray()).apply {
-                        qos = 1
-                        isRetained = true // New joiners see current status
-                    }
-                    client.publish(topic, message)
-                    Log.d("ChatRepo", "Published presence: $username (Online: $isOnline)")
-                } catch (e: Exception) {
-                    Log.e("ChatRepo", "Publish presence failed: ${e.message}")
-                }
+        repositoryScope.launch {
+            val client = mqttClient ?: return@launch
+            if (!client.isConnected) return@launch
+            publishPresenceNow(client, if (isOnline) username else "")
+        }
+    }
+
+    private fun publishPresenceNow(client: MqttClient, payload: String) {
+        try {
+            val message = MqttMessage(payload.toByteArray()).apply {
+                qos = 1
+                isRetained = true // New joiners see current status
             }
+            client.publish("presence/$clientId", message)
+        } catch (e: Exception) {
+            Log.e("ChatRepo", "Publish presence failed: ${e.message}")
         }
     }
 
     fun observeMessages(): Flow<ChatMessage> = _incomingMessages.asSharedFlow()
     fun observeConnected(): Flow<Unit> = _connected.asSharedFlow()
-    fun observePresenceCount(): Flow<Int> = _onlineUsers.map { it.values.distinct().size }
-    fun observeOnlineNames(): Flow<List<String>> = _onlineUsers.map { it.values.distinct().sorted() }
+    fun observePresenceCount(): Flow<Int> = _onlineUsers.map { ChatMessages.rosterNames(it).size }
+    fun observeOnlineNames(): Flow<List<String>> = _onlineUsers.map { ChatMessages.rosterNames(it) }
 
-    fun sendMessage(username: String, text: String) {
-        val client = mqttClient ?: return
-        if (!client.isConnected) {
-            _connectionError.value = "Not connected"
-            return
+    /** True when the message went out; false (and nothing sent) when empty, too soon after the last one, or offline. */
+    suspend fun sendMessage(username: String, text: String): Boolean = withContext(serial) {
+        val body = ChatMessages.outgoingText(text)
+        val name = ChatMessages.cleanNick(username)
+        val client = mqttClient
+        val now = System.currentTimeMillis()
+        if (body.isEmpty() || name.isEmpty() || client == null || !client.isConnected || now - lastSend < SEND_GAP_MS) {
+            return@withContext false
         }
-
-        repositoryScope.launch(Dispatchers.IO) {
-            try {
-                val payload = gson.toJson(mapOf("user" to username, "message" to text))
-                client.publish("spazradio", payload.toByteArray(), 2, false)
-            } catch (e: Exception) {
-                _connectionError.value = "Send failed: ${e.message}"
-            }
+        try {
+            val payload = gson.toJson(mapOf("user" to name, "message" to body))
+            client.publish("spazradio", payload.toByteArray(), 2, false)
+            lastSend = now
+            true
+        } catch (e: Exception) {
+            Log.w("ChatRepo", "Send failed: ${e.message}")
+            false
         }
     }
 
+    /** Clears our presence, then closes the connection for good (also when the link is down). Returns at once. */
     fun disconnect() {
-        try {
-            repositoryScope.launch {
-                connectionMutex.withLock { isConnecting = false }
-                
-                currentUsername?.let { 
-                    publishPresence(it, false) 
-                }
+        currentUsername = null
+        repositoryScope.launch { closeClient() }
+    }
 
-                if (mqttClient?.isConnected == true) {
-                    mqttClient?.disconnect()
-                }
-                mqttClient = null
-                currentUsername = null
-                _connectionError.value = null
-                _onlineUsers.value = emptyMap()
+    /** [disconnect], then ends the repository's own scope: for the ViewModel's onCleared. */
+    fun shutdown() {
+        currentUsername = null
+        repositoryScope.launch { closeClient() }.invokeOnCompletion { repositoryScope.cancel() }
+    }
+
+    private fun closeClient() {
+        val client = mqttClient
+        mqttClient = null
+        if (client != null) {
+            // The clear goes out before the DISCONNECT, in the same call (a graceful DISCONNECT skips the will).
+            if (client.isConnected) publishPresenceNow(client, "")
+            try { client.disconnect(2000) } catch (_: Exception) {
+                try { client.disconnectForcibly(0, 1000) } catch (_: Exception) {}
             }
-        } catch (e: Exception) {
-            Log.e("ChatRepo", "Error during disconnect")
+            try { client.close() } catch (_: Exception) {}
         }
+        _connectionError.value = null
+        _onlineUsers.value = emptyMap()
+    }
+
+    private companion object {
+        const val SEND_GAP_MS = 1000L
     }
 }

@@ -117,4 +117,10 @@
     <string name="visuals_updates_current">Las escenas están al día.</string>
     <string name="visuals_updates_newer_app">Estas escenas requieren una versión más reciente de la app.</string>
     <string name="visuals_updates_failed">No se pudo contactar con el servidor.</string>
+
+    <!-- chat (audit 2026-11-26) -->
+    <string name="chat_error_connection">Problema de conexión del chat. Reintentando&#8230;</string>
+    <string name="chat_not_sent">No enviado. Comprueba tu conexión e inténtalo de nuevo.</string>
+    <string name="chat_connecting">Conectando&#8230;</string>
+    <string name="chat_send">Enviar</string>
 </resources>
