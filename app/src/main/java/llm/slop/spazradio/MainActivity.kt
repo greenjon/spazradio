@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import llm.slop.spazradio.data.ArchiveShow
 import llm.slop.spazradio.ui.components.ArchiveContent
 import llm.slop.spazradio.ui.components.CONTROLS_FADE_MS
 import llm.slop.spazradio.ui.components.ChatContent
@@ -148,7 +150,13 @@ fun RadioApp(
     val jukeboxFile by radioViewModel.jukeboxFile.collectAsState()
     val downloadingUrls by archiveViewModel.downloadingUrls.collectAsState()
     val downloadedFiles by archiveViewModel.downloadedFiles.collectAsState()
-    val jukeboxShow = remember(jukeboxFile, archiveCount) { jukeboxFile?.let { archiveViewModel.showFor(it) } }
+    // Looked up again when the show changes or the archive list grows; null hides the button.
+    val jukeboxShow by produceState<ArchiveShow?>(null, jukeboxFile, archiveCount) {
+        val file = jukeboxFile
+        // A new show: drop the last one's button at once rather than while its file is being looked for.
+        if (file == null || value?.let { findInArchive(file, listOf(it)) } == null) value = null
+        if (file != null) value = archiveViewModel.jukeboxShow(file)
+    }
     val headerDownload = jukeboxShow?.let { show ->
         when {
             show.url in downloadingUrls -> HeaderDownload.DOWNLOADING

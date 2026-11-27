@@ -371,14 +371,31 @@ class ArchiveViewModel(
     fun fileNameFor(show: ArchiveShow): String = downloadTracker.getFileName(show)
 
     /**
-     * The archive entry for the jukebox show on the stream, so the header and the Archives list share one
-     * download. Matched on the URL, then on the file name; a show missing from the feed gets an entry of its own.
+     * The archive entry for the jukebox show on the stream, or null when there is nothing to download (the button
+     * hides rather than offer a 404). Same order as the web TV's SAVE (v60), with the feed first since the app
+     * keeps it: the feed entry with that URL or file name (so the header and the Archives list share one download;
+     * `/playing` often names `archives/olde/`, which serves only some files, while the feed has the copy in
+     * `archives/imports/`), else the file where `/playing` says when a HEAD request finds it there, else nothing.
      */
-    fun showFor(file: JukeboxFile): ArchiveShow {
-        val name = file.url.substringAfterLast('/')
-        return allShows.firstOrNull { it.url == file.url }
-            ?: allShows.firstOrNull { it.url.substringAfterLast('/') == name }
-            ?: ArchiveShow(title = file.title, url = file.url, date = "", originalDate = "")
+    suspend fun jukeboxShow(file: JukeboxFile): ArchiveShow? {
+        findInArchive(file, allShows)?.let { return it }
+        return if (isServed(file.url)) ArchiveShow(title = file.title, url = file.url, date = "", originalDate = "") else null
+    }
+
+    private val served = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+    /** One HEAD request per file (answers kept; a request that fails without an answer is asked again later). */
+    private suspend fun isServed(url: String): Boolean {
+        served[url]?.let { return it }
+        return withContext(Dispatchers.IO) {
+            try {
+                headClient.newCall(Request.Builder().url(url).head().build()).execute().use { response ->
+                    response.isSuccessful.also { served[url] = it }
+                }
+            } catch (_: Exception) {
+                false
+            }
+        }
     }
 
     private val headClient = OkHttpClient.Builder()
@@ -405,4 +422,11 @@ class ArchiveViewModel(
         val file = File(directory, downloadTracker.getFileName(show))
         return if (file.exists()) file else null
     }
+}
+
+/** The feed entry for a jukebox file: the same URL, else the same file name (any folder), else null. */
+fun findInArchive(file: JukeboxFile, shows: List<ArchiveShow>): ArchiveShow? {
+    val name = file.url.substringAfterLast('/')
+    return shows.firstOrNull { it.url == file.url }
+        ?: shows.firstOrNull { name.isNotEmpty() && it.url.substringAfterLast('/') == name }
 }
