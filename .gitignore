@@ -19,3 +19,8 @@ key.properties
 *.keystore
 app/release.jks
 /app/release/
+
+# Per-user Android Studio state (keep codeStyles, inspectionProfiles, dictionaries shared)
+/.idea/deploymentTargetSelector.xml
+/.idea/deviceManager.xml
+/.idea/appInsightsSettings.xml

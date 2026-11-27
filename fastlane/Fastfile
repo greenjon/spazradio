@@ -18,16 +18,7 @@ default_platform(:android)
 platform :android do
   desc "Runs all the tests"
   lane :test do
-    gradle(task: "test")
-  end
-
-  desc "Submit a new Beta Build to Crashlytics Beta"
-  lane :beta do
-    gradle(task: "clean assembleRelease")
-    crashlytics
-  
-    # sh "your_script.sh"
-    # You can also use other beta testing services here
+    gradle(task: "testDebugUnitTest")
   end
 
   desc "Build signed Google Play App Bundle (AAB)"
@@ -45,11 +36,18 @@ platform :android do
     )
   end
 
-  desc "Deploy a new version to the Google Play"
+  # Unused so far: Play uploads are done by hand. Needs json_key_file in Appfile and key.properties for signing.
+  # Uploads only the bundle; store text, screenshots and changelogs are left alone.
+  desc "Upload the signed AAB to the Google Play internal track (no metadata)"
   lane :deploy do
     gradle(task: "clean bundleRelease")
     upload_to_play_store(
-      aab: "app/build/outputs/bundle/release/app-release.aab"
+      aab: "app/build/outputs/bundle/release/app-release.aab",
+      track: "internal",
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
     )
   end
 end

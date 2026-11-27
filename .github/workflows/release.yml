@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
 
 jobs:
   release:
@@ -28,20 +27,11 @@ jobs:
 
       - run: chmod +x gradlew
 
-      - name: Compute Version
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            TAG=${GITHUB_REF#refs/tags/v}
-            VERSION_TAG="v$TAG"
-          else
-            TAG="1.6.3"
-            VERSION_TAG="v$TAG"
-          fi
-          COUNT=$(git rev-list --count HEAD)
+      - name: Compute Tag
+        run: echo "VERSION_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-          echo "VERSION_CODE=$COUNT" >> $GITHUB_ENV
-          echo "VERSION_NAME=$TAG" >> $GITHUB_ENV
-          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
+      - name: Unit tests and lint
+        run: ./gradlew testDebugUnitTest lintDebug
 
       - name: Decode Signing Keystore
         id: keystore
@@ -61,9 +51,10 @@ jobs:
 
       - name: Build Release APK and AAB
         run: |
-          ./gradlew assembleRelease bundleRelease \
-            -PVERSION_CODE=${{ env.VERSION_CODE }} \
-            -PVERSION_NAME=${{ env.VERSION_NAME }}
+          # Tester builds are debug-signed on purpose when no signing secret exists; the flag makes that explicit.
+          EXTRA=""
+          if [ "${{ steps.keystore.outputs.has_keystore }}" != "true" ]; then EXTRA="-PallowDebugSigning"; fi
+          ./gradlew assembleRelease bundleRelease $EXTRA
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/app/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
