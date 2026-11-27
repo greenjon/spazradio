@@ -1,4 +1,8 @@
 SPAZ Radio 2.0.4
-- Visuals updated from the web TV: the Spaz logos are back as their own layer, backgrounds change with the scenes, and effects are picked at random.
-- The download button beside the title hides when the jukebox show's file can't be found, instead of downloading an error.
-- The chat copes with malformed messages: odd names, huge texts and bad times no longer break it or empty the history.
+- Reconnects by itself after a dropped stream; pauses when headphones unplug.
+- Reopening the app no longer stops an archive show that is playing.
+- Chat is plain text, connects only while the app is open, and keeps your draft if sending fails.
+- Downloads work on Android 7-9 and say when they fail.
+- Schedule, theme and translation fixes; visuals updated from the web TV.
+- Clearer privacy policy.
+- Chat history now checks the server's certificate.

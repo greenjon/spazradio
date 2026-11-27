@@ -69,7 +69,7 @@ it out. Use `--since <rev>` to scope from somewhere else, such as a release tag.
 
 | Audit | Tag | Kind | Notes |
 |---|---|---|---|
-| (none yet) | | | first run will be a full audit |
+| 2026-11-26 | `audit-2026-11-26` | full | first audit; report in `.planning/audit-2026-11-26.md`, lane detail in `.planning/audit-2026-11-26/` |
 
 ## Lanes
 
@@ -242,7 +242,8 @@ This is the same as Liquid LSD's method, shortened:
 6. **Docs pass** last. Covers `PRIVACY.md`, the changelog, the store text and this page.
 7. **New checks.** Turn any finding type seen twice into an automatic check.
 8. **Close.** Tag the commit (see above), add a row to the audit table, and move open items to
-   `.planning/open-items.md`.
+   `.planning/open-items.md`. Keep the merged report and the lane files until the next audit closes, then delete
+   them (git history keeps them).
 
 ## Who runs what
 

@@ -13,7 +13,7 @@ All servers are run by Spaz Radio: `radio.spaz.org` and `spaz.org`. Like any web
 | What | Where | When |
 | --- | --- | --- |
 | Live audio stream | `radio.spaz.org` | While you play the radio |
-| "Now playing" and listener count (`/playing`) | `radio.spaz.org` | About every 10 seconds while the app's playback service is running |
+| "Now playing" and listener count (`/playing`) | `radio.spaz.org` | About every 10 seconds while the radio plays or the app is open |
 | Show schedule | `radio.spaz.org` | When you open the schedule, then hourly while it stays open |
 | Archive list (RSS) and archive playback | `spaz.org` | When you browse or play archives |
 | Archive downloads | `spaz.org` | Only when you tap Download. Files are saved to the shared `Music/SPAZRadio` folder, which other apps can see |
@@ -45,7 +45,7 @@ Settings > Debug & Support > "Send Debug Logs" is optional and only runs when yo
 - **ACCESS_NETWORK_STATE**: to tell whether you are online or on a metered (mobile data) connection, so the app can pick a stream quality, ask before big downloads, and reconnect chat.
 - **FOREGROUND_SERVICE and FOREGROUND_SERVICE_MEDIA_PLAYBACK**: to keep the radio playing with the screen off.
 - **POST_NOTIFICATIONS** (Android 13+): to show the playback notification and download progress.
-- **WAKE_LOCK**: to turn the screen off while the phone is in your pocket or face down with visuals playing (uses the proximity sensor; the sensor reading never leaves the device).
+- **WAKE_LOCK**: to keep the network stream running while the screen is off, and to turn the screen off while the phone is in your pocket or face down with visuals playing (uses the proximity sensor; the sensor reading never leaves the device).
 - **WRITE_EXTERNAL_STORAGE** (Android 9 and older only): to save archive downloads to `Music/SPAZRadio`.
 
 The app does not ask for your location, contacts, microphone or camera.
