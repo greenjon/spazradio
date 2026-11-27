@@ -132,5 +132,32 @@
   "sam.jpg",
   "signal-2021-08-17-135535.jpg",
   "signal-2022-05-30-19-27-09-661.jpg"
- ]
+ ],
+ "logo": {
+  "base": "gallery/logo/",
+  "images": [
+   "11230238_1079605558722712_2269403984728940991_n.png",
+   "boobs.png",
+   "chaos.png",
+   "destination_mutation.png",
+   "hex.png",
+   "logo_spaz_3D_256_300x.png",
+   "logo_spaz_BWball_256_300x.png",
+   "logo_spaz_bitclouds_256_300x.png",
+   "logo_spaz_napkin_256_300x.png",
+   "logo_spaz_patch_256_300x.png",
+   "logo_spaz_sound.png",
+   "logo_spaz_sunfront_24bit_300x.png",
+   "logo_spaz_sunfront_256_300x.png",
+   "mex.png",
+   "opart.png",
+   "signal-2024-02-18-175330_002.png",
+   "signal-2024-12-19-160226_002.png",
+   "signal-2024-12-19-160226_003.png",
+   "signal-2024-12-19-160226_004.png",
+   "spazfast99.png",
+   "subzero1.png"
+  ],
+  "opaque": []
+ }
 }

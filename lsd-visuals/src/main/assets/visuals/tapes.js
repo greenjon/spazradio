@@ -6,6 +6,11 @@
 import { decodeName } from './schedule.js';
 
 export const TAPES_FEED_URL = 'https://spaz.org/archives/archives.rss';
+// The Spaz Radio Android app downloads shows to play offline; the TV only offers SAVE on the track line (ui.js). On Android, spaz.org/go/
+// offers Google Play or the APK; anywhere else it would send the viewer back to the TV, so they get the Play page.
+const APP_GO_URL = 'https://spaz.org/go/';
+const APP_PLAY_URL = 'https://play.google.com/store/apps/details?id=llm.slop.spazradio';
+export const appUrl = (userAgent = globalThis.navigator?.userAgent ?? '') => (/android/i.test(userAgent) ? APP_GO_URL : APP_PLAY_URL);
 const FILE_PREFIX = 'https://spaz.org/archives/imports/';
 const FEED_STALE_MS = 60 * 60 * 1000;   // opening TAPES refetches a list older than this (the feed is daily)
 const RANDOM_MIN_S = 20 * 60;           // the die does not land on a stray few minutes of a show
@@ -51,6 +56,57 @@ export function parseFeed(xml) {
     shows.push({ id, url, title, date, seconds: parseDuration(item.match(DURATION)?.[1]), search: `${title} ${date}`.toLowerCase() });
   }
   return shows;
+}
+
+// -------------------------------------------------------
+// Share links: /tv/?tape=<id>&t=1h12m3s opens the TV with that show cued at that moment. The id is the archive
+// file's name without .ogg, as in the feed, so a link outlives the list it was made from.
+// -------------------------------------------------------
+const LINK_MIN_S = 5;   // a link to the first few seconds is a link to the show
+
+/** `1h12m3s`, `72m`, `90s`, `4323`, `1:12:03` -> seconds. Anything else -> 0. */
+export function parseLinkTime(s) {
+  const v = String(s ?? '').trim().toLowerCase();
+  if (/^\d+(:\d+)*$/.test(v)) return parseDuration(v);
+  const m = v.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
+  if (!v || !m) return 0;
+  return Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0);
+}
+
+/** 4323 -> `1h12m3s`, 90 -> `1m30s`, 0 -> `0s`. */
+export function formatLinkTime(seconds) {
+  const s = Math.max(0, Math.floor(Number(seconds) || 0));
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60;
+  return `${h ? `${h}h` : ''}${m ? `${m}m` : ''}${ss || (!h && !m) ? `${ss}s` : ''}`;
+}
+
+/** `?tape=<id>&t=…` -> { id, at } (at in seconds), or null when there is no usable tape id. */
+export function parseTapeLink(search) {
+  const params = new URLSearchParams(search ?? '');
+  const id = params.get('tape')?.trim();
+  // The id becomes part of a URL under the archive. Every archive name is letters, digits, _ and -, so nothing else
+  // gets in: nothing that could leave that folder or end the path.
+  if (!id || id.length > 200 || !/^[\w.-]+$/.test(id) || id.includes('..')) return null;
+  return { id, at: parseLinkTime(params.get('t')) };
+}
+
+/** The show a link names: from the list when it is there, else made from the id alone (no length, a rough title). */
+export function showForLink(id, shows = []) {
+  const known = shows.find((s) => s.id === id);
+  if (known) return known;
+  const title = tidyTitle(id.replace(/^\d{4}-\d{2}-\d{2}[-_ ]*/, '')) || id;
+  const date = id.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? '';
+  return { id, url: `${FILE_PREFIX}${id}.ogg`, title, date, seconds: 0, search: `${title} ${date}`.toLowerCase() };
+}
+
+/** The share link for show `id` at `seconds`, on the page at `href` (its other options dropped). */
+export function tapeLinkUrl(href, id, seconds = 0) {
+  const url = new URL(href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('tape', id);
+  if (seconds >= LINK_MIN_S) url.searchParams.set('t', formatLinkTime(seconds));
+  return url.href;
 }
 
 /** Shows matching every word of `query` in the title or date. An empty query keeps them all. */
@@ -126,36 +182,122 @@ export async function fetchPeaks(show, fetchImpl = fetch) {
 }
 
 // -------------------------------------------------------
-// The show list: fetched when TAPES first opens, since most visits never will.
+// The show list: fetched when TAPES first opens, since most visits never will. The last good list is kept on
+// the device (Cache Storage, LIST_CACHE), so TAPES opens at once on a later visit, offline too, and the feed is
+// fetched again only once the kept list is older than FEED_STALE_MS. When it is, the browser asks the server
+// (a 304 when the feed has not changed) and an unchanged Last-Modified skips parsing the 6 MB again.
 // -------------------------------------------------------
+export const LIST_CACHE = 'lsd-tv-tapes';   // sw.js keeps this cache when it clears old ones
+const LIST_KEY = 'tapes-list.json';
+const LIST_VERSION = 1;
+
 export const tapesState = {
   shows: [],
   fetchedAt: 0,     // Date.now() of the last good fetch (0: never)
+  modified: '',     // the feed's Last-Modified at that fetch
   failed: false,    // the last fetch failed and there is no copy
   loading: null,    // the fetch in flight
+  restoring: null,  // reading the kept list, the first time TAPES opens
+  restored: false,  // the kept list has been read (or there was none)
 };
 
-/** Replaces the list (a good fetch, or the headless check's fixture). */
-export function setTapes(shows) {
+/** Replaces the list (a good fetch, a kept list, or the headless check's fixture). */
+export function setTapes(shows, fetchedAt = Date.now(), modified = '') {
   tapesState.shows = shows;
-  tapesState.fetchedAt = Date.now();
+  tapesState.fetchedAt = fetchedAt;
+  tapesState.modified = modified;
   tapesState.failed = false;
+}
+
+/**
+ * The archive's copy of the jukebox show's file (radio.spaz.org/playing's `download`), or null when the archive
+ * list has no show by that file name. The radio plays from a batch copied into `archives/olde/`, which spaz.org
+ * does not serve; most of those files are in `archives/imports/` under the same name, and the list knows which.
+ * (Files the station took from `archives/imported/<uploader>/<folders>/` are not in the list, and their path is
+ * lost in the copy, so they have none.) A file already in `imports/` is its own copy.
+ */
+export function archiveFileFor(url, shows = tapesState.shows) {
+  if (!url) return null;
+  if (url.startsWith(FILE_PREFIX)) return url;
+  let name;
+  try { name = decodeURIComponent(new URL(url).pathname.split('/').pop()); } catch { return null; }
+  const id = name.replace(/\.ogg$/i, '');
+  if (!id || id === name) return null;
+  return showIndex(shows).get(id)?.url ?? null;
+}
+let indexOf = null, index = null;
+/** id -> show, rebuilt when the list is replaced. */
+function showIndex(shows) {
+  if (indexOf !== shows) { index = new Map(shows.map((s) => [s.id, s])); indexOf = shows; }
+  return index;
 }
 
 export const tapesStale = (now = Date.now()) => now - tapesState.fetchedAt > FEED_STALE_MS;
 
+/** Shows -> the kept form: [id, title, date, seconds] each (the URL and search text follow from them). */
+export const packShows = (shows) => shows.map((s) => [s.id, s.title, s.date, s.seconds]);
+/** The kept form -> shows. Anything malformed is dropped. */
+export function unpackShows(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.filter((r) => Array.isArray(r) && typeof r[0] === 'string' && r[0]).map(([id, title, date, seconds]) => {
+    const t = String(title ?? id), d = String(date ?? '');
+    return { id, url: `${FILE_PREFIX}${id}.ogg`, title: t, date: d, seconds: Number(seconds) || 0, search: `${t} ${d}`.toLowerCase() };
+  });
+}
+
+/** Where the list is kept: Cache Storage when the browser has it (not in a private window, not in node), else nowhere. */
+export function createListStore(cachesImpl = globalThis.caches) {
+  const open = () => cachesImpl.open(LIST_CACHE);
+  return {
+    async load() {
+      try {
+        const res = await (await open()).match(LIST_KEY);
+        const rec = res ? await res.json() : null;
+        return rec?.v === LIST_VERSION ? rec : null;
+      } catch { return null; }
+    },
+    async save(state) {
+      try {
+        const body = JSON.stringify({ v: LIST_VERSION, fetchedAt: state.fetchedAt, modified: state.modified, shows: packShows(state.shows) });
+        await (await open()).put(LIST_KEY, new Response(body, { headers: { 'Content-Type': 'application/json' } }));
+      } catch { /* not kept: the next visit fetches the feed */ }
+    },
+  };
+}
+let defaultStore = null;
+const listStore = () => (defaultStore ??= createListStore());
+
+/** Reads the kept list once, unless a list is already in (a fetch, or the headless fixture). Returns tapesState. */
+export function restoreTapes(store = listStore()) {
+  if (tapesState.restored) return Promise.resolve(tapesState);
+  tapesState.restoring ??= (async () => {
+    const rec = await store.load();
+    const shows = unpackShows(rec?.shows);
+    if (shows.length && !tapesState.fetchedAt && Number.isFinite(rec.fetchedAt)) setTapes(shows, rec.fetchedAt, String(rec.modified ?? ''));
+    return tapesState;
+  })().finally(() => { tapesState.restoring = null; tapesState.restored = true; });
+  return tapesState.restoring;
+}
+
 /** Fetches the feed (one retry after 2 s), keeping the last good list if it fails. Returns tapesState. */
-export function refreshTapes(fetchImpl = fetch) {
+const feedSignal = (ms) => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
+export function refreshTapes(fetchImpl = fetch, store = listStore()) {
   if (tapesState.loading) return tapesState.loading;
   tapesState.failed = false;
   tapesState.loading = (async () => {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const res = await fetchImpl(TAPES_FEED_URL, { cache: 'no-cache' });
+        const res = await fetchImpl(TAPES_FEED_URL, { cache: 'no-cache', signal: feedSignal(20000) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const shows = parseFeed(await res.text());
-        if (!shows.length) throw new Error('empty feed');
-        setTapes(shows);
+        const modified = res.headers?.get?.('last-modified') ?? '';
+        if (modified && modified === tapesState.modified && tapesState.shows.length) {
+          setTapes(tapesState.shows, Date.now(), modified);   // unchanged: no need to parse it again
+        } else {
+          const shows = parseFeed(await res.text());
+          if (!shows.length) throw new Error('empty feed');
+          setTapes(shows, Date.now(), modified);
+        }
+        await store.save(tapesState);
         return tapesState;
       } catch (err) {
         if (attempt === 0) await new Promise((r) => setTimeout(r, 2000));

@@ -1,19 +1,21 @@
 import { cvState, tick, suspendAudio, resumeAudio } from './dsp.js';
 import { powerState, viewerState } from './ui.js';
-import { autopilotState, autopilotSettings, tickAutopilot, startAutopilot, handleRelayMessage, advanceForeground, setPrewarm, setHeavyAllowed, setSteppedLookup } from './autopilot.js';
+import { autopilotState, autopilotSettings, tickAutopilot, startAutopilot, handleRelayMessage, advanceForeground, setPrewarm, setHeavyAllowed, setSteppedLookup, fetchTimed, sharedJson } from './autopilot.js';
 import { evaluateParameter, makeEvalContext, paramSpec } from './evaluator.js';
 import { lookupParam } from './isf.js';
 import { AudioTextures, audioFrame } from './audiotex.js';
-import { Library, DeckPipeline, MixerPipeline } from './graph.js';
+import { Library, DeckPipeline, MixerPipeline, Target } from './graph.js';
 import { MandalaRecipes } from './mandala.js';
 import { Gallery } from './gallery.js';
 import { heardBeats, DelayLine } from './sync.js';
 import { DropEnvelope } from './energy.js';
 import { installEmbedApi } from './embed.js';
 import { embed } from './embedmode.js';
+import { startLite, visualsChoice, rememberSlow, initLite, liteState } from './lite.js';
+import { createFrameLoop } from './frameloop.js';
 
 async function loadText(url) {
-  const res = await fetch(url);
+  const res = await fetchTimed(url);
   if (!res.ok) {
     throw new Error(`Failed to load ${url}: status ${res.status}`);
   }
@@ -55,7 +57,28 @@ function getUniformLocations(gl, program, names) {
   return locs;
 }
 
+/** The photo slideshow instead of the visuals (lite.js). Embedded, the host app shows its own visuals instead. */
+function goLite(reason) {
+  if (embed) return false;
+  startLite(reason);
+  return true;
+}
+
+// The visuals once init() has set them up: pause() while lite mode is the picture, resume() after.
+let visuals = null;
+let starting = false;       // init() is setting the visuals up (asked again meanwhile, it still runs once)
+initLite({
+  powerState, viewerState,
+  pause: () => visuals?.pause(),
+  run: () => { if (visuals) visuals.resume(); else if (!starting) init().catch(initFailed); },   // lite -> full
+});
+
 async function init() {
+  // Lite picked (MENU › TV › VISUALS or ?lite=1), or this device was too slow on an earlier visit: no WebGL
+  // context, and none of the shaders or scenes are fetched.
+  const choice = embed ? 'full' : visualsChoice();
+  if (choice !== 'full') { goLite(choice === 'lite-auto' ? 'slow' : 'chosen'); return; }
+  starting = true;
   const canvas = document.getElementById('glCanvas');
   const gl = canvas.getContext('webgl2', {
     alpha: false,
@@ -66,9 +89,18 @@ async function init() {
   });
 
   if (!gl) {
-    alert('WebGL 2 is not supported in this browser.');
+    if (goLite('no-webgl')) return;
     throw new Error('WebGL 2 not supported');
   }
+  // Context loss (GPU reset, driver update, a phone reclaiming the tab's GPU): every program, texture and target
+  // is gone and each draw does nothing. Asking for it back (preventDefault) and reloading once it is restored
+  // rebuilds them all; an embed host hears `failed` meanwhile and can show its own visuals.
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    console.warn('[lsd] WebGL context lost; reloading when it is restored');
+    if (embed) window.LSDHost?.failed?.('WebGL context lost');
+  });
+  canvas.addEventListener('webglcontextrestored', () => location.reload());
 
   const extFloat = gl.getExtension('EXT_color_buffer_float');
   const fmt = { internalFormat: gl.RGBA16F, format: gl.RGBA, type: gl.HALF_FLOAT };
@@ -97,8 +129,8 @@ async function init() {
     loadText('shaders/mandala.frag'),
     loadText('shaders/mixer.frag'),
     loadText('shaders/crt_post.frag'),
-    loadText('catalog.json').then(JSON.parse),
-    loadText('mandala_recipes.json').then(JSON.parse)
+    sharedJson('catalog.json'),
+    sharedJson('mandala_recipes.json')
   ]);
 
   const mandalaProgram = createProgram(gl, mandalaVertSrc, mandalaFragSrc);
@@ -176,6 +208,9 @@ async function init() {
   const AUDIO_KEYS = ['audio_amp', 'audio_bass', 'audio_mid', 'audio_himid', 'audio_high', 'audio_flux_amp', 'audio_flux_bass', 'audio_flux_mid', 'audio_flux_himid', 'audio_flux_high',
     'audio_energy', 'audio_energy_bass', 'audio_energy_mid', 'audio_energy_himid', 'audio_energy_high'];
   const drop = new DropEnvelope();
+  const REACT_KEYS = AUDIO_KEYS.slice(0, 10), SECTION_KEYS = AUDIO_KEYS.slice(10);
+  let reactK = 1;
+  const react = (v) => Math.min(1, v * reactK);
   function updateEvalContext() {
     // Live broadcast: the desktop's beat clock (phase-locked flywheel). Standalone: the web's own
     // beat detector (dsp.js) integrates tempo into total beats, so a tempo change never jumps the phase.
@@ -184,8 +219,10 @@ async function init() {
     // SYNC (sync.js): the beat and the audio signals the picture reads are those the viewer hears now.
     const now = performance.now();
     const beats = heardBeats(now, viewerState.syncMs);
-    audioDelay.push(now, Object.fromEntries(AUDIO_KEYS.map((key) => [key, cvState[key]])));
-    const heard = { ...audioDelay.read(now, viewerState.syncMs) };
+    const values = {};
+    for (const key of AUDIO_KEYS) values[key] = cvState[key];
+    audioDelay.push(now, values);
+    const heard = audioDelay.read(now, viewerState.syncMs); // read only: no copy
     drop.report(cvState.drops, cvState.dropLag, heardBeats(now, 0), bpm); // dated in analysis time, read at the heard beat
     evalCtx.time = elapsedTime;
     evalCtx.beats = beats;
@@ -194,18 +231,15 @@ async function init() {
     evalCtx.bpm = bpm;
     // REACT dial: scales every audio signal (not the beat) after auto gain and clamps to 0..1, like the
     // desktop's Audio Response, so the dial is about taste, not the stream's level.
-    const k = viewerState.reducedNow ? Math.min(viewerState.react, 0.6) : viewerState.react; // reduced motion caps it
-    const r = (v) => Math.min(1, v * k);
-    evalCtx.cv = {
-      audio_amp: r(heard.audio_amp), audio_bass: r(heard.audio_bass),
-      audio_mid: r(heard.audio_mid), audio_himid: r(heard.audio_himid), audio_high: r(heard.audio_high),
-      audio_flux_amp: r(heard.audio_flux_amp), audio_flux_bass: r(heard.audio_flux_bass),
-      audio_flux_mid: r(heard.audio_flux_mid), audio_flux_himid: r(heard.audio_flux_himid), audio_flux_high: r(heard.audio_flux_high),
-      // Song sections are not scaled by REACT (like Audio Response on the desktop); reduced motion softens the hit.
-      audio_energy: heard.audio_energy ?? 0, audio_energy_bass: heard.audio_energy_bass ?? 0, audio_energy_mid: heard.audio_energy_mid ?? 0,
-      audio_energy_himid: heard.audio_energy_himid ?? 0, audio_energy_high: heard.audio_energy_high ?? 0, audio_drop: drop.value(beats) * (viewerState.reducedNow ? 0.6 : 1),
-      beatSine: Math.sin(beats * 2 * Math.PI), bpm,
-    };
+    reactK = viewerState.reducedNow ? Math.min(viewerState.react, 0.6) : viewerState.react; // reduced motion caps it
+    // One object, filled in place each frame (no per-frame garbage on phones).
+    const cv = evalCtx.cv;
+    for (const key of REACT_KEYS) cv[key] = react(heard[key]);
+    // Song sections are not scaled by REACT (like Audio Response on the desktop); reduced motion softens the hit.
+    for (const key of SECTION_KEYS) cv[key] = heard[key] ?? 0;
+    cv.audio_drop = drop.value(beats) * (viewerState.reducedNow ? 0.6 : 1);
+    cv.beatSine = Math.sin(beats * 2 * Math.PI);
+    cv.bpm = bpm;
   }
   updateEvalContext();
 
@@ -234,7 +268,7 @@ async function init() {
     blit: { program: blitProgram, uTexture: gl.getUniformLocation(blitProgram, 'uTexture') },
     mixerProg: {
       program: mixerProgram,
-      ...Object.fromEntries(['uTex1', 'uTexBG', 'uProgress', 'uBgAlpha', 'uLevelA', 'uLevelB', 'uLevelBG', 'uMasterLevel']
+      ...Object.fromEntries(['uTex1', 'uTexBG', 'uTexLogo', 'uProgress', 'uBgAlpha', 'uLogoAlpha', 'uLevelA', 'uLevelB', 'uLevelBG', 'uMasterLevel']
         .map((n) => [n, gl.getUniformLocation(mixerProgram, n)]))
     }
   };
@@ -254,6 +288,8 @@ async function init() {
     const k = cap * SCALES[adapt.idx];
     return [Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))];
   }
+  // `dt`: the real frame time, up to 0.5 s (not the 0.1 s the animation clamps to), so a device at 1-2 fps
+  // steps down every STEP_GAP_MS like any other, instead of after minutes.
   function adaptScale(dt, now) {
     adapt.ema += (dt - adapt.ema) * 0.05;
     if (now - adapt.lastChange < STEP_GAP_MS) return false;
@@ -344,13 +380,18 @@ async function init() {
   const pipeB  = new DeckPipeline(ctx, renderW, renderH);
   const pipeBG = new DeckPipeline(ctx, renderW, renderH);
   const mixerPipe = new MixerPipeline(ctx, renderW, renderH);
+  const logoTarget = new Target(gl, renderW, renderH, fmt);   // the Spaz logos layer (MENU › SPAZ LOGOS)
+  let logoLevel = viewerState.logos ? 1 : 0;                  // eased towards on / off, so a toggle fades
 
   window.LSD = { cvState, audioFrame, autopilotState, powerState, viewerState, library: ctx.library, handleRelayMessage, advanceForeground,
-    renderSize: () => [renderW, renderH, SCALES[adapt.idx]], gpu };
+    renderSize: () => [renderW, renderH, SCALES[adapt.idx]], gpu, frames: () => frameCount };
 
+  const frameInfoObj = { time: 0, dt: 0, index: 0 };   // reused every call: the frame loop allocates nothing
   function frameInfo() {
-    return { time: elapsedTime, dt: frameDt, index: frameCount };
+    frameInfoObj.time = elapsedTime; frameInfoObj.dt = frameDt; frameInfoObj.index = frameCount;
+    return frameInfoObj;
   }
+  const logoOpts = { dt: 0, bpm: 0, beats: 0, calm: false };
 
   // Draws a deck's source (ISF via the graph, or mandala here) then runs its FX chain.
   // Returns the deck's final texture.
@@ -376,6 +417,7 @@ async function init() {
   const UNIT_SPEC = { min: 0, max: 1, steps: null };
   const mandalaRecipes = new MandalaRecipes(mandalaTable);
   const gallery = new Gallery(gl, quadVAO);   // the Spaz Radio photo gallery (gallery.js); loads on first use
+  const logos = new Gallery(gl, quadVAO, { set: 'logo' });   // ...and its logos, the layer between background and scene
 
   function renderMandala(deckData, target) {
     target.bind();
@@ -404,10 +446,70 @@ async function init() {
 
   let noSignal = 0;
   let paused = false;       // embed mode: the host hid the picture
+  let stopped = false;      // too slow: lite.js (or, embedded, the host app) took over for good
   let forceResize = false;
+
+  // Too slow for the visuals: frames are counted over 8 s windows of wall time, with the TV on and the page
+  // visible, from 5 s after power-on (the warm-up, the first shaders and the GPU probe stutter). Two windows
+  // in a row under 12 fps at the coarsest render step (one could be a shader compiling) and the device cannot
+  // run the visuals: the photo slideshow takes over, and the next visit starts with it (MENU › TV › VISUALS
+  // tries again). At 1 fps that is about 30 s after power-on: ~12 s for the scaler to step down, then 16 s.
+  const SLOW_WINDOW_MS = 8000, SLOW_GRACE_MS = 5000, SLOW_FPS = 12, SLOW_WINDOWS = 2, GAP_MS = 3000;
+  const speed = { since: 0, frames: 0, last: 0, onAt: 0, slowWindows: 0 };
+  const loop = createFrameLoop(render);   // the only place a frame is requested: start() cancels a pending one first
+  let liteHold = liteState.on;   // lite mode is the picture (maybe picked again while this loaded): the loop
+                                 // rests, everything stays ready to come back
+  visuals = {
+    pause() { liteHold = true; },
+    resume() {
+      if (!liteHold) return;
+      liteHold = false;
+      lastTime = performance.now();
+      speed.onAt = 0; speed.since = 0; speed.slowWindows = 0;   // measure afresh
+      forceResize = true;
+      loop.start();
+    },
+  };
+  const forcedFull = new URLSearchParams(location.search).get('lite') === '0';   // ?lite=0: full, however slow
+  function tooSlow(now) {
+    if (forcedFull) return false;
+    if (!powerState.on || document.hidden) { speed.since = 0; speed.onAt = 0; speed.slowWindows = 0; return false; }
+    if (!speed.onAt) speed.onAt = now;
+    if (now - speed.last > GAP_MS) { speed.since = 0; speed.slowWindows = 0; }   // hidden or stalled: start over
+    speed.last = now;
+    if (now - speed.onAt < SLOW_GRACE_MS) return false;
+    if (!speed.since) { speed.since = now; speed.frames = 0; return false; }
+    speed.frames++;
+    if (now - speed.since < SLOW_WINDOW_MS) return false;
+    const fps = (speed.frames * 1000) / (now - speed.since);
+    speed.since = now; speed.frames = 0;
+    speed.slowWindows = fps < SLOW_FPS && adapt.idx === SCALES.length - 1 ? speed.slowWindows + 1 : 0;
+    return speed.slowWindows >= SLOW_WINDOWS;
+  }
+  function handOver() {
+    console.warn('[lsd] too slow for the visuals here; switching to the lite picture');
+    if (embed) { stopped = true; window.LSDHost?.failed?.('too slow'); return; }   // the app shows its own visuals
+    rememberSlow();
+    goLite('slow');   // pauses the loop (visuals.pause); VISUALS › FULL resumes it
+  }
+
+  // Off: once the shutdown animation has drawn its last (black) frame the screen stays as it is, so nothing
+  // is drawn and the loop slows to OFF_TICK_MS (the radio clock and the autopilot still move along).
+  // Power-on is picked up at the next tick; any requestAnimationFrame(render) (resume) takes the timer over.
+  const OFF_TICK_MS = 100;
+  let offTimer = 0;
+  let darkDrawn = false;
+  function nextFrame(off) {
+    if (off) offTimer = setTimeout(() => { offTimer = 0; render(performance.now()); }, OFF_TICK_MS);
+    else loop.start();
+  }
+
   function render(now) {
-    if (paused) return;
-    const dt = Math.min((now - lastTime) / 1000, 0.1);
+    if (offTimer) { clearTimeout(offTimer); offTimer = 0; }
+    if (paused || stopped || liteHold) return;
+    if (tooSlow(now)) { handOver(); return; }
+    const frameMs = now - lastTime;
+    const dt = Math.min(frameMs / 1000, 0.1);
     lastTime = now;
     elapsedTime += dt;
     frameDt = dt;
@@ -437,11 +539,15 @@ async function init() {
       }
     }
 
+    const dark = !powerState.on && powerState.shutdownProgress >= 1.0;
+    if (dark && darkDrawn) { nextFrame(true); return; }
+    darkDrawn = dark;
+
     const displayW = canvas.clientWidth  || window.innerWidth;
     const displayH = canvas.clientHeight || window.innerHeight;
     const targetW  = Math.max(1, Math.floor(displayW * (window.devicePixelRatio || 1)));
     const targetH  = Math.max(1, Math.floor(displayH * (window.devicePixelRatio || 1)));
-    const rescaled = powerState.on && adaptScale(dt, now);
+    const rescaled = powerState.on && adaptScale(Math.min(frameMs / 1000, 0.5), now);
     if (canvas.width !== targetW || canvas.height !== targetH || rescaled || forceResize) {
       forceResize = false;
       canvas.width  = targetW;
@@ -453,6 +559,7 @@ async function init() {
       pipeB.resize(renderW, renderH);
       pipeBG.resize(renderW, renderH);
       mixerPipe.resize(renderW, renderH);
+      logoTarget.resize(renderW, renderH);
     }
 
     gl.disable(gl.BLEND);
@@ -463,10 +570,19 @@ async function init() {
       const texA = renderDeck(autopilotState.deckA, pipeA) ?? pipeA.clean.tex;
       const texB = renderDeck(autopilotState.deckB, pipeB) ?? pipeB.clean.tex;
       const texBG = renderDeck(autopilotState.deckBG, pipeBG);
+      // The Spaz logos, between the background and the scene: MENU › SPAZ LOGOS, never over a live broadcast's
+      // picture (the desktop's own). A toggle fades them over about half a second; off, they are not drawn.
+      const logosWanted = viewerState.logos && !autopilotState.isLiveBroadcast;
+      logoLevel = logosWanted ? Math.min(1, logoLevel + frameDt * 2) : Math.max(0, logoLevel - frameDt * 2);
+      if (logoLevel > 0) {
+        logoOpts.dt = frameDt; logoOpts.bpm = evalCtx.bpm; logoOpts.beats = evalCtx.beats; logoOpts.calm = viewerState.reducedNow;
+        logos.render(logoTarget, logoOpts);
+      }
       const mix = autopilotState.mixer || {};
       finalTex = mixerPipe.render(
         mix, texA, texB, texBG ?? pipeBG.clean.tex,
         (autopilotState.deckBG && !autopilotState.deckBG.empty) ? (autopilotState.bgAlpha ?? 1.0) : 0.0,
+        logoTarget.tex, logoLevel,
         (mix.alpha ?? 1.0) * autopilotState.masterAlpha,
         frameInfo());
     }
@@ -494,21 +610,21 @@ async function init() {
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    requestAnimationFrame(render);
+    nextFrame(false);
   }
 
-  requestAnimationFrame(render);
+  loop.start();
 
   installEmbedApi({
     frames: () => frameCount,
     isPaused: () => paused,
     pause() { if (paused) return; paused = true; suspendAudio(); },
     resume() {
-      if (!paused) return;
+      if (!paused || stopped || liteHold) return;
       paused = false;
       lastTime = performance.now();
       resumeAudio();
-      requestAnimationFrame(render);
+      loop.start();
     },
     // Quality floor: the render scale never goes finer than SCALES[index]'s step (0 = adaptive over all steps).
     setQuality(index) {
@@ -525,9 +641,11 @@ async function init() {
   });
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  init().catch((err) => {
-    console.error('Liquid LSD WebGL2 init error:', err);
-    window.LSDHost?.failed?.(String(err));   // embed: the host falls back to its own visuals
-  });
-});
+function initFailed(err) {
+  starting = false;
+  console.error('Liquid LSD WebGL2 init error:', err);
+  window.LSDHost?.failed?.(String(err));   // embed: the host falls back to its own visuals
+  goLite('error');                         // standalone: the photo slideshow
+}
+
+window.addEventListener('DOMContentLoaded', () => init().catch(initFailed));

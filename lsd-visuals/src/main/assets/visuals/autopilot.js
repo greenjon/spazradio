@@ -7,6 +7,9 @@ import { BeatFlywheel } from './beatclock.js';
 import { chainFits, chainAnswers, dominantBand } from './pairing.js';
 import { MandalaRecipes } from './mandala.js';
 
+// Array.at / findLast need Safari 15.4; the TV supports Safari 15.0 (tools/compat.test.mjs).
+const last = (a) => a[a.length - 1];
+
 const RELAY_URL = 'wss://spaz.org/lsd-relay';
 let relayEnabled = !embed;   // embed mode starts with it off (the host app turns it on with the `live` option)
 let relaySocket = null;
@@ -82,6 +85,9 @@ let fgPreparing = false;
 let fgHoldStart = 0;       // beat the current scene finished fading in
 const fgHistory = [];      // scenes that have been on air, newest last (a channel coming back keeps its chain)
 const HISTORY_MAX = 50;
+let fgStarted = false;     // startup is over: a scene is on air, or there is no playlist to tune to (nowShowing().tuning)
+let tagsReady = false;     // every playlist preset's tags and source are known (loadPresetTags)
+let catalogComplete = false; // ...and the background playlist is in: contentCatalog() is final (`lsd-catalog-ready`)
 
 let bgPlaylist = [];
 let bgPlaylistIdx = 0;
@@ -100,6 +106,35 @@ export function nextSwitchBeat(beats, holdBars, fadeBeats) {
   return Math.max(beats, barLine - fadeBeats);
 }
 
+// A fetch that gives up on a request after FETCH_TIMEOUT_MS and asks again (FETCH_TRIES in all): on a bad
+// mobile connection one stalled request would otherwise hold up whatever waits on it (the first scene) for
+// minutes, and asking again usually gets an answer at once. An HTTP error is returned, not retried.
+const FETCH_TIMEOUT_MS = 8000;
+const FETCH_TRIES = 3;
+export async function fetchTimed(url, ms = FETCH_TIMEOUT_MS) {
+  const timed = typeof AbortSignal !== 'undefined' && AbortSignal.timeout;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fetch(url, timed ? { signal: AbortSignal.timeout(ms) } : undefined);
+    } catch (err) {
+      if (!timed || attempt >= FETCH_TRIES) throw err;
+      console.warn(`[autopilot] ${url}: ${err.name}, asking again`);
+    }
+  }
+}
+
+/** A JSON file fetched once for the whole page: renderer.js and the autopilot both read catalog.json and the
+ *  Mandala recipe table at startup. Rejects (and is forgotten, to be tried again) if it can't be had. */
+const sharedJsonCache = new Map();
+export function sharedJson(url) {
+  if (!sharedJsonCache.has(url)) {
+    const p = fetchTimed(url).then((res) => { if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`); return res.json(); });
+    sharedJsonCache.set(url, p);
+    p.catch(() => sharedJsonCache.delete(url));
+  }
+  return sharedJsonCache.get(url);
+}
+
 // Preset Caches
 const presetCache = new Map();
 
@@ -115,7 +150,7 @@ async function fetchPreset(nameOrPath) {
   if (presetCache.has(path)) return presetCache.get(path);
 
   try {
-    const res = await fetch(path);
+    const res = await fetchTimed(path);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     presetCache.set(path, data);
@@ -136,7 +171,7 @@ async function loadPlaylistFile(filename) {
   }
 
   try {
-    const res = await fetch(path);
+    const res = await fetchTimed(path);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     const lines = text.split(/\r?\n/)
@@ -168,29 +203,55 @@ const contentCache = new Map();
 let fxIdx = -1;
 let transitionIdx = -1;
 
-async function fetchContent(list, id) {
+// The cache holds the promise, so a file asked for again while it is still on its way is fetched once
+// (pickChain asks for a few candidates ahead); a failed fetch is dropped from it, to be tried again.
+function fetchContent(list, id) {
   const entry = list.find((e) => e.id === id);
-  if (!entry) { console.warn(`[autopilot] Unknown content id '${id}'`); return null; }
-  if (contentCache.has(entry.file)) return contentCache.get(entry.file);
+  if (!entry) { console.warn(`[autopilot] Unknown content id '${id}'`); return Promise.resolve(null); }
+  if (!contentCache.has(entry.file)) {
+    const p = loadContent(entry.file);
+    contentCache.set(entry.file, p);
+    p.then((data) => { if (!data && contentCache.get(entry.file) === p) contentCache.delete(entry.file); });
+  }
+  return contentCache.get(entry.file);
+}
+
+async function loadContent(file) {
   try {
-    const res = await fetch(entry.file);
+    const res = await fetchTimed(file);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    contentCache.set(entry.file, data);
-    return data;
+    return await res.json();
   } catch (err) {
-    console.warn(`[autopilot] Failed to fetch '${entry.file}':`, err.message);
+    console.warn(`[autopilot] Failed to fetch '${file}':`, err.message);
     return null;
   }
 }
 
+// A preset that could not be fetched is left out of the picks for a while (playable()), rather than going
+// on air as a default Mandala under its name.
+const UNAVAILABLE_MS = 60000;
+const unavailable = new Map(); // preset name -> performance.now() it failed
+const markUnavailable = (name) => unavailable.set(name, performance.now());
+const isUnavailable = (name) => {
+  const at = unavailable.get(name);
+  if (at === undefined) return false;
+  if (performance.now() - at < UNAVAILABLE_MS) return true;
+  unavailable.delete(name);
+  return false;
+};
+
 /**
  * A playlist line `preset` or `preset | fxchain` -> deck state: the preset's source and
  * parameters plus an FX chain (the pinned one, else the next in the settings rotation).
+ * Rejects if the preset can't be fetched (and marks it unavailable for a while).
  */
 async function buildDeck(line, background = false) {
   const [presetName, pinned] = line.split('|').map((p) => p.trim());
   const raw = await fetchPreset(presetName);
+  if (!raw) {
+    markUnavailable(presetName);
+    throw new Error(`preset '${presetName}' is unavailable`);
+  }
   const deck = parseDeckPreset(raw, Math.random, { mandalaRecipes });
   deck.raw = raw;    // the preset as stored, for ROLL
   deck.tags = raw?.tags ?? [];
@@ -207,14 +268,33 @@ async function buildDeck(line, background = false) {
   return deck;
 }
 
-/** Next chain in the settings rotation that suits a preset with these tags (pairing.js); null if none does. */
+/**
+ * Next chain in the settings rotation that suits a preset with these tags (pairing.js); null if none does.
+ * EFFECTS RANDOM: any chain in the rotation, picked at random, whatever the scene (reduced motion still applies).
+ */
+const CHAIN_LOOKAHEAD = 4;   // chain candidates fetched at once
 async function pickChain(tags, dominant = null) {
   const n = autopilotSettings.fxChains.length;
   const calmOk = (c) => !(reducedMotion && (c.tags ?? []).some((t) => CALM_SKIP_CHAIN_TAGS.includes(t)));
+  if (effectsRandom) {
+    const ids = [...autopilotSettings.fxChains];
+    for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+    for (const id of ids) {
+      const candidate = await fetchContent(catalog.fxChains, id);
+      if (candidate && calmOk(candidate)) return candidate;
+    }
+    return null;
+  }
   let fallback = null;
+  // The rotation's next n picks, worked out up front so a few can be fetched side by side: on a slow
+  // connection asking for one candidate after another held up the first scene by a round trip each.
+  const order = [];
+  for (let k = fxIdx, tries = 0; tries < n; tries++) order.push(k = getNextIndex(k, n, autopilotSettings.fxPlaybackOrder));
+  const ids = order.map((i) => autopilotSettings.fxChains[i]);
   for (let tries = 0; tries < n; tries++) {
-    fxIdx = getNextIndex(fxIdx, n, autopilotSettings.fxPlaybackOrder);
-    const candidate = await fetchContent(catalog.fxChains, autopilotSettings.fxChains[fxIdx]);
+    for (const id of ids.slice(tries + 1, tries + CHAIN_LOOKAHEAD)) fetchContent(catalog.fxChains, id);
+    fxIdx = order[tries];
+    const candidate = await fetchContent(catalog.fxChains, ids[tries]);
     if (!candidate || !calmOk(candidate) || !chainFits(tags, candidate)) continue;
     if (chainAnswers(tags, dominant, candidate)) return candidate;  // follows another part of the music
     fallback ??= candidate;
@@ -275,7 +355,7 @@ export function tickAutopilot(dt, beats, music = {}) {
   // 1. Foreground A/B crossfade, on the bar line
   if (fgPlaylist.length > 0) {
     if (fgTransitionState === 'hold') {
-      prepareForeground();
+      if (tagsReady) prepareForeground(); // until then a heavy scene could slip past runnable()
       if (!autopilotState.hold && beats >= fgSwitchAt && fgNext) startForegroundCrossfade(beats);
     } else {
       const fade = Math.max(0.25, fgFadeLen);
@@ -293,6 +373,7 @@ export function tickAutopilot(dt, beats, music = {}) {
     const half = Math.max(0.25, bgFadeLen * 0.5);
     switch (bgTransitionState) {
       case 'hold':
+        if (bgMode === 'hold' && beats >= bgSwitchAt && bgRefreshDue()) { refreshHeldBackground(); break; }
         prepareBackground();
         if (bgMode === 'scenes' && beats >= bgSwitchAt && bgNext) startBackgroundChange(beats, autopilotSettings.bgFadeBeats);
         break;
@@ -301,7 +382,7 @@ export function tickAutopilot(dt, beats, music = {}) {
         if (bgMode === 'off') break;
         if (!bgNext && !bgPreparing) {
           const back = bgPlaylist.indexOf(bgResume);
-          prepareBackground(back >= 0 ? back : null);
+          prepareBackground(back >= 0 && playable(bgResume) ? back : null);
         }
         if (bgNext) {
           autopilotState.deckBG = bgNext.deck;
@@ -368,12 +449,14 @@ function prepareForeground(line = null) {
     const pick = weights ? weightedPick(fgPlaylist, weights, fgPlaylistIdx) : -1;
     fgPlaylistIdx = pick >= 0 ? pick : nextPlayable(fgPlaylistIdx, fgPlaylist, order);
     line = fgPlaylist[fgPlaylistIdx];
+    if (isUnavailable(presetName(line))) { fgPreparing = false; return null; } // nothing else to try yet: wait
   }
   return buildLook(line).then((look) => {
     if (token !== fgPrepareToken) return;
     fgNext = look;
     prewarm(look.deck, look.transition);
-  }).finally(() => { if (token === fgPrepareToken) fgPreparing = false; });
+  }).catch((err) => console.warn(`[autopilot] ${err.message}`))
+    .finally(() => { if (token === fgPrepareToken) fgPreparing = false; });
 }
 
 async function buildLook(line) {
@@ -396,10 +479,11 @@ export function setHeavyAllowed(on) { heavyAllowed = !!on; }
 // A build without photos (an app that bundles the engine without the gallery: gallery.json lists none) never
 // picks the photo-gallery background.
 let galleryAllowed = true;
+const galleryOk = (line) => presetSource.get(line) !== 'gallery' || galleryAllowed;
 const runnable = (line) => (heavyAllowed || !autopilotSettings.heavySources.includes(presetSource.get(line)))
-  && (galleryAllowed || presetSource.get(line) !== 'gallery')
+  && galleryOk(line)
   && !(reducedMotion && (presetTags.get(line) ?? []).some((t) => CALM_SKIP_LOOK_TAGS.includes(t)));
-const playable = (line) => runnable(line) && !skipped.has(presetName(line));
+const playable = (line) => runnable(line) && !skipped.has(presetName(line)) && !isUnavailable(presetName(line));
 const presetName = (line) => (line ?? '').split('|')[0].trim();
 
 // -------------------------------------------------------
@@ -443,7 +527,7 @@ let dropLook = null;          // hard scene built when the breakdown starts, rea
 
 /** A random line from both playlists whose preset has one of `tags`, not the scene on air. */
 function pickLine(tags) {
-  const current = fgHistory.at(-1)?.line;
+  const current = last(fgHistory)?.line;
   const pool = [...new Set([...fgPlaylist, ...bgPlaylist])]
     .filter((l) => l !== current && playable(l) && (presetTags.get(l) ?? []).some((t) => tags.includes(t)));
   return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
@@ -470,7 +554,7 @@ function followSections(beats, { section = 'normal', drops = 0 }) {
           if (flash) look.transition = flash;
           dropLook = look;
           prewarm(look.deck, look.transition);
-        });
+        }).catch((err) => console.warn(`[autopilot] ${err.message}`));
       }
       console.log('[autopilot] Breakdown');
     }
@@ -506,14 +590,43 @@ async function dropTransition() {
   return dto ? parseTransition(dto) : null;
 }
 
-/** Loads every playlist preset's tags (cached), so section changes can pick a fitting scene. */
-async function loadPresetTags() {
-  await Promise.all([...new Set([...fgPlaylist, ...bgPlaylist])].map(async (line) => {
-    const raw = await fetchPreset(line.split('|')[0].trim());
-    presetTags.set(line, raw?.tags ?? []);
-    presetSource.set(line, raw?.visualSourceType ?? null);
-  }));
+/** Learns one playlist line's tags and source (runnable() needs the source); false if its preset can't be had. */
+async function learnPreset(line) {
+  if (presetSource.has(line)) return true;
+  const raw = await fetchPreset(presetName(line));
+  if (!raw) { markUnavailable(presetName(line)); return false; }
+  presetTags.set(line, raw.tags ?? []);
+  presetSource.set(line, raw.visualSourceType ?? null);
+  return true;
 }
+
+/** Loads every playlist preset's tags (cached), so section changes can pick a fitting scene. */
+// A few at a time, so a channel change (or a shader the scene on air needs) isn't queued behind them:
+// browsers ask an HTTP/1.1 server (spaz.org) for at most six files at once.
+async function loadPresetTags(lines = [...fgPlaylist, ...bgPlaylist]) {
+  const todo = [...new Set(lines)];
+  const worker = async () => { for (let line = todo.shift(); line !== undefined; line = todo.shift()) await learnPreset(line); };
+  await Promise.all(Array.from({ length: 3 }, worker));
+}
+
+/**
+ * The first of playlist indices `order` whose scene this machine can play, learning each unknown one's source
+ * on the way (until loadPresetTags has them all); -1 if none can. Lets the first scene and channel changes
+ * go ahead without waiting for every preset.
+ */
+async function firstPlayable(order) {
+  for (const i of order) {
+    const line = fgPlaylist[i];
+    if (!tagsReady && !presetSource.has(line) && !(await learnPreset(line))) continue;
+    if (playable(line)) return i;
+  }
+  return -1;
+}
+const shuffled = (list) => {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+};
 
 let bgPrepareToken = 0;
 function prepareBackground(idx = null) {
@@ -522,12 +635,33 @@ function prepareBackground(idx = null) {
   bgPreparing = true;
   bgPlaylistIdx = idx ?? nextPlayable(bgPlaylistIdx, bgPlaylist, autopilotSettings.bgPlaybackOrder);
   const line = bgPlaylist[bgPlaylistIdx];
+  if (idx === null && isUnavailable(presetName(line))) { bgPreparing = false; return null; } // nothing else to try yet
   return buildDeck(line, true).then((deck) => {
     if (token !== bgPrepareToken) return false;
     bgNext = { line, deck };
     prewarm(deck, null);
     return true;
-  }).finally(() => { if (token === bgPrepareToken) bgPreparing = false; });
+  }).catch((err) => { console.warn(`[autopilot] ${err.message}`); return false; })
+    .finally(() => { if (token === bgPrepareToken) bgPreparing = false; });
+}
+
+// HOLD keeps the background but not its effects: every 2x TIME the line on air is built again (the next FX
+// chain from the rotation, its random values rolled) and comes back in through the usual dip to black. A
+// line with its own chain (`preset | chain`, or `| none`) would come back the same, so it is left alone.
+let bgRefresh = false;   // a rebuild of the background on air is being fetched
+const bgRefreshDue = () => effectsOn && !!bgOnAir && !bgPicked && !bgOnAir.includes('|') && !bgRefresh;
+function refreshHeldBackground() {
+  const idx = bgPlaylist.indexOf(bgOnAir);
+  const later = () => { bgSwitchAt = nextSwitchBeat(lastBeats, autopilotSettings.bgHoldBars, autopilotSettings.bgFadeBeats); };
+  if (idx < 0) { later(); return; }
+  bgRefresh = true;
+  bgNext = null;   // the next line the rotation queued; it is queued again after
+  Promise.resolve(prepareBackground(idx)).then((ok) => {
+    bgRefresh = false;
+    if (ok && bgMode === 'hold' && bgTransitionState === 'hold' && bgNext?.line === bgOnAir && !autopilotState.isLiveBroadcast) {
+      startBackgroundChange(lastBeats, autopilotSettings.bgFadeBeats);
+    } else later();
+  });
 }
 
 let bgFadeLen = 8;          // beats this background change takes (a dip to black and back)
@@ -585,12 +719,12 @@ function replanForeground() {
 /** What is on air, for the on-screen display: {name, chain, channel, channels}. Fires `lsd-now-showing`. */
 export function nowShowing() {
   const deck = fgActiveDeck === 'A' ? autopilotState.deckA : autopilotState.deckB;
-  const line = fgHistory.at(-1)?.line ?? fgPlaylist[fgPlaylistIdx] ?? '';
+  const line = last(fgHistory)?.line ?? fgPlaylist[fgPlaylistIdx] ?? '';
   const name = line.split('|')[0].trim();
   const background = bgOnAir.split('|')[0].trim() || null;
   const backgroundPicked = (bgPicked ?? bgOnAir).split('|')[0].trim() || null;   // BACKGROUND's row: where a step is going
   return { name, chain: deck?.chainName ?? null, background, backgroundPicked, channel: fgPlaylist.indexOf(line) + 1, channels: fgPlaylist.length,
-    skipped: skipped.has(name), effects: effectsOn, bgMode };
+    skipped: skipped.has(name), effects: effectsOn, bgMode, tuning: !fgStarted && fgHistory.length === 0 };
 }
 
 function announce() {
@@ -611,30 +745,36 @@ function settleCrossfade() {
  * to), in playlist order, now. A scene that was on air before comes back with the chain it had.
  */
 let fgTuning = null;       // the line a channel change is building, so quick presses keep counting
-function changeChannel(dir) {
+async function changeChannel(dir) {
   const n = fgPlaylist.length;
   if (autopilotState.isLiveBroadcast || n === 0) return;
-  const from = fgPlaylist.indexOf(fgTuning ?? fgHistory.at(-1)?.line);
-  let idx = from < 0 ? fgPlaylistIdx : from;
-  for (let tries = 0; tries < n; tries++) {
-    idx = (idx + dir + n) % n;
-    if (playable(fgPlaylist[idx])) break;
-  }
-  return tuneChannel(idx);
+  const from = fgPlaylist.indexOf(fgTuning ?? last(fgHistory)?.line);
+  const start = from < 0 ? fgPlaylistIdx : from;
+  const order = Array.from({ length: n }, (_, k) => (((start + dir * (k + 1)) % n) + n) % n);
+  const idx = order.find((i) => tagsReady && playable(fgPlaylist[i])) ?? await firstPlayable(order);
+  // A preset that can't be fetched is now marked unavailable: the next press-worth of channels is tried.
+  if (await tuneChannel(idx >= 0 ? idx : order[0]) === 'failed' && order.some((i) => playable(fgPlaylist[i]))) return changeChannel(dir);
 }
 
 /** R: a playable channel picked at random, never the one on air (or being tuned to). */
-function randomChannel(rand = Math.random) {
+async function randomChannel(rand = Math.random) {
   const n = fgPlaylist.length;
   if (autopilotState.isLiveBroadcast || n === 0) return;
-  const current = fgTuning ?? fgHistory.at(-1)?.line;
+  const current = fgTuning ?? last(fgHistory)?.line;
+  if (!tagsReady) {
+    // Some sources still unknown: try a random order, learning as it goes.
+    const idx = await firstPlayable(shuffled([...fgPlaylist.keys()].filter((i) => fgPlaylist[i] !== current)));
+    if (idx < 0) return;
+    if (await tuneChannel(idx) === 'failed') return randomChannel(rand);
+    return;
+  }
   const choices = [];
   for (let i = 0; i < n; i++) if (fgPlaylist[i] !== current && playable(fgPlaylist[i])) choices.push(i);
   if (!choices.length) return;
-  return tuneChannel(choices[Math.floor(rand() * choices.length)]);
+  if (await tuneChannel(choices[Math.floor(rand() * choices.length)]) === 'failed') return randomChannel(rand);
 }
 
-/** Puts playlist line `idx` on air now (shared by CH up / down and R). */
+/** Puts playlist line `idx` on air now (shared by CH up / down and R); 'failed' if its preset can't be had. */
 async function tuneChannel(idx) {
   const line = fgPlaylist[idx];
   fgPlaylistIdx = idx;
@@ -644,8 +784,8 @@ async function tuneChannel(idx) {
     fgPreparing = false;
     fgTuning = null;
   }
-  if (line === fgHistory.at(-1)?.line) return; // back to the one on air (or the only channel)
-  const seen = fgHistory.findLast((h) => h.line === line);
+  if (line === last(fgHistory)?.line) return; // back to the one on air (or the only channel)
+  const seen = [...fgHistory].reverse().find((h) => h.line === line);
   if (seen) {
     // Back with the chain it had, but a fresh transition (reduced motion may have come on since).
     fgNext = { ...seen, transition: await pickTransition() };
@@ -657,6 +797,7 @@ async function tuneChannel(idx) {
     await prepareForeground(line);
     if (fgTuning !== line) return; // a later press took over
     fgTuning = null;
+    if (fgNext?.line !== line && isUnavailable(presetName(line))) return 'failed';
   }
   settleCrossfade();
   if (fgNext?.line === line && !autopilotState.isLiveBroadcast) startForegroundCrossfade(lastBeats);
@@ -781,9 +922,11 @@ export function setAutoRollBars(bars) {
 }
 
 // -------------------------------------------------------
-// EFFECTS (MENU): AUTO puts FX chains on the scenes and backgrounds, OFF plays the sources clean.
+// EFFECTS (MENU): AUTO puts FX chains that suit them on the scenes and backgrounds, RANDOM any chain on
+// anything (pickChain), OFF plays the sources clean.
 // -------------------------------------------------------
 let effectsOn = true;
+let effectsRandom = true;    // the default: RANDOM
 function stripChain(deck) {
   if (!deck || deck.empty) return;
   if (roll?.deck === deck) finishRoll();
@@ -798,8 +941,11 @@ async function rechain(deck) {
   deck.fxStripped = false;
   prewarm(deck, null);
 }
+/** `on`: true (AUTO), 'random' (RANDOM) or false (OFF). AUTO <-> RANDOM changes the picks from the next chain on. */
 export async function setEffects(on) {
-  if (!!on === effectsOn) return;
+  const wasRandom = effectsRandom;
+  effectsRandom = on === 'random';
+  if (!!on === effectsOn) { if (wasRandom !== effectsRandom) announce(); return; }
   effectsOn = !!on;
   const onAir = [fgActiveDeck === 'A' ? autopilotState.deckA : autopilotState.deckB, autopilotState.deckBG];
   const queued = [fgNext?.deck, dropLook?.deck, bgNext?.deck];
@@ -820,9 +966,9 @@ export function setFollowMusic(on) {
 
 // -------------------------------------------------------
 // Background: B or MENU › BACKGROUND changes it now; BG CHANGES picks 'scenes' (every 2x TIME), 'hold'
-// (stays until changed by hand) or 'off' (faded out and not rendered).
+// (stays until changed by hand, with new effects every 2x TIME: refreshHeldBackground) or 'off' (faded out and not rendered).
 // -------------------------------------------------------
-let bgMode = 'hold';      // the default: the gallery (first background line) stays
+let bgMode = 'scenes';    // the default: a new background every 2x TIME
 export function setBackgroundMode(mode) {
   if (!['scenes', 'hold', 'off'].includes(mode) || mode === bgMode) return;
   bgMode = mode;
@@ -918,6 +1064,10 @@ export function contentCatalog() {
   };
   const rotation = new Set(autopilotSettings.fxChains);
   return {
+    // false while the presets' tags and sources are still loading: backgrounds may be missing, and a scene whose
+    // source is not known yet (source null) reports runnable even if it is a heavy one. `lsd-catalog-ready` fires
+    // (and an embed host gets a state push with catalogComplete) when it turns true.
+    complete: catalogComplete,
     scenes: fgPlaylist.map(scene),
     backgrounds: bgPlaylist.map((line, i) => ({ index: i, name: presetName(line), source: presetSource.get(line) ?? null, tags: presetTags.get(line) ?? [], runnable: runnable(line) })),
     fxChains: catalog.fxChains.map((c) => ({ id: c.id, name: c.name, inRotation: rotation.has(c.id) })),
@@ -928,7 +1078,7 @@ export function contentCatalog() {
 /** The controls' settings, for a host's display (nowShowing has what is on air). */
 export function controlState() {
   return { hold: autopilotState.hold, holdBars: autopilotSettings.fgHoldBars, autoRollBars: autopilotSettings.autoRollBars,
-    follow: followMusic, effects: effectsOn, bgMode, lockedChain, lockedTransition,
+    follow: followMusic, effects: effectsOn, effectsRandom, bgMode, lockedChain, lockedTransition, catalogComplete,
     live: autopilotState.isLiveBroadcast, broadcaster: autopilotState.broadcaster ?? null };
 }
 
@@ -953,7 +1103,7 @@ export function prunedSkips() { const live = new Set(fgPlaylist.map(presetName))
  */
 export function toggleSkip() {
   if (autopilotState.isLiveBroadcast) return { action: 'none' };
-  const line = fgTuning ?? fgHistory.at(-1)?.line;
+  const line = fgTuning ?? last(fgHistory)?.line;
   if (!line) return { action: 'none' };
   const name = presetName(line), channel = fgPlaylist.indexOf(line) + 1;
   if (skipped.has(name)) { skipped.delete(name); announce(); return { action: 'restored', channel, name }; }
@@ -981,6 +1131,16 @@ export function tuneTo(n) {
   return 'ok';
 }
 
+// The autopilot's picture (decks, mixer, background) while a live broadcast has the screen: put aside on the
+// first full snapshot, back when the broadcast ends, so the viewer does not keep the broadcaster's master FX,
+// levels and background.
+let autopilotPicture = null;
+function setAutopilotBackground(deck) {
+  if (autopilotPicture) { autopilotPicture.deckBG = deck; autopilotPicture.bgAlpha = 1.0; return; } // the broadcast has the screen
+  autopilotState.deckBG = deck;
+  autopilotState.bgAlpha = 1.0;
+}
+
 /** Applies one relay message (state_full / state_delta / broadcaster_offline) to the live state. */
 export function handleRelayMessage(msg) {
   if (tapeHold) { noteStationAir(msg); return; }
@@ -993,6 +1153,10 @@ export function handleRelayMessage(msg) {
       const wasLive = autopilotState.isLiveBroadcast;
       autopilotState.isLiveBroadcast = true;
       noteClock(msg.clock);
+      if (!autopilotPicture) {
+        const { deckA, deckB, deckBG, mixer, bgAlpha } = autopilotState;
+        autopilotPicture = { deckA, deckB, deckBG, mixer, bgAlpha };
+      }
       if (msg.preset) {
         autopilotState.deckA = msg.preset.deckA || null;
         autopilotState.deckB = msg.preset.deckB || null;
@@ -1019,6 +1183,7 @@ export function handleRelayMessage(msg) {
         autopilotState.isLiveBroadcast = false;
         autopilotState.broadcaster = null;
         autopilotState.clock.reset();
+        if (autopilotPicture) { Object.assign(autopilotState, autopilotPicture); autopilotPicture = null; }
         broadcastStatus(false);
         console.log('[autopilot] Broadcaster offline — returning to autopilot');
         // Pick the autopilot up again at the next bar line (planned on the next tick, from the current beat).
@@ -1122,8 +1287,13 @@ function noteClock(clock) {
   }
 }
 
+// Keys a patch may never write: they would reach Object.prototype (audit W5-5; the relay has the same guard).
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function applyPatch(target, patch) {
+  if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) return;
   for (const [key, val] of Object.entries(patch)) {
+    if (UNSAFE_KEYS.has(key)) continue;
     if (
       typeof val === 'object' && val !== null && !Array.isArray(val) &&
       typeof target[key] === 'object' && target[key] !== null
@@ -1139,41 +1309,32 @@ function applyPatch(target, patch) {
 // Startup
 // -------------------------------------------------------
 export async function startAutopilot() {
-  // 1. Load settings.json
-  try {
-    const res = await fetch('settings.json');
-    if (res.ok) {
-      const cfg = await res.json();
-      Object.assign(autopilotSettings, cfg);
+  // Resolves once the first scene is on air (renderer.js starts drawing then); the background, the other
+  // presets' tags and the relay follow on their own. Only what the first scene needs is waited for: on a slow
+  // connection the old start (every preset in both playlists first) left the screen black for 20 s and more.
+  // 1. settings.json, Mandala's recipe table (each mandala scene rolls one recipe as it loads, preset.js) and the
+  //    content catalog (FX chain and transition presets), side by side.
+  await Promise.all([
+    fetchTimed('settings.json').then(async (res) => {
+      if (!res.ok) return;
+      Object.assign(autopilotSettings, await res.json());
       if (viewerHoldBars) { autopilotSettings.fgHoldBars = viewerHoldBars; autopilotSettings.bgHoldBars = viewerHoldBars * 2; }
       console.log('[autopilot] Loaded settings.json:', autopilotSettings);
-    }
-  } catch (e) {
-    console.warn('[autopilot] Could not load settings.json, using defaults.');
-  }
+    }).catch(() => console.warn('[autopilot] Could not load settings.json, using defaults.')),
+    sharedJson('mandala_recipes.json').then((table) => {
+      mandalaRecipes = new MandalaRecipes(table);
+    }).catch(() => console.warn('[autopilot] Could not load mandala_recipes.json; mandala scenes keep their stored recipe.')),
+    sharedJson('catalog.json').then((data) => {
+      catalog = data;
+    }).catch(() => console.warn('[autopilot] Could not load catalog.json; no FX chains or transitions.')),
+  ]);
 
-  // 1a. Mandala's recipe table, so each mandala scene rolls one recipe as it loads (preset.js)
-  try {
-    const res = await fetch('mandala_recipes.json');
-    if (res.ok) mandalaRecipes = new MandalaRecipes(await res.json());
-  } catch (e) {
-    console.warn('[autopilot] Could not load mandala_recipes.json; mandala scenes keep their stored recipe.');
-  }
-
-  // 1b. Load the content catalog (FX chain and transition presets)
-  try {
-    const res = await fetch('catalog.json');
-    if (res.ok) catalog = await res.json();
-  } catch (e) {
-    console.warn('[autopilot] Could not load catalog.json; no FX chains or transitions.');
-  }
-
-  // 2. Load Foreground playlist
+  // 2. Foreground playlist and its first scene
   fgPlaylist = await loadPlaylistFile(autopilotSettings.fgPlaylist);
   if (fgPlaylist.length === 0) {
     // Fallback: check autopilot.json
     try {
-      const res = await fetch('autopilot.json');
+      const res = await fetchTimed('autopilot.json');
       if (res.ok) {
         const list = await res.json();
         if (list.length > 0) {
@@ -1184,43 +1345,71 @@ export async function startAutopilot() {
         }
       }
     } catch (e) {}
+    fgStarted = true;
   } else {
-    bgPlaylist = await loadPlaylistFile(autopilotSettings.bgPlaylist);
-    await loadPresetTags();
-    // A random playable channel to start on, so every visit doesn't open on the same scene.
-    const starts = fgPlaylist.flatMap((line, i) => (playable(line) ? [i] : []));
-    fgPlaylistIdx = starts.length ? starts[Math.floor(Math.random() * starts.length)] : 0;
-    const first = fgPlaylist[fgPlaylistIdx];
-    autopilotState.deckA = await buildDeck(first);
-    autopilotState.deckB = await buildDeck(first);
-    autopilotState.mixer.balance = 0.0;
-    fgActiveDeck = 'A';
-    fgHistory.push({ line: first, deck: autopilotState.deckA, transition: {} });
-    fgSwitchAt = nextSwitchBeat(lastBeats, autopilotSettings.fgHoldBars, autopilotSettings.fgFadeBeats);
+    // A random playable channel to start on, so every visit doesn't open on the same scene. Only the
+    // candidates' own presets are fetched (runnable() needs each one's source), not the whole playlist.
+    const pick = await firstPlayable(shuffled([...fgPlaylist.keys()]));
+    const idx = pick >= 0 ? pick : Math.floor(Math.random() * fgPlaylist.length);
+    const first = fgPlaylist[idx];
+    // No preset could be had at all (offline with nothing cached): the default scene, rather than nothing.
+    const deck = await buildDeck(first).catch(() => {
+      const d = parseDeckPreset(null, Math.random, { mandalaRecipes });
+      applyChain(d, null);
+      return Object.assign(d, { raw: null, tags: [], dominant: null, pinned: null, background: false, fxStripped: !effectsOn });
+    });
+    // A CH press while this was loading has already put the viewer's pick on air: it stays.
+    if (!fgHistory.length) {
+      fgPlaylistIdx = idx;
+      const deckB = await buildDeck(first).catch(() => deck);
+      const target = autopilotPicture ?? autopilotState; // an embed host's live broadcast may already have the screen
+      target.deckA = deck;
+      target.deckB = deckB;
+      target.mixer.balance = 0.0;
+      fgActiveDeck = 'A';
+      fgHistory.push({ line: first, deck, transition: {} });
+      fgSwitchAt = nextSwitchBeat(lastBeats, autopilotSettings.fgHoldBars, autopilotSettings.fgFadeBeats);
+    }
+    fgStarted = true;
     announce();
   }
 
-  // 3. Background playlist
-  if (bgPlaylist.length === 0) {
-    bgPlaylist = await loadPlaylistFile(autopilotSettings.bgPlaylist);
-    await loadPresetTags();
-  }
+  // 3. The rest, without holding up the picture
+  startBackground().catch((err) => console.warn('[autopilot] Background start failed:', err));
+  // 4. Connect to live relay
+  connectRelay();
+}
+
+/** Background playlist, every preset's tags and source, the first background. */
+async function startBackground() {
+  // The rotation (tickAutopilot) sees the background playlist only once its first line is on air.
+  const list = await loadPlaylistFile(autopilotSettings.bgPlaylist);
+  await loadPresetTags([...fgPlaylist, ...list]);
+  tagsReady = true;
   try {
-    const res = await fetch('gallery.json');
-    galleryAllowed = res.ok && ((await res.json()).images?.length ?? 0) > 0;
+    const res = await fetchTimed('gallery.json');
+    const m = res.ok ? await res.json() : {};
+    galleryAllowed = (m.images?.length ?? 0) > 0;
   } catch (e) {
     galleryAllowed = true; // offline web TV with no cached list: gallery.js copes by itself
   }
-  if (bgPlaylist.length > 0) {
-    // The first background line (the TV starts on the gallery), or the first one this build can show.
-    const first = Math.max(0, bgPlaylist.findIndex((l) => runnable(l)));
-    bgPlaylistIdx = first;
-    autopilotState.deckBG = await buildDeck(bgPlaylist[first], true);
-    bgOnAir = bgPlaylist[first];
-    autopilotState.bgAlpha = 1.0;
-    bgSwitchAt = nextSwitchBeat(lastBeats, autopilotSettings.bgHoldBars, autopilotSettings.bgFadeBeats);
+  if (list.length > 0) {
+    // The first background line (the TV starts on the photos), or the first one this build can show.
+    const first = list.findIndex((l) => playable(l));
+    const deck = first >= 0 ? await buildDeck(list[first], true).catch(() => null) : null;
+    bgPlaylist = list;
+    if (deck) {
+      bgPlaylistIdx = first;
+      setAutopilotBackground(deck);
+      bgOnAir = list[first];
+      bgSwitchAt = nextSwitchBeat(lastBeats, autopilotSettings.bgHoldBars, autopilotSettings.bgFadeBeats);
+      announceBackground();
+    } else {
+      // None could be had yet: dark, and the rotation fades one in when it can (the 'off' state).
+      bgPlaylistIdx = list.length - 1;
+      bgTransitionState = 'off';
+    }
   }
-
-  // 4. Connect to live relay
-  connectRelay();
+  catalogComplete = true;
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('lsd-catalog-ready'));
 }

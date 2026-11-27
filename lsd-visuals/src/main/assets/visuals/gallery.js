@@ -1,5 +1,8 @@
 // gallery.js — the "gallery" source: the Spaz Radio listener photos (spaz.org/radio "Add Pic"), drawn the way
-// the old radio page drew them behind the player, smoothed out. Trial (branch trial/spaz-gallery-bg).
+// the old radio page drew them behind the player, smoothed out; or, built with { set: 'logo' } (renderer.js's
+// logos layer, between the background and the scene: MENU › SPAZ LOGOS), the old page's logos instead:
+// see-through Spaz emblems, one or two at a time, turning slowly around their middles over nothing, so the
+// background shows around them.
 //
 // The old page (groundCycler in spaz.org/radio): every 0.5-7.5 s a random photo faded in over 0-10 s while
 // it grew from 3000 to 8000 px and turned 200 degrees, with the turn's centre off the middle of the screen,
@@ -8,7 +11,8 @@
 // steady zoom and turn around a point off the photo's middle; the newest photo on top; the photo keeps its
 // shape. Only a few photos are held at a time (the old page kept all of them, 500 MB and more).
 //
-// Images come from gallery.json, built by scripts/gallery_curate.py (not in git; publish_web_tv.sh uploads it).
+// Images come from gallery.json, built by scripts/gallery_curate.py (not in git; publish_web_tv.sh uploads it):
+// the photos at its top level, the logos under "logo" (minus the ones listed "opaque", which only lite.js shows).
 //
 // Curating (?gallery=curate, served by `scripts/gallery_curate.py preview`): the photos left in gallery-curate/,
 // one at a time in name order with the name on screen, the list re-read every 10 s (so deleting in a file manager
@@ -37,27 +41,37 @@ precision highp float;
 in vec2 vUV;
 uniform sampler2D uTex;
 uniform float uAlpha;
+uniform float uGain;     // brightness (1 for photos; the logos are dimmed)
 out vec4 fragColor;
 void main() {
   vec2 e = min(vUV, 1.0 - vUV);
   float edge = smoothstep(0.0, 0.04, min(e.x, e.y));   // soft edges, so a turning photo has no hard rim
-  float a = uAlpha * edge;
-  fragColor = vec4(texture(uTex, vUV).rgb * a, a);     // premultiplied
+  fragColor = texture(uTex, vUV) * (uAlpha * edge);    // premultiplied (on upload); a logo's own alpha kept
+  fragColor.rgb *= uGain;
 }`;
 
 const MAX_SIDE = 1024;       // photos are scaled down to this before they go to the GPU
 const POOL = 8;              // photos held at once
 const MAX_LAYERS = 4;        // photos on screen at once
+// The logos stay in the background of the picture: one at a time (the next comes in while the last fades out,
+// sometimes after a moment of none), see-through and dimmed, with long fades.
+const LOGO_OPACITY = 0.55;
+const LOGO_GAIN = 0.75;
+const LOGO_PAUSE = [4, 16];  // beats from a logo starting to fade out to the next one coming in
 const FETCH_EVERY_S = 20;    // a new photo in the pool this often, once the pool is full
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const smooth = (x) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 
 export class Gallery {
-  constructor(gl, quadVAO, manifestUrl = 'gallery.json') {
+  /** `set`: 'ground' (the photos) or 'logo'. */
+  constructor(gl, quadVAO, { set = 'ground', manifestUrl = 'gallery.json' } = {}) {
     this.gl = gl;
     this.quadVAO = quadVAO;
+    this.set = set;
+    this.logos = set === 'logo';
     this.manifestUrl = manifestUrl;
+    this.base = null;        // the folder the pictures come from (offline: only kept copies from it)
     this.started = false;
     this.urls = [];          // shuffled
     this.next = 0;           // next url to fetch
@@ -70,7 +84,7 @@ export class Gallery {
     this.clock = 0;          // smooth beat clock (dt * bpm / 60): drives motion, never jumps
     this.nextSpawn = 0;      // clock value from which the next photo may come in
     this.lastBeats = null;
-    this.curate = typeof location !== 'undefined' && new URLSearchParams(location.search).get('gallery') === 'curate';
+    this.curate = !this.logos && typeof location !== 'undefined' && new URLSearchParams(location.search).get('gallery') === 'curate';
     if (this.curate) {
       this.manifestUrl = 'curate/list.json';
       this.names = [];         // what is left in gallery-curate/, sorted
@@ -94,18 +108,22 @@ export class Gallery {
     gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
     gl.linkProgram(prog);
     this.prog = prog;
-    this.loc = Object.fromEntries(['uHalf', 'uPivotUV', 'uPivotPos', 'uAngle', 'uAspect', 'uTex', 'uAlpha']
+    this.loc = Object.fromEntries(['uHalf', 'uPivotUV', 'uPivotPos', 'uAngle', 'uAspect', 'uTex', 'uAlpha', 'uGain']
       .map((n) => [n, gl.getUniformLocation(prog, n)]));
     if (this.curate) { this.startCurate(); return; }
     this.loadManifest();
   }
 
-  /** The photo list (gallery.json), shuffled. A failure is tried again with the 20 s fetch (render). */
+  /** The picture list (gallery.json), shuffled. A failure is tried again with the 20 s fetch (render). */
   loadManifest() {
     this.inflight++;
     this.lastFetch = performance.now();
-    fetch(this.manifestUrl).then((r) => r.json()).then((m) => {
-      this.urls = m.images.map((n) => m.base + encodeURIComponent(n));
+    fetch(this.manifestUrl, { signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined }).then((r) => r.json()).then((m) => {
+      const list = this.logos ? m.logo : m;
+      if (!list?.images) { this.noneListed = true; throw new Error(`no ${this.set} pictures listed`); } // final: asking again would not change it
+      const opaque = new Set(list.opaque ?? []);
+      this.base = list.base;
+      this.urls = list.images.filter((n) => !opaque.has(n)).map((n) => list.base + encodeURIComponent(n));
       for (let i = this.urls.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [this.urls[i], this.urls[j]] = [this.urls[j], this.urls[i]];
@@ -121,7 +139,10 @@ export class Gallery {
   useKeptPhotos() {
     if (this.allUrls || typeof caches === 'undefined') return;
     this.allUrls = this.urls;
-    caches.open('lsd-tv-photos').then((c) => c.keys()).then((keys) => {
+    const dir = new URL(this.base ?? 'gallery/', location.href).href;
+    const mine = (url) => url.startsWith(dir) && !url.slice(dir.length).includes('/');   // not logo/, sky/ or lite/
+    caches.open('lsd-tv-photos').then((c) => c.keys()).then((all) => {
+      const keys = all.filter((k) => mine(k.url));
       if (this.allUrls !== this.urls || keys.length === 0) { this.allUrls = null; return; }
       this.urls = keys.map((k) => k.url).sort(() => Math.random() - 0.5);
       this.next = 0;
@@ -198,7 +219,9 @@ export class Gallery {
     }
     gl.bindTexture(gl.TEXTURE_2D, slot.tex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);   // a logo's see-through edges mipmap without dark rims
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     gl.generateMipmap(gl.TEXTURE_2D);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
@@ -229,6 +252,7 @@ export class Gallery {
     if (!photo) return;
     photo.fresh = false;
     photo.shown++;
+    if (this.logos) { this.spawnLogo(photo, aspect, calm); return; }
     if (this.layers.length >= MAX_LAYERS) {        // the oldest photo on screen starts to leave
       const old = this.layers.find((l) => l.outAt > this.clock);
       if (old) old.outAt = this.clock;
@@ -254,6 +278,29 @@ export class Gallery {
     });
   }
 
+  /**
+   * A logo: the old page spun its logos fast and blew them up past the screen; here one at a time, from
+   * about two thirds of the screen high to well past its edges (two to four times the old size here), turning
+   * steadily around its own middle while it drifts and slowly grows, fading in and out over many beats.
+   */
+  spawnLogo(photo, aspect, calm) {
+    const fadeIn = rand(8, 16);
+    this.layers.push({
+      photo,
+      born: this.clock,
+      fadeIn,
+      outAt: this.clock + fadeIn + rand(16, 32),
+      fadeOut: rand(16, 32),
+      scale0: rand(0.33, 0.6) * rand(2, 4),                      // half height, screen half-heights: past the edges
+      grow: rand(0.002, 0.006) * (calm ? 0.5 : 1),
+      angle0: rand(-Math.PI, Math.PI),
+      turn: (calm ? 0.4 : 1) * rand(3, 8) * (Math.random() < 0.5 ? -1 : 1) * Math.PI / 180,
+      pivotUV: [0.5, 0.5],
+      pivotPos: [rand(-0.45, 0.45) * aspect, rand(-0.35, 0.35)],
+      drift: [rand(-0.004, 0.004) * aspect, rand(-0.003, 0.003)],
+    });
+  }
+
   /** Draws the gallery into `target` (a graph.js Target). `beats`: the heard beat count. */
   render(target, { dt, bpm, beats, calm = false, alpha = 1 }) {
     this.start();
@@ -262,7 +309,7 @@ export class Gallery {
     if (this.decoded.length) this.upload();
     // Every 20 s, one more photo; after a bad start (no list, or every photo failing: offline), try again.
     if (this.inflight === 0 && performance.now() - this.lastFetch > FETCH_EVERY_S * 1000) {
-      if (!this.curate && this.urls.length === 0) this.loadManifest();
+      if (!this.curate && this.urls.length === 0) { if (!this.noneListed) this.loadManifest(); }
       else if (this.pool.length > 0) this.fetchNext();
       else { this.failures = 0; this.fill(); }
     }
@@ -272,13 +319,26 @@ export class Gallery {
     // straight away when nothing is showing.
     const onBeat = this.lastBeats !== null && Math.floor(beats) !== Math.floor(this.lastBeats);
     this.lastBeats = beats;
-    const visible = this.layers.filter((l) => l.outAt > this.clock).length;
+    let visible = 0;
+    for (const l of this.layers) if (l.outAt > this.clock) visible++;
     const due = this.clock >= this.nextSpawn && (onBeat || this.clock >= this.nextSpawn + 1);
-    if (this.pool.length > 0 && (visible === 0 || due)) {
+    // Logos: only once the last one has begun to fade out and its pause is over.
+    if (this.pool.length > 0 && (this.logos ? visible === 0 && due : visible === 0 || due)) {
       this.spawn(aspect, calm);
-      this.nextSpawn = this.clock + (this.curate ? 4 : rand(2, 8) * (calm ? 2 : 1)) - 0.5;
+      if (this.logos) {
+        const l = this.layers[this.layers.length - 1];
+        this.nextSpawn = l.outAt + rand(...LOGO_PAUSE) * (calm ? 2 : 1);
+      } else {
+        const gap = this.curate ? 4 : rand(2, 8);
+        this.nextSpawn = this.clock + gap * (calm && !this.curate ? 2 : 1) - 0.5;
+      }
     }
-    this.layers = this.layers.filter((l) => this.clock < l.outAt + l.fadeOut);
+    let kept = 0;                                     // drop the finished layers in place (no new array per frame)
+    for (let i = 0; i < this.layers.length; i++) {
+      const l = this.layers[i];
+      if (this.clock < l.outAt + l.fadeOut) this.layers[kept++] = l;
+    }
+    this.layers.length = kept;
     if (this.curate) this.tickCurate();
 
     target.bind();
@@ -292,9 +352,11 @@ export class Gallery {
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(this.loc.uTex, 0);
     gl.uniform1f(this.loc.uAspect, aspect);
+    gl.uniform1f(this.loc.uGain, this.logos ? LOGO_GAIN : 1);
+    const peak = this.logos ? LOGO_OPACITY : 1;
     for (const l of this.layers) {                    // oldest first, so the newest photo is on top
       const age = this.clock - l.born;
-      const a = smooth(age / l.fadeIn) * (1 - smooth((this.clock - l.outAt) / l.fadeOut)) * alpha;
+      const a = smooth(age / l.fadeIn) * (1 - smooth((this.clock - l.outAt) / l.fadeOut)) * alpha * peak;
       if (a <= 0.001) continue;
       const s = l.scale0 * Math.exp(l.grow * age);
       gl.bindTexture(gl.TEXTURE_2D, l.photo.tex);

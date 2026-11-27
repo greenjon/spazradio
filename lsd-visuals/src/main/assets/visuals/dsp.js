@@ -5,6 +5,7 @@ import { BeatTracker, BeatClock } from './beattrack.js';
 import { EnergyWatch } from './energy.js';
 import { embed } from './embedmode.js';
 import { SpectrumAnalyzer, audioFrame, BINS } from './audiotex.js';
+import { startSideFeed, backoffMs } from './sidefeed.js';
 
 export const cvState = {
   // The audio_* signals are normalised exactly as the desktop's AudioEngine publishes them (auto gain,
@@ -34,13 +35,16 @@ export const cvState = {
   audio_energy_himid: 0.0,
   audio_energy_high: 0.0,
   noSignal:       false, // the TV is on but the stream is down or silent (renderer shows snow)
+  sideFeed:       '',    // the live radio's second copy for the picture (sidefeed.js): '' when not used, else its status
   glitchUntil:    0,     // performance.now() until which the picture rolls: a tape going in or out (renderer)
   isLive:         false, // true once AudioContext is running and stream is connected
 };
 
 // Analysis nodes and pre-allocated buffers
+const RESUME_WAIT_MS = 1500; // startAudio: how long a suspended context gets to resume before play() decides
 let audioCtx = null;
 let gainNode = null;
+let eqNodes = null; // [bass, mid, treble, trim] between the volume and the speakers
 let broadbandAnalyser = null;
 let bassAnalyser = null;
 let midAnalyser = null;
@@ -324,23 +328,94 @@ function updateBeat() {
 
 // Per-frame tick called from renderer.js rAF loop
 // No signal: the TV is on but the stream failed, stalled or has been silent for 4 s. The renderer
-// fades to analog snow; every 10 s the stream is reconnected. `?nostatic` (headless checks, which have
-// no audio) turns this off.
+// fades to analog snow. The stream is reconnected (every 10 s at most) only when its playhead has stopped:
+// a playing stream that the analysis hears as silence is not fixed by reloading it, and each reload is a
+// hiccup in the sound. `?nostatic` (headless checks, which have no audio) turns this off.
 const STREAM_URL = 'https://radio.spaz.org:8060/radio.ogg';
 const SILENT_AMP = 0.004;
+const STUCK_S = 4;         // the playhead has not moved for this long: the stream is down
+const DEAF_S = 2;          // the playhead moves but the analysis hears exact zeros for this long: see below
 let wantAudio = false;
 let quietFor = 0;
 let lastRetryMs = 0;
-const noStatic = typeof location !== 'undefined' && new URLSearchParams(location.search).has('nostatic');
+// Reconnects: every 10 s for the first minute, so a short drop comes back as quickly as before; after that
+// they back off (20 s, 40 s, then every minute or so, with jitter) until the stream plays again.
+const RETRY_BASE_MS = 10000;
+const RETRY_CAP_MS = 60000;
+const RETRY_FLAT = 6;      // attempts at the plain 10 s before backing off
+let retryAttempt = 0;
+let retryWaitMs = RETRY_BASE_MS;
+function noteRetry(now) {
+  lastRetryMs = now;
+  retryWaitMs = retryAttempt < RETRY_FLAT ? RETRY_BASE_MS : backoffMs(retryAttempt - RETRY_FLAT + 1, RETRY_BASE_MS, RETRY_CAP_MS);
+  retryAttempt++;
+}
+function resetRetry() { retryAttempt = 0; retryWaitMs = RETRY_BASE_MS; }
+const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+const noStatic = params.has('nostatic');
+
+// Safari plays the live stream out loud but hands createMediaElementSource only zeros (a tape's file comes
+// through). Once that is seen, the live radio's sound reaches the analysis from a second copy of the stream
+// decoded in sidefeed.js instead, for the rest of the visit. `?sidefeed` uses it from the start (to test it).
+let elementDeaf = params.has('sidefeed');
+// Safari also plays that stream straight to the speakers, past the volume and the EQ below, so the volume
+// dial sets the element's own volume instead (macOS; on an iPhone or iPad only the device's buttons can) and
+// the EQ is unavailable on the live radio. Only WebKit does this: elsewhere exact zeros could be real dead air.
+const webkit = typeof navigator !== 'undefined' && /AppleWebKit/.test(navigator.userAgent)
+  && !/Chrome\/|Chromium\/|Edg\/|Android/.test(navigator.userAgent);
+let elementBypass = false;
+// Until the graph is heard carrying sound, a WebKit browser may be bypassing it: the dial is applied to the
+// element from the start (a little too quiet for a moment if the graph works) rather than playing at full volume.
+let graphHeard = false;
+let deafFor = 0;
+let sideFeed = null;
+let lastPlayhead = -1;
+let playheadStill = 0;     // s since the <audio> element's playhead last moved
+
+function stopSideFeed() {
+  sideFeed?.stop();
+  sideFeed = null;
+  cvState.sideFeed = elementDeaf ? 'stopped' : '';
+}
 
 function updateSignal(dt) {
   if (embed) { cvState.noSignal = false; return; } // the host plays the radio; silence is just a quiet picture
   if (tape && !micOn) { updateTapeSignal(dt); return; }
+  const audioEl = document.getElementById('lsdAudio');
+  const t = audioEl?.currentTime ?? -1;
+  playheadStill = wantAudio && !micOn && (!audioEl || audioEl.paused || t === lastPlayhead) ? playheadStill + dt : 0;
+  lastPlayhead = t;
+  const playing = wantAudio && !micOn && playheadStill < 1; // currentTime may update only a few times a second
+
+  if (webkit && !graphHeard && playing && analysisReady && cvState.raw.audio_amp > 0 && !elementDeaf) {
+    graphHeard = true;
+    applyElementVolume();
+  }
+  // Only WebKit hands the graph zeros while playing: elsewhere exact zeros are dead air, not a reason to
+  // download a second copy (`?sidefeed` still forces it, for testing).
+  if (!elementDeaf && webkit) {
+    deafFor = playing && analysisReady && cvState.raw.audio_amp === 0 ? deafFor + dt : 0;
+    if (deafFor > DEAF_S) {
+      elementDeaf = true;
+      console.warn('[dsp] the stream plays but the analysis hears silence: decoding a second copy for the picture');
+      elementBypass = true;
+      soundPathChanged();
+    }
+  }
+  if (elementDeaf && playing && !sideFeed && audioCtx) {
+    sideFeed = startSideFeed(audioCtx, analysisIn, STREAM_URL);
+    quietFor = 0;
+  }
+  if (sideFeed) cvState.sideFeed = sideFeed.status;
+
   quietFor = analysisReady && cvState.raw.audio_amp > SILENT_AMP ? 0 : quietFor + dt;
-  cvState.noSignal = wantAudio && !noStatic && quietFor > 4;
+  // The second copy cannot be decoded here: the sound plays, so a still picture, not snow.
+  const blind = sideFeed?.status === 'unsupported' && playing;
+  cvState.noSignal = wantAudio && !noStatic && quietFor > 4 && !blind;
   const now = performance.now();
-  if (cvState.noSignal && !micOn && now - lastRetryMs > 10000) {
-    lastRetryMs = now;
+  if (playing && !cvState.noSignal) resetRetry();
+  if (cvState.noSignal && !micOn && playheadStill > STUCK_S && now - lastRetryMs > retryWaitMs) {
+    noteRetry(now);
     reconnect();
   }
 }
@@ -360,6 +435,7 @@ function reconnect() {
 // where it was.
 const TAPE_STUCK_S = 6;
 let tape = null; // { url, pos, paused, ready, stuck, lastT }
+let tapeMetaListener = null; // loadTape's pending 'loadedmetadata' handler
 
 /** Points the element at the tape, from `tape.pos`. The promise is play()'s: it rejects if the browser refuses. */
 function loadTape() {
@@ -368,12 +444,16 @@ function loadTape() {
   const t = tape;
   t.ready = false;
   t.stuck = 0;
-  audioEl.addEventListener('loadedmetadata', () => {
+  // A stuck tape is reloaded every few seconds: the previous load's listener goes, so they do not pile up.
+  if (tapeMetaListener) audioEl.removeEventListener('loadedmetadata', tapeMetaListener);
+  tapeMetaListener = () => {
+    tapeMetaListener = null;
     if (tape !== t) return;
     if (t.pos > 0) audioEl.currentTime = t.pos;
     t.ready = true;
     t.lastT = t.pos;
-  }, { once: true });
+  };
+  audioEl.addEventListener('loadedmetadata', tapeMetaListener, { once: true });
   audioEl.src = t.url;
   if (t.paused || micOn) return Promise.resolve();
   return audioEl.play().then(() => { analysisReady = true; cvState.isLive = true; });
@@ -387,8 +467,9 @@ function updateTapeSignal(dt) {
   tape.lastT = audioEl.currentTime;
   tape.stuck = !wantAudio || tape.paused || audioEl.ended || moved ? 0 : tape.stuck + dt;
   cvState.noSignal = !noStatic && tape.stuck > TAPE_STUCK_S;
-  if (cvState.noSignal && now - lastRetryMs > 10000) {
-    lastRetryMs = now;
+  if (moved && !cvState.noSignal) resetRetry();
+  if (cvState.noSignal && now - lastRetryMs > retryWaitMs) {
+    noteRetry(now);
     reconnect();
   }
 }
@@ -411,7 +492,9 @@ function resetAnalysis() {
 export function insertTape(url, startAt = 0) {
   tape = { url, pos: startAt, paused: false, ready: false, stuck: 0, lastT: 0 };
   releaseMic();
+  stopSideFeed();
   resetAnalysis();
+  soundPathChanged(); // a tape's file goes through the graph, even in Safari
   if (wantAudio) loadTape().catch((err) => console.warn('[dsp] tape did not start:', err.message)); // TV off: power-on starts it
 }
 
@@ -421,6 +504,7 @@ export function ejectTape() {
   tape = null;
   resetAnalysis();
   cvState.noSignal = false;
+  soundPathChanged();
   if (wantAudio && !micOn) reconnect();
 }
 
@@ -465,9 +549,10 @@ function updateAudioFrame(dt) {
   audioFrame.spectrum.set(spectrum.spectrum);
 }
 
-export function tick(dt) {
+/** One step of the analysis. `spectrum = false` skips the shaders' spectrum and waveform (lite mode draws none). */
+export function tick(dt, spectrum = true) {
   updateSignal(dt);
-  updateAudioFrame(dt);
+  if (spectrum) updateAudioFrame(dt);
   if (analysisReady) {
     updateAmplitudes(dt);
     // Sections come from auto gain's own watch (updated in updateAmplitudes), fed the fixed-scale levels.
@@ -494,10 +579,13 @@ let analysisIn = null;
 let micOn = false;
 let micStream = null;
 let micSource = null;
+let micPendingReq = 0;    // the request token of the permission prompt that is up, 0 for none
+let micReq = 0;           // bumped to cancel a pending permission request
 export const micAvailable = () => !embed && !!navigator.mediaDevices?.getUserMedia;
 export const isMicOn = () => micOn;
 
 function releaseMic() {
+  micReq++;
   if (!micOn) return;
   micOn = false;
   micSource?.disconnect();
@@ -508,12 +596,27 @@ function releaseMic() {
 
 /** Switches the analysed input to the microphone (`on`) or back to the radio; rejects if the mic is refused. */
 export async function setMic(on) {
-  if (embed || on === micOn || !audioCtx) return micOn;
+  if (embed || !audioCtx) return micOn;
+  if (!on && !micOn) micReq++; // cancels a request that is waiting on the prompt
+  if (on === micOn) return micOn;
   if (on) {
+    if (micPendingReq && micPendingReq === micReq) return micOn; // a live request is already waiting on the browser's prompt
+    const req = ++micReq;
+    micPendingReq = req;
     // Raw sound: the browser's speech clean-up would flatten the beat.
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-    });
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+    } finally {
+      if (micPendingReq === req) micPendingReq = 0;
+    }
+    // Power-off, a tape going in or the viewer switching back while the prompt was up: no longer wanted.
+    if (req !== micReq || !wantAudio || micOn || !audioCtx) {
+      stream.getTracks().forEach((t) => t.stop());
+      return micOn;
+    }
     micStream = stream;
     micSource = audioCtx.createMediaStreamSource(stream);
     micSource.connect(analysisIn);
@@ -524,6 +627,7 @@ export async function setMic(on) {
     if (audioCtx.state === 'suspended') await audioCtx.resume().catch(() => {});
     stream.getAudioTracks()[0]?.addEventListener('ended', () => { if (micStream === stream) setMic(false).catch(() => {}); });
     document.getElementById('lsdAudio')?.pause();
+    stopSideFeed();
     tracker.reset();
     quietFor = 0;
     window.dispatchEvent(new CustomEvent('lsd-mic', { detail: true }));
@@ -549,8 +653,12 @@ export async function startAudio() {
   wantAudio = true;
   quietFor = 0;
   lastRetryMs = performance.now(); // the first reconnect waits for this attempt to fail
-  // Set stream src on user gesture (embed mode: the host app plays the radio and feeds us instead)
-  if (!embed && !tape) audioEl.src = STREAM_URL;
+  resetRetry();
+  // Set stream src on user gesture (embed mode: the host app plays the radio and feeds us instead). A fresh
+  // address each time, as in reconnect(): with the same one, Firefox replays the bytes it kept from the last
+  // visit (a reload), so the sound starts at once, then goes silent while the live stream catches up.
+  if (!embed && !tape) audioEl.src = `${STREAM_URL}?t=${Date.now()}`;
+  applyElementVolume();
 
   if (!audioCtx) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -621,7 +729,17 @@ export async function startAudio() {
     if (radio) {
       radio.connect(source);
       radio.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      // The EQ shapes only what is heard: the analysis above taps the radio before it.
+      const band = (type, hz) => { const f = audioCtx.createBiquadFilter(); f.type = type; f.frequency.value = hz; return f; };
+      const bass = band('lowshelf', EQ_HZ.bass);
+      const mid = band('peaking', EQ_HZ.mid);
+      mid.Q.value = EQ_MID_Q;
+      const treble = band('highshelf', EQ_HZ.treble);
+      const trim = audioCtx.createGain();
+      gainNode.connect(bass); bass.connect(mid); mid.connect(treble); treble.connect(trim);
+      trim.connect(audioCtx.destination);
+      eqNodes = [bass, mid, treble, trim];
+      applyEq(true);
     }
     source.connect(broadbandAnalyser);
     source.connect(bassFilter);
@@ -672,14 +790,24 @@ export async function startAudio() {
     himidBuf = new Float32Array(himidAnalyser.fftSize);
   }
 
+  // Without a click (AUTOPLAY, ?kiosk), a browser that blocks sound leaves resume() pending instead of
+  // failing, so it gets a moment; the radio's play() below then says whether sound is allowed.
   if (audioCtx.state === 'suspended') {
-    await audioCtx.resume();
+    await Promise.race([audioCtx.resume(), new Promise((r) => setTimeout(r, RESUME_WAIT_MS))]);
   }
 
   if (embed) { /* the host app plays the radio */ }
   else if (micOn) audioEl.pause();  // the microphone is the input; the radio waits
   else if (tape) { tape.paused = false; await loadTape(); }
   else await audioEl.play();
+  if (audioCtx.state === 'suspended') {
+    // The element plays but the context it is routed through does not: nothing would be heard.
+    await Promise.race([audioCtx.resume(), new Promise((r) => setTimeout(r, RESUME_WAIT_MS))]);
+    if (audioCtx.state === 'suspended') {
+      if (!embed) audioEl.pause();
+      throw new DOMException('The browser wants a click before sound', 'NotAllowedError');
+    }
+  }
 
   cvState.isLive = true;
   analysisReady = true;
@@ -689,6 +817,7 @@ export async function startAudio() {
 export async function stopAudio() {
   wantAudio = false;
   releaseMic();
+  stopSideFeed();
   if (tape) tape.ready = false; // it stays in, at tape.pos
   cvState.noSignal = false;
   const audioEl = document.getElementById('lsdAudio');
@@ -729,6 +858,77 @@ export function setVolume(volume) {
   if (gainNode && audioCtx) {
     gainNode.gain.setTargetAtTime(volume * volume, audioCtx.currentTime, 0.05);
   }
+  applyElementVolume();
+}
+
+/** The live radio is heard straight from the <audio> element (Safari), past the volume gain and the EQ. */
+/** True while this viewer's side feed (the second copy of the stream for the analysis) is playing. */
+export const isSideFeedRunning = () => !!sideFeed && sideFeed.status === 'playing';
+export const radioBypassesGraph = () => elementBypass && !tape && !micOn && !embed;
+
+let volumeFixed = null;
+/** The page cannot set an element's volume (iPhone, iPad: the device's buttons do). */
+export function elementVolumeFixed() {
+  if (volumeFixed === null) {
+    try { const a = new Audio(); a.volume = 0.5; volumeFixed = a.volume !== 0.5; } catch { volumeFixed = false; }
+  }
+  return volumeFixed;
+}
+
+/** The dial's volume on the element while the radio bypasses the graph, else 1 (the gain node has it). */
+function applyElementVolume() {
+  const audioEl = typeof document !== 'undefined' ? document.getElementById('lsdAudio') : null;
+  if (!audioEl) return;
+  const provisional = webkit && !graphHeard && !tape && !micOn && !embed && !elementVolumeFixed();
+  const v = radioBypassesGraph() || provisional ? currentVolumeRatio * currentVolumeRatio : 1;
+  if (audioEl.volume !== v) audioEl.volume = v;
+}
+
+/** The radio started or stopped bypassing the graph: the element's volume follows, and the UI (lsd-sound-path). */
+function soundPathChanged() {
+  applyElementVolume();
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('lsd-sound-path', { detail: radioBypassesGraph() }));
+}
+
+// -------------------------------------------------------
+// Equalizer: three bands on what is heard (radio or tape), the same as the Spaz Radio app's.
+// -------------------------------------------------------
+export const EQ_MIN_DB = -12;
+export const EQ_MAX_DB = 12;
+const EQ_HZ = { bass: 120, mid: 1000, treble: 6000 };
+const EQ_MID_Q = 0.7;
+let eq = { on: false, bass: 0, mid: 0, treble: 0 };
+
+/** Boosts would push loud masters past full scale, so the whole signal drops by the largest boost. */
+export function eqHeadroomDb({ bass, mid, treble }) {
+  return -Math.max(0, bass, mid, treble);
+}
+
+function applyEq(now = false) {
+  if (!eqNodes || !audioCtx) return;
+  const [bass, mid, treble, trim] = eqNodes;
+  const g = eq.on ? eq : { bass: 0, mid: 0, treble: 0 };
+  // Glide while playing; a suspended context would leave a glide pending, so set the value outright.
+  const glide = !now && audioCtx.state === 'running';
+  const set = (param, v) => {
+    if (glide) { param.setTargetAtTime(v, audioCtx.currentTime, 0.03); return; }
+    param.cancelScheduledValues(0);
+    param.value = v;
+  };
+  set(bass.gain, g.bass);
+  set(mid.gain, g.mid);
+  set(treble.gain, g.treble);
+  set(trim.gain, 10 ** (eqHeadroomDb(g) / 20));
+}
+
+/** The EQ's live gains [bass dB, mid dB, treble dB, trim ratio], or null before the sound has started (for the headless check). */
+export const eqGains = () => eqNodes?.map((n) => n.gain.value) ?? null;
+
+/** settings: { on, bass, mid, treble } in whole dB. Takes effect at once, or when the sound starts. */
+export function setEq(settings) {
+  const clamp = (v) => Math.max(EQ_MIN_DB, Math.min(EQ_MAX_DB, Math.round(Number(v) || 0)));
+  eq = { on: !!settings.on, bass: clamp(settings.bass), mid: clamp(settings.mid), treble: clamp(settings.treble) };
+  applyEq();
 }
 
 // -------------------------------------------------------

@@ -9,6 +9,8 @@ export const SCHEDULE_URL = 'https://radio.spaz.org/djdash/droid';
 export const SCHEDULE_REFRESH_MS = 60 * 60 * 1000; // hourly while the TV is on (like the app)
 export const SCHEDULE_STALE_MS = 10 * 60 * 1000;   // opening the page refetches a list older than this
 
+// Array.at / findLast need Safari 15.4; the TV supports Safari 15.0 (tools/compat.test.mjs).
+const last = (a) => a[a.length - 1];
 const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
 /** `Spukkin Faceship&#039;s` -> `Spukkin Faceship's`. The result is text: put it in with textContent. */
@@ -75,8 +77,8 @@ export function groupByDay(shows, now, opts = {}) {
   const days = [];
   for (const s of upcoming(shows, now)) {
     const day = dayLabel(s.start, now, opts);
-    if (days.at(-1)?.day !== day) days.push({ day, shows: [] });
-    days.at(-1).shows.push({ time: `${timeLabel(s.start, opts)} – ${timeLabel(s.end, opts)}`, name: s.name, onAir: s.onAir });
+    if (last(days)?.day !== day) days.push({ day, shows: [] });
+    last(days).shows.push({ time: `${timeLabel(s.start, opts)} – ${timeLabel(s.end, opts)}`, name: s.name, onAir: s.onAir });
   }
   return days;
 }
@@ -89,11 +91,62 @@ export function nextLine(shows, now, opts = {}) {
   return `NEXT: ${s.name} · ${day === 'TODAY' ? '' : `${day} `}${timeLabel(s.start, opts)}`;
 }
 
-/** radio.spaz.org/playing -> { title, live }. The server decides what is live, and puts `[LIVE!] ` before the title. */
+/**
+ * Reads radio.spaz.org/playing the way spaz.org/radio does: its JSONP copy, a script that calls
+ * update_meta({...}). A script needs no CORS header, and /playing sends none, so fetch() can't read it.
+ * The file is static and always calls update_meta, whatever ?callback= says. Resolves with the raw object.
+ */
+// One request at a time: update_meta is a single global, so a second script loaded while the first is out (a quick
+// power off/on) would take the first one's answer and leave it to time out. A call while one is out shares it.
+let playingInFlight = null;
+export function loadPlayingJsonp(url = 'https://radio.spaz.org/streams/playing-jsonp', timeoutMs = 8000) {
+  if (!playingInFlight) {
+    playingInFlight = requestPlayingJsonp(url, timeoutMs);
+    playingInFlight.then(() => { playingInFlight = null; }, () => { playingInFlight = null; });
+  }
+  return playingInFlight;
+}
+function requestPlayingJsonp(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    let settled = false;
+    const done = (fn, v) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      s.remove();
+      globalThis.update_meta = () => {}; // a late copy finds a no-op, not a ReferenceError
+      fn(v);
+    };
+    globalThis.update_meta = (m) => done(resolve, m);
+    s.onload = () => done(reject, new Error('playing-jsonp did not call update_meta'));
+    s.onerror = () => done(reject, new Error('playing-jsonp failed to load'));
+    const timer = setTimeout(() => done(reject, new Error('playing-jsonp timed out')), timeoutMs);
+    s.src = `${url}${url.includes('?') ? '&' : '?'}callback=update_meta&t=${Date.now()}`;
+    document.head.appendChild(s);
+  });
+}
+
+/** radio.spaz.org/playing -> { title, live, download }. The server decides what is live, and puts `[LIVE!] ` before
+ * the title. `download` is the show's file on spaz.org as the server names it: often
+ * `archives/olde/<id>.ogg`, the radio's own copy, which spaz.org does not serve; `archiveFileFor` in tapes.js
+ * finds the archive's copy), or ''
+ * while the show is live: a live show has no file yet. */
 export function parsePlaying(raw) {
   const live = raw?.live === true || raw?.live === 'true';
   const title = decodeName(raw?.playing);
-  return { title: live && title && !title.startsWith('[LIVE!]') ? `[LIVE!] ${title}` : title, live };
+  return {
+    title: live && title && !title.startsWith('[LIVE!]') ? `[LIVE!] ${title}` : title,
+    live,
+    download: live || !raw?.download ? '' : archiveFileUrl(raw.download),
+  };
+}
+/** A path or URL from the server as an http(s) URL on spaz.org's terms, or '' for anything else. */
+function archiveFileUrl(path) {
+  try {
+    const url = new URL(String(path), 'https://spaz.org/');
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : '';
+  } catch { return ''; }
 }
 
 // -------------------------------------------------------
@@ -106,13 +159,16 @@ export const scheduleState = {
   loading: null,    // the fetch in flight
 };
 
+/** An abort signal that fires after `ms` (none where the browser lacks AbortSignal.timeout): a hung request must not hold its poller. */
+export const timeoutSignal = (ms) => (typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
+
 /** Fetches the feed (one retry after 2 s). Keeps the last good list if it fails. Returns scheduleState. */
 export function refreshSchedule(fetchImpl = fetch) {
   if (scheduleState.loading) return scheduleState.loading;
   scheduleState.loading = (async () => {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const res = await fetchImpl(SCHEDULE_URL, { cache: 'no-store' });
+        const res = await fetchImpl(SCHEDULE_URL, { cache: 'no-store', signal: timeoutSignal(10000) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         setShows(parseSchedule(await res.json()));
         return scheduleState;

@@ -88,7 +88,7 @@ export function installEmbedApi(hooks) {
 
     // --- Controls (the VJ app). Spaz Radio uses none of these. Each returns what it did; every one does
     // nothing during a live broadcast (state().live), as on the TV. The state is pushed after each. ---
-    /** What can be chosen: {scenes: [{channel, name, tags, source, pinnedChain, skipped, runnable}], backgrounds:
+    /** What can be chosen: {complete, scenes: [{channel, name, tags, source, pinnedChain, skipped, runnable}], backgrounds:
      *  [{index, name, source, tags, runnable}], fxChains: [{id, name, inRotation}], transitions: [{id, name, inRotation}]}. */
     catalog: () => contentCatalog(),
     /** What is on air and how the controls are set (the object LSDHost.state receives). */
@@ -106,7 +106,8 @@ export function installEmbedApi(hooks) {
     time: (bars) => after(setHoldBars(clamp(Math.round(Number(bars) || 16), 1, 256))),
     /** Reroll the scene every this many bars; 0 = off. */
     autoRoll: (bars) => after(setAutoRollBars(clamp(Math.round(Number(bars) || 0), 0, 256))),
-    effects: (on) => after(setEffects(!!on)),
+    /** Effects on (true: RANDOM, the default; 'auto': chains that suit the scene) or off (false). */
+    effects: (on) => after(setEffects(on === 'auto' ? true : on ? 'random' : false)),
     nextChain: () => after(nextFxChain()),
     /** FX chain by id on the scene on air (null = none): 'ok', 'off', 'live' or 'unknown'. */
     chain: (id) => after(setChain(id ?? null)),
@@ -151,5 +152,7 @@ export function installEmbedApi(hooks) {
     return result;
   }
   window.addEventListener('lsd-now-showing', () => setTimeout(push, 0));
+  // The catalog is final (every preset's source known, backgrounds in): state().catalogComplete turns true.
+  window.addEventListener('lsd-catalog-ready', () => setTimeout(push, 0));
   setInterval(push, 1000);
 }

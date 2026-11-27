@@ -18,8 +18,8 @@
     {
       "desktop": "src/main/resources/shaders/mixer.frag",
       "web": "web/shaders/mixer.frag",
-      "mode": "auto_shader",
-      "description": "Master deck mixer & crossfader compositing shader"
+      "mode": "web_extension",
+      "description": "Master deck mixer & crossfader compositing shader (web adds the Spaz logos layer: uTexLogo, uLogoAlpha; TV v65)"
     },
     {
       "desktop": "library/sources/dynamic_spiral/dynamic_spiral.fs",
@@ -73,7 +73,7 @@
       "desktop": "library/sources/chladni_cymatics/chladni_cymatics.fs",
       "web": "web/shaders/chladni_cymatics.frag",
       "mode": "auto_shader",
-      "description": "Physical 2D acoustic plate resonance simulation (Chladni cymatics)"
+      "description": "Chladni cymatics: sand on a vibrating plate or water dish"
     },
     {
       "desktop": "src/main/resources/default_filters/3d_elevation.fs",
@@ -475,16 +475,23 @@
       "mode": "manual_review",
       "description": "Shader audio spectrum (FFT, dB mapping, release); golden vectors in web/tools/spectrum_vectors.json",
       "last_synced_hash": "584f0d9997565e122b4808df50cd6bef155dd977ae3e04ab5f4afe386bb2dce4"
+    },
+    {
+      "desktop": "src/main/kotlin/llm/slop/liquidlsd/audio/BeatTrackerEngine.kt",
+      "web": "web/beattrack.js",
+      "mode": "manual_review",
+      "description": "Tempo tracker (autocorrelation, multiples comb, tempo prior, accent check); a reimplementation, not a line port, so no golden vectors: measure with web/checks/tempo_report.mjs",
+      "last_synced_hash": "62f86dced7d101fe3fa6415f2d151d037b0fe2a330bfa27a9418e9b4c3082b4f"
+    },
+    {
+      "desktop": "src/main/kotlin/llm/slop/liquidlsd/audio/BeatHopper.kt",
+      "web": "web/beattrack.js",
+      "mode": "manual_review",
+      "description": "Tempo tracker hop/band onset feed; a reimplementation, measure with web/checks/tempo_report.mjs",
+      "last_synced_hash": "58ea1524c4ef476fcc43b4591964776b5818f1fdf8f483aef2e170f1f2abd789"
     }
   ],
   "content": [
-    {
-      "desktop_dir": "defaults/fx_chains",
-      "web_dir": "web/content/fxchains",
-      "ext": ".lsdfxchain",
-      "catalog_key": "fxChains",
-      "description": "Desktop FX chain presets (FXChainDto) the autopilot can apply to decks"
-    },
     {
       "desktop_dir": "defaults/transitions",
       "web_dir": "web/content/transitions",
@@ -497,7 +504,7 @@
       "ext": ".lsdfxchain",
       "catalog_key": "fxChains",
       "web_only": true,
-      "description": "Web-authored FX chains (desktop FXChainDto format), named web-*"
+      "description": "FX chains (desktop FXChainDto format), named web-*; the desktop ships them as its factory chains without the prefix"
     }
   ],
   "mandala_recipes": {
