@@ -33,8 +33,10 @@ fun Oscilloscope(
 
     val frameClock = remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(Unit) {
-        while (true) {
+    // Only ticks while there is sound to draw.
+    LaunchedEffect(isPlaying) {
+        var tail = 90 // ~3 s more after pausing, so the picture fades out instead of freezing
+        while (isPlaying || tail-- > 0) {
             delay(16L * 2) // ~30 FPS
             frameClock.longValue++
         }
@@ -75,6 +77,7 @@ fun Oscilloscope(
 
         val width = size.width.toInt()
         val height = size.height.toInt()
+        if (width <= 0 || height <= 0) return@Canvas
 
         if (bitmapRef.value == null ||
             bitmapRef.value!!.width != width ||

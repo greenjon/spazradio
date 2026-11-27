@@ -7,12 +7,11 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -22,6 +21,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class ScheduleItem(
     val datePart: String,
@@ -31,25 +31,51 @@ data class ScheduleItem(
 )
 
 data class RawShow(
-    val start_timestamp: Long,
-    val end_timestamp: Long,
-    val name: String,
-    val url: String
+    val start_timestamp: Long = 0,
+    val end_timestamp: Long = 0,
+    // Gson fills missing fields with null whatever Kotlin says, so these are honestly nullable.
+    val name: String? = null,
+    val url: String? = null
 )
+
+/** Parses the schedule feed, dropping bad rows one by one (the web TV does the same). */
+object ScheduleParser {
+    const val FALLBACK_NAME = "SPAZ Radio"
+    private val gson = Gson()
+
+    /** Throws IllegalArgumentException when the body is not a JSON array. */
+    fun parse(json: String): List<RawShow> {
+        val root = JsonParser.parseString(json)
+        require(root.isJsonArray) { "Schedule is not a JSON array" }
+        return root.asJsonArray.mapNotNull { el ->
+            try {
+                val show = gson.fromJson(el, RawShow::class.java) ?: return@mapNotNull null
+                if (show.end_timestamp <= show.start_timestamp) return@mapNotNull null
+                if (show.name.isNullOrBlank()) show.copy(name = FALLBACK_NAME) else show
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+}
 
 class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
     private val cacheFile = File(context.cacheDir, "schedule_cache.json")
-    
+
+    // Rows are kept raw and formatted when read, so a time zone or locale change and
+    // shows that have ended are picked up by refreshView() without another fetch.
+    private var rawShows: List<RawShow> = emptyList()
+
     private val _schedule = MutableStateFlow<List<ScheduleItem>>(emptyList())
     val schedule: StateFlow<List<ScheduleItem>> = _schedule
 
     private val _loading = MutableStateFlow(true)
     val loading: StateFlow<Boolean> = _loading
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
+    private val _error = MutableStateFlow(false)
+    val error: StateFlow<Boolean> = _error
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -58,29 +84,23 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         .followSslRedirects(true)
         .build()
 
-    private val gson = Gson()
+    private var lastFetch = 0L
+    private val fetching = AtomicBoolean(false)
 
     init {
         loadFromCache()
-        startPolling()
     }
 
     private fun loadFromCache() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (cacheFile.exists()) {
-                    val json = cacheFile.readText()
-                    val type = object : TypeToken<List<RawShow>>() {}.type
-                    val rawShows: List<RawShow> = gson.fromJson(json, type)
-                    
-                    val now = System.currentTimeMillis()
-                    val validShows = rawShows
-                        .filter { it.end_timestamp > now }
-                        .map { formatShowItem(it) }
-                    
-                    if (validShows.isNotEmpty()) {
-                        _schedule.value = validShows
-                        _loading.value = false
+                    val cached = ScheduleParser.parse(cacheFile.readText())
+                    // Never let a slow cache read replace fresher network data.
+                    if (rawShows.isEmpty() && lastFetch == 0L) {
+                        rawShows = cached
+                        refreshView()
+                        if (_schedule.value.isNotEmpty()) _loading.value = false
                     }
                 }
             } catch (e: Exception) {
@@ -89,26 +109,34 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun startPolling() {
-        viewModelScope.launch(Dispatchers.IO) {
-            while (isActive) {
+    /** Re-filters and re-formats the rows for the current time, locale and time zone. */
+    fun refreshView() {
+        val now = System.currentTimeMillis()
+        _schedule.value = rawShows
+            .filter { it.end_timestamp > now }
+            .mapNotNull { runCatching { formatShowItem(it) }.getOrNull() }
+    }
+
+    /** Called while the schedule panel is on screen: refresh the view, and the feed if it is over an hour old. */
+    suspend fun keepFresh() {
+        while (true) {
+            refreshView()
+            if (System.currentTimeMillis() - lastFetch > TimeUnit.HOURS.toMillis(1)) {
                 loadScheduleSync()
-                // Poll every hour
-                delay(TimeUnit.HOURS.toMillis(1))
             }
+            delay(TimeUnit.MINUTES.toMillis(5))
         }
     }
 
-    private fun saveToCache(rawShows: List<RawShow>) {
+    private fun saveToCache(shows: List<RawShow>) {
         try {
-            val json = gson.toJson(rawShows)
-            cacheFile.writeText(json)
+            cacheFile.writeText(Gson().toJson(shows))
         } catch (e: Exception) {
             Log.e("ScheduleViewModel", "Error saving cache", e)
         }
     }
 
-    // Public alias for manual refresh if ever needed
+    // Manual refresh (the Retry button)
     fun loadSchedule() {
         viewModelScope.launch(Dispatchers.IO) {
             loadScheduleSync()
@@ -116,50 +144,52 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     }
 
     private suspend fun loadScheduleSync() {
-        if (_schedule.value.isEmpty()) {
-            _loading.value = true
-        }
-        _error.value = null
+        if (!fetching.compareAndSet(false, true)) return
+        try {
+            if (_schedule.value.isEmpty()) {
+                _loading.value = true
+            }
+            _error.value = false
 
-        var attempt = 0
-        val maxAttempts = 2
+            var attempt = 0
+            val maxAttempts = 2
 
-        while (attempt < maxAttempts) {
-            try {
-                val request = Request.Builder()
-                    .url("https://radio.spaz.org/djdash/droid")
-                    .build()
+            while (attempt < maxAttempts) {
+                try {
+                    val request = Request.Builder()
+                        .url("https://radio.spaz.org/djdash/droid")
+                        .build()
 
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        throw IOException("Unexpected code $response")
+                    client.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) {
+                            throw IOException("Unexpected code $response")
+                        }
+
+                        val body = response.body ?: throw IOException("Empty body")
+                        val shows = ScheduleParser.parse(body.string())
+
+                        rawShows = shows
+                        lastFetch = System.currentTimeMillis()
+                        refreshView()
+                        saveToCache(shows)
                     }
-
-                    val body = response.body ?: throw IOException("Empty body")
-                    val responseData = body.string()
-                    val type = object : TypeToken<List<RawShow>>() {}.type
-                    val rawShows: List<RawShow> = gson.fromJson(responseData, type)
-
-                    val now = System.currentTimeMillis()
-                    val validShows = rawShows.filter { it.end_timestamp > now }
-                    
-                    _schedule.value = validShows.map { formatShowItem(it) }
-                    saveToCache(rawShows)
-                }
-                break
-            } catch (e: Exception) {
-                attempt++
-                if (attempt >= maxAttempts) {
-                    Log.e("ScheduleViewModel", "Error fetching schedule", e)
-                    if (_schedule.value.isEmpty()) {
-                        _error.value = "Schedule unavailable"
+                    break
+                } catch (e: Exception) {
+                    attempt++
+                    if (attempt >= maxAttempts) {
+                        Log.e("ScheduleViewModel", "Error fetching schedule", e)
+                        if (_schedule.value.isEmpty()) {
+                            _error.value = true
+                        }
+                    } else {
+                        delay(2_000)
                     }
-                } else {
-                    delay(2_000)
                 }
             }
+            _loading.value = false
+        } finally {
+            fetching.set(false)
         }
-        _loading.value = false
     }
 
     private fun formatShowItem(show: RawShow): ScheduleItem {
@@ -176,7 +206,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         )
 
         val cleanName = android.text.Html
-            .fromHtml(show.name, android.text.Html.FROM_HTML_MODE_LEGACY)
+            .fromHtml(show.name ?: ScheduleParser.FALLBACK_NAME, android.text.Html.FROM_HTML_MODE_LEGACY)
             .toString()
 
         return ScheduleItem(

@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import llm.slop.spazradio.ui.theme.LocalNeonTheme
 import androidx.compose.ui.unit.dp
 import llm.slop.spazradio.R
 
@@ -26,9 +28,8 @@ fun InfoBox(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    // If the surface color is exactly DeepBlue (which is our Neon theme surface color),
-    // use the requested 50% transparent black. Otherwise, fall back to the standard surface behavior.
-    val backgroundColor = if (MaterialTheme.colorScheme.surface == Color(0xFF120A8F)) {
+    // Neon gets 50% transparent black; every other theme uses its (nearly opaque) surface color.
+    val backgroundColor = if (LocalNeonTheme.current) {
         Color.Black.copy(alpha = 0.5f)
     } else {
         MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
@@ -65,7 +66,7 @@ fun InfoBox(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_close),
-                        contentDescription = "Close",
+                        contentDescription = stringResource(R.string.action_close),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -95,7 +96,7 @@ fun ErrorContent(message: String, onRetry: () -> Unit) {
         Text(message, color = MaterialTheme.colorScheme.error)
         Spacer(Modifier.height(8.dp))
         Button(onClick = onRetry) {
-            Text("Retry")
+            Text(stringResource(R.string.label_retry))
         }
     }
 }

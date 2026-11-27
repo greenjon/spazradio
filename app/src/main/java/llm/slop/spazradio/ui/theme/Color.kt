@@ -26,3 +26,7 @@ val LunarizedViolet = Color(0xFF626bbe)
 val LunarizedBlue = Color(0xFF2284c1)
 val LunarizedCyan = Color(0xFF25968d)
 val LunarizedGreen = Color(0xFF7a8d00)
+
+// Darker variants for the Light scheme, so text and small labels reach 4.5:1 on the panel colors.
+val LunarizedGreenOnLight = Color(0xFF556300)
+val LunarizedBase01Deep = Color(0xFF3F565F)

@@ -5,6 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import llm.slop.spazradio.AppTheme
 
@@ -24,7 +26,7 @@ private val LunarizedDarkColorScheme = darkColorScheme(
 )
 
 private val LunarizedLightColorScheme = lightColorScheme(
-    primary = LunarizedGreen,
+    primary = LunarizedGreenOnLight,
     secondary = LunarizedBlue,
     tertiary = LunarizedMagenta,
     background = LunarizedBase3,
@@ -34,7 +36,7 @@ private val LunarizedLightColorScheme = lightColorScheme(
     onTertiary = LunarizedBase03,
     onBackground = LunarizedBase00,
     onSurface = LunarizedBase01, // Base color for text
-    onSurfaceVariant = LunarizedBase00,
+    onSurfaceVariant = LunarizedBase01Deep,
     error = LunarizedRed
 )
 
@@ -48,8 +50,13 @@ private val NeonColorScheme = darkColorScheme(
     onSecondary = NeonGreen, // Match old logic where unselected was green
     onTertiary = Color.Black,
     onBackground = NeonGreen,
-    onSurface = NeonYellow
+    onSurface = NeonYellow,
+    error = Color(0xFFF2B8B5),
+    onError = Color(0xFF601410)
 )
+
+/** True under the Neon theme, whose info panels are translucent black instead of the surface color. */
+val LocalNeonTheme = staticCompositionLocalOf { false }
 
 @Composable
 fun SpazRadioTheme(
@@ -65,9 +72,11 @@ fun SpazRadioTheme(
         AppTheme.AUTO -> if (darkTheme) LunarizedDarkColorScheme else LunarizedLightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalNeonTheme provides (appTheme == AppTheme.NEON)) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
