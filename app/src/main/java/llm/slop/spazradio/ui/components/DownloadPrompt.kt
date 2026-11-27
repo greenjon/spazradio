@@ -55,13 +55,30 @@ fun rememberShowDownloader(
         contract = ActivityResultContracts.RequestPermission()
     ) { _ -> }
 
+    // Android 7-9 can't save into the public Music folder without storage access. The download waits
+    // for the answer; if it's refused the enqueue fails and the tracker reports the failure.
+    var awaitingStorage by remember { mutableStateOf<ArchiveShow?>(null) }
+    val storageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        awaitingStorage?.let { archiveViewModel.downloadArchive(it) }
+        awaitingStorage = null
+    }
+
     val start: (ArchiveShow) -> Unit = { show ->
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
         ) {
-            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            awaitingStorage = show
+            storageLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            archiveViewModel.downloadArchive(show)
         }
-        archiveViewModel.downloadArchive(show)
     }
 
     pending?.let { show ->
