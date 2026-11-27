@@ -19,6 +19,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import llm.slop.spazradio.R
@@ -28,18 +29,20 @@ import llm.slop.spazradio.AppMode
 @Composable
 fun FooterToolbar(
     appMode: AppMode,
-    activeUtility: ActiveUtility,
+    /** Which panel buttons show as on: one at a time on phones, two side by side on wide screens. */
+    isSelected: (ActiveUtility) -> Boolean,
     visualsEnabled: Boolean,
     onUtilityClick: (ActiveUtility) -> Unit,
     onToggleVisuals: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.25f)
 ) {
     // We check the navigation bar height to ensure we don't overlap system buttons.
     // NavigationBar handles this internally via windowInsets, but we explicitly
     // use the default to ensure it "checks" if the user is using a nav bar.
     NavigationBar(
         modifier = modifier.fillMaxWidth(),
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.25f),
+        containerColor = containerColor,
         contentColor = MaterialTheme.colorScheme.primary,
         tonalElevation = 0.dp,
         windowInsets = NavigationBarDefaults.windowInsets
@@ -48,7 +51,7 @@ fun FooterToolbar(
         val infoIcon = if (appMode == AppMode.RADIO) Icons.AutoMirrored.Filled.EventNote else Icons.AutoMirrored.Filled.List
         
         NavigationBarItem(
-            selected = activeUtility == ActiveUtility.INFO,
+            selected = isSelected(ActiveUtility.INFO),
             onClick = { onUtilityClick(ActiveUtility.INFO) },
             icon = { Icon(infoIcon, contentDescription = infoLabel) },
             label = { Text(infoLabel) },
@@ -56,7 +59,7 @@ fun FooterToolbar(
         )
 
         NavigationBarItem(
-            selected = activeUtility == ActiveUtility.CHAT,
+            selected = isSelected(ActiveUtility.CHAT),
             onClick = { onUtilityClick(ActiveUtility.CHAT) },
             icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.label_chat)) },
             label = { Text(stringResource(R.string.label_chat)) },
@@ -64,7 +67,7 @@ fun FooterToolbar(
         )
 
         NavigationBarItem(
-            selected = activeUtility == ActiveUtility.SETTINGS,
+            selected = isSelected(ActiveUtility.SETTINGS),
             onClick = { onUtilityClick(ActiveUtility.SETTINGS) },
             icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title)) },
             label = { Text(stringResource(R.string.settings_title)) },

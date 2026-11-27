@@ -26,6 +26,8 @@ fun InfoBox(
     title: String,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Drops the title bar and most of the padding, for when a landscape keyboard leaves only a sliver. */
+    compact: Boolean = false,
     content: @Composable () -> Unit
 ) {
     // Neon gets 50% transparent black; every other theme uses its (nearly opaque) surface color.
@@ -47,9 +49,9 @@ fun InfoBox(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(if (compact) 4.dp else 16.dp)
         ) {
-            Box(
+            if (!compact) Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)

@@ -8,7 +8,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.People
@@ -69,26 +72,33 @@ fun ChatContent(
 @Composable
 fun NicknameEntry(onJoin: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
+    val join = { if (text.isNotBlank()) onJoin(text) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = stringResource(R.string.chat_join),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        // A landscape keyboard leaves room for the name field only; Done on the keyboard joins.
+        val isImeVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+        if (!isImeVisible) {
+            Text(
+                text = stringResource(R.string.chat_join),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
         TextField(
             value = text,
             onValueChange = { text = it.take(ChatMessages.MAX_NAME) },
             placeholder = { Text(stringResource(R.string.chat_name_hint)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { join() }),
             colors = TextFieldDefaults.colors(
                 focusedIndicatorColor = MaterialTheme.colorScheme.primary,
                 unfocusedIndicatorColor = MaterialTheme.colorScheme.primary
@@ -96,7 +106,7 @@ fun NicknameEntry(onJoin: (String) -> Unit) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(
-            onClick = { if (text.isNotBlank()) onJoin(text) },
+            onClick = join,
             enabled = text.isNotBlank(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,

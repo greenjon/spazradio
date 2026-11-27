@@ -182,29 +182,7 @@ fun PlayerHeader(
             }
             
             // Also balances the play button so the title stays centred when there is nothing to download.
-            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                when (download) {
-                    HeaderDownload.AVAILABLE -> IconButton(onClick = onDownload) {
-                        Icon(
-                            imageVector = Icons.Default.Download,
-                            contentDescription = stringResource(R.string.download_this_show),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    HeaderDownload.DOWNLOADING -> CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    HeaderDownload.DOWNLOADED -> Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = stringResource(R.string.label_downloaded),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    null -> {}
-                }
-            }
+            HeaderDownloadButton(download, onDownload)
         }
 
         if (isArchivePlaying && playbackDuration > 0) {
@@ -220,6 +198,34 @@ fun PlayerHeader(
 
 /** The download button beside the title, for the jukebox show on the stream. */
 enum class HeaderDownload { AVAILABLE, DOWNLOADING, DOWNLOADED }
+
+/** The jukebox show's download button, spinner or tick; an empty 48 dp box when there is nothing to offer. */
+@Composable
+fun HeaderDownloadButton(download: HeaderDownload?, onDownload: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.size(48.dp), contentAlignment = Alignment.Center) {
+        when (download) {
+            HeaderDownload.AVAILABLE -> IconButton(onClick = onDownload) {
+                Icon(
+                    imageVector = Icons.Default.Download,
+                    contentDescription = stringResource(R.string.download_this_show),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            HeaderDownload.DOWNLOADING -> CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+            HeaderDownload.DOWNLOADED -> Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = stringResource(R.string.label_downloaded),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            null -> {}
+        }
+    }
+}
 
 @Composable
 fun PlaybackControls(
@@ -262,6 +268,7 @@ fun PlaybackControls(
     }
 }
 
+/** Track time as m:ss or h:mm:ss. */
 private fun formatTime(ms: Long): String {
     val totalSeconds = ms / 1000
     val hours = totalSeconds / 3600

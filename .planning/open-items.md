@@ -12,8 +12,12 @@ Items left open by audits, plus owner decisions. Strike or delete them as they a
   - light theme over the visuals
   - 200% font
   - the pocket sensor
+  - landscape (branch `landscape-layouts`): a phone on its side (cinema strip, panel on the right, chat with the
+    keyboard up) and a tablet or foldable (two panels, Settings in Chat's slot, rotating both ways)
 - **Resync liquid-lsd-android** to liquid-lsd e6901b3 (merged to liquid-lsd main 2026-11-26).
 - **Play Console Data safety (A8-11).** Re-check it against the rewritten `PRIVACY.md`.
+
+- **Landscape and tablet screenshots** for the Play listing, once landscape is checked on real devices.
 
 ## After the 2.0.4 release
 
@@ -37,6 +41,9 @@ Items left open by audits, plus owner decisions. Strike or delete them as they a
   `file_paths.xml`.
 - **A3-10.** Tell the user downloads go to `Music/SPAZRadio`.
 - **A3-11.** Download tracking is lost on process death.
+- **Landscape: hardware Enter on the chat name field.** Joining with a physical keyboard's Enter (adb keyevent 66
+  on the emulator) lands the panel pager on Settings. The on-screen keyboard's ✓ and the Chat button are fine.
+  Matters for Chromebooks and keyboard cases.
 - **A7-1 remainder.** Hard-coded English left in `ArchiveContent`, `DownloadTracker` and the view models.
 - **A8-3 remainder.** The nickname is redacted from shared logs, but `ChatRepository` still logs presence lines.
 - **A9-3, A9-4.** ProGuard rules are broad and partly dead.

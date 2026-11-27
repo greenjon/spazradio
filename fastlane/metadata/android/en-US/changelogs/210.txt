@@ -1,8 +1,8 @@
 SPAZ Radio 2.0.4
+- Landscape: full-screen visuals on phones, schedule and chat side by side on tablets.
 - Reconnects by itself after a dropped stream; pauses when headphones unplug.
 - Reopening the app no longer stops an archive show that is playing.
-- Chat is plain text, connects only while the app is open, and keeps your draft if sending fails.
+- Chat: plain text, connects only while open, keeps unsent drafts, checks the certificate.
 - Downloads work on Android 7-9 and say when they fail.
 - Schedule, theme and translation fixes; visuals updated from the web TV.
 - Clearer privacy policy.
-- Chat history now checks the server's certificate.

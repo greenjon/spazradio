@@ -15,6 +15,21 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import llm.slop.spazradio.ui.components.CinemaStrip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -183,9 +198,58 @@ fun RadioApp(
         }
     }
 
+    val screenLayout = rememberScreenLayout()
+    val wide = screenLayout == ScreenLayout.WIDE
+
+    // Wide screens keep the list on the left and chat or settings on the right, each opened on its own.
+    var wideInfoOpen by rememberSaveable { mutableStateOf(false) }
+    var wideSide by rememberSaveable { mutableStateOf(ActiveUtility.NONE) }
+    // Settings borrows chat's slot; chat comes back when settings closes.
+    var chatUnderSettings by rememberSaveable { mutableStateOf(false) }
+    val toggleWide: (ActiveUtility) -> Unit = { utility ->
+        when (utility) {
+            ActiveUtility.INFO -> wideInfoOpen = !wideInfoOpen
+            ActiveUtility.CHAT -> {
+                chatUnderSettings = false
+                wideSide = if (wideSide == ActiveUtility.CHAT) ActiveUtility.NONE else ActiveUtility.CHAT
+            }
+            ActiveUtility.SETTINGS -> if (wideSide == ActiveUtility.SETTINGS) {
+                wideSide = if (chatUnderSettings) ActiveUtility.CHAT else ActiveUtility.NONE
+                chatUnderSettings = false
+            } else {
+                chatUnderSettings = wideSide == ActiveUtility.CHAT
+                wideSide = ActiveUtility.SETTINGS
+            }
+            ActiveUtility.NONE -> {}
+        }
+    }
+    // On a wide screen the view model's one open panel is only a request (start-up, a mode change, a
+    // rotation from portrait): it opens that side and is cleared again.
+    LaunchedEffect(wide, activeUtility) {
+        if (!wide || activeUtility == ActiveUtility.NONE) return@LaunchedEffect
+        if (activeUtility == ActiveUtility.INFO) wideInfoOpen = true
+        else { chatUnderSettings = false; wideSide = activeUtility }
+        radioViewModel.closeInfoBox()
+    }
+    // Turning back to a single panel keeps the one most recently in use.
+    var wasWide by remember { mutableStateOf(wide) }
+    LaunchedEffect(wide) {
+        if (wasWide && !wide) {
+            val keep = when {
+                wideSide != ActiveUtility.NONE -> wideSide
+                wideInfoOpen -> ActiveUtility.INFO
+                else -> ActiveUtility.NONE
+            }
+            if (keep != ActiveUtility.NONE) radioViewModel.setActiveUtility(keep)
+        }
+        wasWide = wide
+    }
+    val anyPanelOpen = activeUtility != ActiveUtility.NONE ||
+        (wide && (wideInfoOpen || wideSide != ActiveUtility.NONE))
+
     // Only worth hiding when there is a picture to watch and nothing open to read.
     val controls = rememberControlsAutoHide(
-        armed = autoHideControls && lissajousMode && isPlaying && activeUtility == ActiveUtility.NONE
+        armed = autoHideControls && lissajousMode && isPlaying && !anyPanelOpen
     )
 
     val coroutineScope = rememberCoroutineScope()
@@ -198,23 +262,14 @@ fun RadioApp(
 
     val pageCount = 300
     val pagerState = rememberPagerState(
-        initialPage = 150 + when (activeUtility) {
-            ActiveUtility.CHAT -> 1
-            ActiveUtility.SETTINGS -> 2
-            else -> 0
-        },
+        initialPage = 150 + activeUtility.pageOffset(),
         pageCount = { pageCount }
     )
 
     // Sync activeUtility (ViewModel) -> Pager
     LaunchedEffect(activeUtility) {
         if (activeUtility != ActiveUtility.NONE) {
-            val targetModulo = when (activeUtility) {
-                ActiveUtility.INFO -> 0
-                ActiveUtility.CHAT -> 1
-                ActiveUtility.SETTINGS -> 2
-                else -> 0
-            }
+            val targetModulo = activeUtility.pageOffset()
             if (pagerState.currentPage % 3 != targetModulo) {
                 val baseIndex = (pagerState.currentPage / 3) * 3
                 pagerState.scrollToPage(baseIndex + targetModulo)
@@ -225,12 +280,7 @@ fun RadioApp(
     val highlightedUtility by remember(pagerState, activeUtility) {
         derivedStateOf {
             if (activeUtility == ActiveUtility.NONE) ActiveUtility.NONE
-            else when (pagerState.currentPage % 3) {
-                0 -> ActiveUtility.INFO
-                1 -> ActiveUtility.CHAT
-                2 -> ActiveUtility.SETTINGS
-                else -> ActiveUtility.INFO
-            }
+            else utilityForPage(pagerState.currentPage)
         }
     }
 
@@ -238,12 +288,7 @@ fun RadioApp(
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { page ->
             if (activeUtility != ActiveUtility.NONE) {
-                val settledUtility = when (page % 3) {
-                    0 -> ActiveUtility.INFO
-                    1 -> ActiveUtility.CHAT
-                    2 -> ActiveUtility.SETTINGS
-                    else -> ActiveUtility.INFO
-                }
+                val settledUtility = utilityForPage(page)
                 if (activeUtility != settledUtility) {
                     radioViewModel.setActiveUtility(settledUtility)
                 }
@@ -251,10 +296,54 @@ fun RadioApp(
         }
     }
 
-    // Back closes an open panel before it leaves the app.
+    // Back closes an open panel before it leaves the app; on a wide screen the right-hand one goes first.
     BackHandler(enabled = activeUtility != ActiveUtility.NONE) { radioViewModel.closeInfoBox() }
+    BackHandler(enabled = wide && (wideSide != ActiveUtility.NONE || wideInfoOpen)) {
+        if (wideSide != ActiveUtility.NONE) toggleWide(wideSide) else wideInfoOpen = false
+    }
+
+    val radioMode = appMode == AppMode.RADIO
+    val panelTitle: @Composable (ActiveUtility) -> String = { utility ->
+        stringResource(
+            when (utility) {
+                ActiveUtility.INFO -> if (radioMode) R.string.schedule_title else R.string.label_archives
+                ActiveUtility.CHAT -> R.string.label_chat
+                ActiveUtility.SETTINGS -> R.string.settings_title
+                ActiveUtility.NONE -> R.string.app_name
+            }
+        )
+    }
+    val panelBody: @Composable (ActiveUtility) -> Unit = { utility ->
+        when (utility) {
+            ActiveUtility.INFO ->
+                if (radioMode) ScheduleContent(scheduleViewModel)
+                else ArchiveContent(archiveViewModel = archiveViewModel, radioViewModel = radioViewModel)
+            ActiveUtility.CHAT -> ChatContent(chatViewModel)
+            ActiveUtility.SETTINGS -> SettingsContent(radioViewModel, chatViewModel)
+            ActiveUtility.NONE -> {}
+        }
+    }
+
+    val onUtilityClick: (ActiveUtility) -> Unit = { utility ->
+        if (wide) {
+            toggleWide(utility)
+        } else if (activeUtility == utility) {
+            radioViewModel.setActiveUtility(ActiveUtility.NONE)
+        } else {
+            val wasClosed = activeUtility == ActiveUtility.NONE
+            if (wasClosed) {
+                radioViewModel.setActiveUtility(utility)
+            }
+
+            coroutineScope.launch {
+                val baseIndex = (pagerState.currentPage / 3) * 3
+                pagerState.scrollToPage(baseIndex + utility.pageOffset())
+            }
+        }
+    }
 
     MainLayout(
+        screenLayout = screenLayout,
         showOscilloscope = lissajousMode,
         showInfoBox = activeUtility != ActiveUtility.NONE,
         appTheme = appTheme,
@@ -277,6 +366,27 @@ fun RadioApp(
                 onDownload = { jukeboxShow?.let(downloadShow) }
             )
         },
+        cinemaStrip = {
+            CinemaStrip(
+                trackStatus = trackSubtitle,
+                listenerCount = listenerCount,
+                archiveCount = archiveCount,
+                isPlaying = isPlaying,
+                isArchivePlaying = isArchivePlaying,
+                playbackPosition = playbackPosition,
+                playbackDuration = playbackDuration,
+                appMode = appMode,
+                onPlayPause = { radioViewModel.togglePlayPause() },
+                onSeek = { radioViewModel.seekTo(it) },
+                onModeChange = { radioViewModel.setAppMode(it) },
+                download = headerDownload,
+                onDownload = { jukeboxShow?.let(downloadShow) },
+                activeUtility = highlightedUtility,
+                visualsEnabled = lissajousMode,
+                onUtilityClick = onUtilityClick,
+                onToggleVisuals = { radioViewModel.setLissajousMode(!lissajousMode) }
+            )
+        },
         oscilloscope = { modifier ->
             if (webVisualsFailed) {
                 val waveform by RadioService.waveformFlow.collectAsState()
@@ -295,23 +405,17 @@ fun RadioApp(
                 )
             }
         },
-        infoBox = { modifier ->
+        infoBox = { modifier, compact ->
             if (activeUtility != ActiveUtility.NONE) {
-                val titleRes by remember(pagerState, appMode) {
-                    derivedStateOf {
-                        when (pagerState.currentPage % 3) {
-                            0 -> if (appMode == AppMode.RADIO) R.string.schedule_title else R.string.label_archives
-                            1 -> R.string.label_chat
-                            2 -> R.string.settings_title
-                            else -> R.string.app_name
-                        }
-                    }
+                val titleUtility by remember(pagerState) {
+                    derivedStateOf { utilityForPage(pagerState.currentPage) }
                 }
 
                 InfoBox(
-                    title = stringResource(titleRes),
+                    title = panelTitle(titleUtility),
                     onClose = { radioViewModel.closeInfoBox() },
-                    modifier = modifier
+                    modifier = modifier,
+                    compact = compact
                 ) {
                     HorizontalPager(
                         state = pagerState,
@@ -319,65 +423,95 @@ fun RadioApp(
                         beyondViewportPageCount = 1,
                         flingBehavior = PagerDefaults.flingBehavior(state = pagerState)
                     ) { page ->
-                        when (page % 3) {
-                            0 -> {
-                                if (appMode == AppMode.RADIO) {
-                                    ScheduleContent(scheduleViewModel)
-                                } else {
-                                    ArchiveContent(
-                                        archiveViewModel = archiveViewModel,
-                                        radioViewModel = radioViewModel
-                                    )
-                                }
-                            }
-                            1 -> ChatContent(chatViewModel)
-                            2 -> SettingsContent(radioViewModel, chatViewModel)
-                        }
+                        panelBody(utilityForPage(page))
                     }
                 }
+            }
+        },
+        widePanels = { leftModifier, rightModifier ->
+            if (wideInfoOpen) {
+                InfoBox(
+                    title = panelTitle(ActiveUtility.INFO),
+                    onClose = { wideInfoOpen = false },
+                    modifier = leftModifier
+                ) { panelBody(ActiveUtility.INFO) }
+            }
+            if (wideSide != ActiveUtility.NONE) {
+                InfoBox(
+                    title = panelTitle(wideSide),
+                    onClose = { toggleWide(wideSide) },
+                    modifier = rightModifier
+                ) { panelBody(wideSide) }
             }
         },
         footer = {
             FooterToolbar(
                 appMode = appMode,
-                activeUtility = highlightedUtility,
-                visualsEnabled = lissajousMode,
-                onUtilityClick = { utility ->
-                    if (activeUtility == utility) {
-                        radioViewModel.setActiveUtility(ActiveUtility.NONE)
-                    } else {
-                        val wasClosed = activeUtility == ActiveUtility.NONE
-                        if (wasClosed) {
-                            radioViewModel.setActiveUtility(utility)
-                        }
-                        
-                        coroutineScope.launch {
-                            val baseIndex = (pagerState.currentPage / 3) * 3
-                            val targetPage = baseIndex + when (utility) {
-                                ActiveUtility.INFO -> 0
-                                ActiveUtility.CHAT -> 1
-                                ActiveUtility.SETTINGS -> 2
-                                else -> 0
-                            }
-                            pagerState.scrollToPage(targetPage)
-                        }
-                    }
+                isSelected = { utility ->
+                    if (wide) (utility == ActiveUtility.INFO && wideInfoOpen) || utility == wideSide
+                    else utility == highlightedUtility
                 },
-                onToggleVisuals = { radioViewModel.setLissajousMode(!lissajousMode) }
+                visualsEnabled = lissajousMode,
+                onUtilityClick = onUtilityClick,
+                onToggleVisuals = { radioViewModel.setLissajousMode(!lissajousMode) },
+                modifier = if (wide) Modifier.widthIn(max = 600.dp) else Modifier,
+                containerColor = if (wide) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.25f)
             )
         }
     )
 }
 
+/** How the screen is laid out: the shape of the window decides, and rotating switches it on the fly. */
+enum class ScreenLayout {
+    /** Taller than wide: header on top, one panel at a time, toolbar along the bottom. */
+    PORTRAIT,
+    /** A phone on its side: the visuals fill the screen, one strip of controls, panels slide over on the right. */
+    CINEMA,
+    /** A tablet or unfolded phone on its side: the list and chat (or settings) open side by side. */
+    WIDE
+}
+
+/** Wide needs Material's "expanded" width and more than a phone's height: a phone on its side is ~900 x 400 dp. */
+private const val WIDE_MIN_WIDTH_DP = 840
+private const val WIDE_MIN_HEIGHT_DP = 480
+
+@Composable
+private fun rememberScreenLayout(): ScreenLayout {
+    val configuration = LocalConfiguration.current
+    val width = configuration.screenWidthDp
+    val height = configuration.screenHeightDp
+    return when {
+        width <= height -> ScreenLayout.PORTRAIT
+        width >= WIDE_MIN_WIDTH_DP && height >= WIDE_MIN_HEIGHT_DP -> ScreenLayout.WIDE
+        else -> ScreenLayout.CINEMA
+    }
+}
+
+/** The panel pager repeats Schedule/List, Chat, Settings, so it can be swiped round in either direction. */
+private fun utilityForPage(page: Int): ActiveUtility = when (page % 3) {
+    1 -> ActiveUtility.CHAT
+    2 -> ActiveUtility.SETTINGS
+    else -> ActiveUtility.INFO
+}
+
+private fun ActiveUtility.pageOffset(): Int = when (this) {
+    ActiveUtility.CHAT -> 1
+    ActiveUtility.SETTINGS -> 2
+    else -> 0
+}
+
 @Composable
 fun MainLayout(
+    screenLayout: ScreenLayout,
     showOscilloscope: Boolean,
     showInfoBox: Boolean,
     appTheme: AppTheme,
     controls: ControlsAutoHide,
     header: @Composable () -> Unit,
+    cinemaStrip: @Composable () -> Unit,
     oscilloscope: @Composable (Modifier) -> Unit,
-    infoBox: @Composable (Modifier) -> Unit,
+    infoBox: @Composable (Modifier, compact: Boolean) -> Unit,
+    widePanels: @Composable (left: Modifier, right: Modifier) -> Unit,
     footer: @Composable () -> Unit
 ) {
     val isKeyboardOpen = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
@@ -398,52 +532,130 @@ fun MainLayout(
             Modifier.background(MaterialTheme.colorScheme.background)
         }
 
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .then(backgroundModifier)
                 .restartsAutoHide(controls)
         ) {
+            val screenWidth = maxWidth
+            // The visuals stay at this one spot whatever the layout, so rotating doesn't restart them.
             if (showOscilloscope) {
                 oscilloscope(Modifier.fillMaxSize())
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .imePadding() 
-            ) {
-                Box(Modifier.graphicsLayer { alpha = controlsAlpha }) {
-                    header()
-                }
-                
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    if (showInfoBox) {
-                        infoBox(
-                            Modifier
-                                .fillMaxSize()
-                                .padding(16.dp)
-                        )
+            when (screenLayout) {
+                ScreenLayout.PORTRAIT -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .imePadding()
+                    ) {
+                        Box(Modifier.graphicsLayer { alpha = controlsAlpha }) {
+                            header()
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            if (showInfoBox) {
+                                infoBox(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp),
+                                    false
+                                )
+                            }
+                        }
+
+                        if (!isKeyboardOpen) {
+                            Spacer(modifier = Modifier.navigationBarsPadding().height(80.dp))
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .graphicsLayer { alpha = controlsAlpha }
+                    ) {
+                        footer()
                     }
                 }
-                
-                if (!isKeyboardOpen) {
-                    Spacer(modifier = Modifier.navigationBarsPadding().height(80.dp))
+
+                ScreenLayout.CINEMA -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .imePadding()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .then(if (isKeyboardOpen) Modifier else Modifier.statusBarsPadding())
+                                // A side navigation bar or a camera cutout can sit on either long edge.
+                                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                        ) {
+                            if (showInfoBox) {
+                                infoBox(
+                                    Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .fillMaxHeight()
+                                        .width((screenWidth * 0.45f).coerceIn(320.dp, 460.dp))
+                                        .padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+                                    // A landscape keyboard leaves ~150 dp: the panel gives it all to the chat.
+                                    isKeyboardOpen
+                                )
+                            }
+                        }
+                        // Typing in chat needs every bit of height, so the strip steps aside for the keyboard.
+                        if (!isKeyboardOpen) {
+                            Box(Modifier.graphicsLayer { alpha = controlsAlpha }) {
+                                cinemaStrip()
+                            }
+                        }
+                    }
                 }
-            }
-            
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .graphicsLayer { alpha = controlsAlpha }
-            ) {
-                footer()
+
+                ScreenLayout.WIDE -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .imePadding()
+                    ) {
+                        Box(Modifier.graphicsLayer { alpha = controlsAlpha }) {
+                            header()
+                        }
+                        val panelWidth = (screenWidth * 0.32f).coerceIn(320.dp, 440.dp)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                                .padding(16.dp)
+                        ) {
+                            widePanels(
+                                Modifier.align(Alignment.CenterStart).fillMaxHeight().width(panelWidth),
+                                Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(panelWidth)
+                            )
+                        }
+                        if (!isKeyboardOpen) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.25f))
+                                    .graphicsLayer { alpha = controlsAlpha },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                footer()
+                            }
+                        }
+                    }
+                }
             }
 
             RevealControlsLayer(controls)
