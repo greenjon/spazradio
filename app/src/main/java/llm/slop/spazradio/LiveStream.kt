@@ -9,6 +9,20 @@ import androidx.media3.common.MimeTypes
 /** Which live mount to play. Auto takes the low one on a metered network (Android counts most mobile data as metered). */
 enum class AudioQuality { AUTO, LOW, HIGH }
 
+/** How long to wait before re-preparing the live stream after a drop: 2, 4, 8, 16 s, then every 30 s, up to [MAX_ATTEMPTS]. */
+object RetryPolicy {
+    const val MAX_ATTEMPTS = 20
+    private val STEPS_MS = longArrayOf(2_000, 4_000, 8_000, 16_000)
+    private const val LONG_MS = 30_000L
+
+    /** Delay before retry number [attempt] (0-based), or null once the retries have run out. */
+    fun delayMs(attempt: Int): Long? = when {
+        attempt < 0 || attempt >= MAX_ATTEMPTS -> null
+        attempt < STEPS_MS.size -> STEPS_MS[attempt]
+        else -> LONG_MS
+    }
+}
+
 /** The live radio stream and the setting that picks its mount. */
 object LiveStream {
     const val MEDIA_ID = "spaz_radio_stream"

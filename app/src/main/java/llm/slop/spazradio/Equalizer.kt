@@ -193,6 +193,9 @@ class EqAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onFlush() {
+        // A new format may mean a new sample rate: force the filters to be recomputed.
+        applied = null
+        coeffs = emptyList()
         state.fill(0.0)
     }
 

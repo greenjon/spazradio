@@ -138,7 +138,7 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
     val audioQuality: StateFlow<AudioQuality> = _audioQuality.asStateFlow()
 
     private val _appTheme = MutableStateFlow(
-        AppTheme.valueOf(prefs.getString("app_theme", AppTheme.NEON.name) ?: AppTheme.NEON.name)
+        enumPref("app_theme", AppTheme.NEON)
     )
     val appTheme: StateFlow<AppTheme> = _appTheme.asStateFlow()
 
@@ -155,7 +155,12 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 mediaController = controller
                 setupController(controller)
                 
-                if (_appMode.value == AppMode.RADIO) {
+                // An archive already loaded in the service (the app was reopened while it plays) is left alone.
+                val current = controller.currentMediaItem
+                if (current != null && current.mediaId != liveStreamId) {
+                    _appMode.value = AppMode.ARCHIVES
+                    updateState(controller)
+                } else if (_appMode.value == AppMode.RADIO) {
                     if (_autoPlayEnabled.value) {
                         showLiveStream()
                     } else {
@@ -250,13 +255,13 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                     PlaybackUiState.Connecting
                 } else {
                     // IDLE and NOT trying to play means we are paused or waiting for manual start
-                    PlaybackUiState.Paused("", "") 
+                    PlaybackUiState.Paused 
                 }
             }
             Player.STATE_BUFFERING -> PlaybackUiState.Buffering
             Player.STATE_READY -> {
-                if (isPlaying) PlaybackUiState.Playing("", "")
-                else PlaybackUiState.Paused("", "")
+                if (isPlaying) PlaybackUiState.Playing
+                else PlaybackUiState.Paused
             }
             Player.STATE_ENDED -> PlaybackUiState.Reconnecting
             else -> PlaybackUiState.Connecting

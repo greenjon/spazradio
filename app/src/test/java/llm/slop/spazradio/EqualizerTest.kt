@@ -95,4 +95,19 @@ class EqualizerTest {
         val out = run(processor(EqBands(bassDb = 12)), tone(60.0, 9600, amp = 32000.0))
         assertTrue(peakOfTail(out) < 32767)
     }
+
+    @Test fun aNewSampleRateRecomputesTheFilters() {
+        val bands = EqBands(trebleDb = -12)
+        val input = tone(15000.0, 4800)
+        val p = processor(bands)
+        run(p, input) // filters computed for 48 kHz
+        p.configure(AudioProcessor.AudioFormat(96000, 2, C.ENCODING_PCM_16BIT))
+        p.flush()
+        val fresh = EqAudioProcessor().apply {
+            this.bands = bands
+            configure(AudioProcessor.AudioFormat(96000, 2, C.ENCODING_PCM_16BIT))
+            flush()
+        }
+        assertArrayEquals(run(fresh, input), run(p, input))
+    }
 }
