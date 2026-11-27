@@ -30,10 +30,8 @@
 -keepclassmembers class llm.slop.spazradio.data.** { *; }
 -keep class llm.slop.spazradio.RawShow { *; }
 -keep class llm.slop.spazradio.ScheduleItem { *; }
--keep class llm.slop.spazradio.TrackInfo { *; }
 -keepclassmembers class llm.slop.spazradio.RawShow { *; }
 -keepclassmembers class llm.slop.spazradio.ScheduleItem { *; }
--keepclassmembers class llm.slop.spazradio.TrackInfo { *; }
 
 # 6. MQTT
 -keep class org.eclipse.paho.client.mqttv3.** { *; }

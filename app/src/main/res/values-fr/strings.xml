@@ -117,8 +117,11 @@
     <string name="visuals_updates_failed">Serveur injoignable.</string>
 
     <!-- chat (audit 2026-11-26) -->
+    <string name="chat_online_count">%d en ligne</string>
     <string name="chat_error_connection">Problème de connexion au chat. Nouvelle tentative&#8230;</string>
     <string name="chat_not_sent">Non envoyé. Vérifiez votre connexion et réessayez.</string>
     <string name="chat_connecting">Connexion&#8230;</string>
     <string name="chat_send">Envoyer</string>
+    <string name="status_archive_error">Impossible de lire l’émission</string>
+    <string name="download_failed">Impossible de télécharger « %1$s ».</string>
 </resources>

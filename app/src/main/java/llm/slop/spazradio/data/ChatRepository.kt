@@ -32,6 +32,7 @@ class ChatRepository(
 
     // One at a time, in the order launched: connect, disconnect and presence changes never overlap. Cancelled
     // only by [shutdown], after its own disconnect has run.
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val serial = Dispatchers.IO.limitedParallelism(1)
     private val repositoryScope = CoroutineScope(serial + SupervisorJob())
     private var lastSend = 0L

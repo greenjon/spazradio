@@ -117,8 +117,11 @@
     <string name="visuals_updates_failed">Server nicht erreichbar.</string>
 
     <!-- chat (audit 2026-11-26) -->
+    <string name="chat_online_count">%d online</string>
     <string name="chat_error_connection">Chat-Verbindungsproblem. Neuer Versuch&#8230;</string>
     <string name="chat_not_sent">Nicht gesendet. Prüfe deine Verbindung und versuche es erneut.</string>
     <string name="chat_connecting">Verbinde&#8230;</string>
     <string name="chat_send">Senden</string>
+    <string name="status_archive_error">Sendung konnte nicht abgespielt werden</string>
+    <string name="download_failed">„%1$s“ konnte nicht heruntergeladen werden.</string>
 </resources>

@@ -143,6 +143,7 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.8.1")
 
     testImplementation(libs.junit)
+    testImplementation("net.sf.kxml:kxml2:2.3.0") // XmlPullParser for the RSS parser tests (Android ships kxml)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

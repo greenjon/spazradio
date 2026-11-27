@@ -302,6 +302,9 @@ class RadioViewModel(application: Application) : AndroidViewModel(application) {
                 if (_isArchivePlaying.value && !isLive) {
                     if (_playbackUiState.value == PlaybackUiState.Buffering) {
                         context.getString(R.string.status_buffering)
+                    } else if (_playbackUiState.value == PlaybackUiState.Reconnecting) {
+                        // Archives are not retried: say the show failed instead of showing its title.
+                        context.getString(R.string.status_archive_error)
                     } else {
                         _archiveTitle.value
                     }

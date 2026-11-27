@@ -33,6 +33,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -173,6 +175,13 @@ fun RadioApp(
         }
     }
     val downloadShow = rememberShowDownloader(archiveViewModel, radioViewModel)
+    // Collected once here (not per downloader) so a failure from the header or the archive list shows one toast.
+    val toastContext = LocalContext.current
+    LaunchedEffect(archiveViewModel) {
+        archiveViewModel.downloadFailures.collect { title ->
+            Toast.makeText(toastContext, toastContext.getString(R.string.download_failed, title), Toast.LENGTH_LONG).show()
+        }
+    }
 
     // Only worth hiding when there is a picture to watch and nothing open to read.
     val controls = rememberControlsAutoHide(
