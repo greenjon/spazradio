@@ -1,7 +1,17 @@
-SPAZ Radio is an open-source radio player for the SPAZ.Radio audio stream featuring real-time, sound-reactive visualizations.
+SPAZ Radio is an open-source player for SPAZ.Radio: the live stream, the show archive, chat and a sound-reactive picture behind it all.
 
-Features:
-- Live audio streaming
-- Liquid LSD audio-reactive visuals (the picture from spaz.org/tv), built in and working offline; a Lissajous scope on devices without WebGL2
-- Lightweight, native Android implementation
-- No ads, no tracking
+What it does:
+- Live radio, with a normal and a low-bitrate stream. Auto picks the low one on mobile data.
+- Now playing: see what is on air right now.
+- Schedule: what is coming up.
+- Archives: browse and search past shows, play them with seeking, and use the jukebox.
+- Downloads: save a whole show to your phone. The app asks first on mobile data.
+- Live chat with other listeners, under a nickname you pick.
+- Equalizer: off, a simple built-in bass/mid/treble one, or your phone's own system equalizer.
+- Liquid LSD visuals: the same audio-reactive picture as spaz.org/tv, built into the app and working offline. Settings let you change quality, reaction to the music, picture delay for Bluetooth speakers, reduced motion, following live artists' visuals, and optional scene updates. Phones without WebGL2 get a simple scope instead.
+- Controls fade away while the visuals play, and the display goes dark when the phone is in a pocket.
+- Auto-start: optionally begin playing as soon as the app opens.
+- Four themes: Neon, Light, Dark and System Auto.
+- Available in English, German, Spanish and French.
+
+No ads, no accounts, no tracking. The source code and privacy policy are at github.com/greenjon/spazradio.

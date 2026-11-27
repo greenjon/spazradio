@@ -49,6 +49,15 @@ android {
                 keyAlias = aliasName
                 keyPassword = keyPass ?: storePass
             } else {
+                // No usable key. Only allowed for builds that do not make a release artifact, or when asked for
+                // explicitly (-PallowDebugSigning, used by CI for tester beta builds): never ship the debug key by accident.
+                val releaseRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+                if (releaseRequested && !project.hasProperty("allowDebugSigning")) {
+                    throw GradleException(
+                        "No release signing key found (KEYSTORE_PATH/KEYSTORE_PASSWORD/KEY_ALIAS env or key.properties, " +
+                            "see key.properties.example). Pass -PallowDebugSigning to build a debug-signed release on purpose."
+                    )
+                }
                 initWith(getByName("debug"))
             }
         }

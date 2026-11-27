@@ -24,18 +24,15 @@ jobs:
 
       - run: chmod +x gradlew
 
-      - name: Compute Version
-        run: |
-          COUNT=$(git rev-list --count HEAD)
-          echo "VERSION_CODE=$COUNT" >> $GITHUB_ENV
-          echo "VERSION_NAME=1.0.$COUNT-nightly" >> $GITHUB_ENV
-          echo "VERSION_TAG=nightly-$COUNT" >> $GITHUB_ENV
+      - name: Compute Tag
+        run: echo "VERSION_TAG=nightly-$(git rev-list --count HEAD)" >> $GITHUB_ENV
 
+      - name: Unit tests and lint
+        run: ./gradlew testDebugUnitTest lintDebug
+
+      # The APK carries the versionName/versionCode from app/build.gradle.kts; only the release tag and file name differ.
       - name: Build Debug APK
-        run: |
-          ./gradlew assembleDebug \
-            -PVERSION_CODE=${{ env.VERSION_CODE }} \
-            -PVERSION_NAME=${{ env.VERSION_NAME }}
+        run: ./gradlew assembleDebug
 
       - name: Rename APK
         run: |

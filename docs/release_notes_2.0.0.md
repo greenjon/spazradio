@@ -1,3 +1,5 @@
+*Historical: the GitHub release notes for v2.0.0. Later releases are described in `fastlane/metadata/android/en-US/changelogs/`.*
+
 **SPAZ Radio 2.0 puts a live, audio-reactive picture behind the radio.** These are the changes since 1.6.3.
 
 ## Liquid LSD visuals

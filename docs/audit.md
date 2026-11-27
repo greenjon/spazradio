@@ -118,8 +118,10 @@ Files: `ArchiveViewModel`, `data/Archive*`, `ArchiveContent`, `DownloadTracker`,
 - RSS parse survives malformed items, missing enclosures and HTML in titles.
 - `olde/` 404s: the web TV v60 fallback has been ported, or this is still listed as a known gap.
 - The mobile-data prompt appears on metered networks and is remembered as documented.
-- Downloads: they are saved where the UI says, cancel and failure are surfaced, there are no duplicates, and the
-  FileProvider exposes only the download directory.
+- Downloads: they are saved where the UI says, cancel and failure are surfaced, and there are no duplicates.
+  Downloads do not use the FileProvider (DownloadManager writes to public Music). The FileProvider serves the
+  cache dir (`file_paths.xml`) for sharing the debug log only, is not exported and grants URIs per file; check that
+  nothing sensitive is written to the cache dir.
 - Seeking and resuming archive playback still go through A1's service path.
 
 ### A4. Chat
@@ -170,8 +172,6 @@ Files: `MainActivity`, `UiState`, `InfoDisplay`, `Header`, `FooterToolbar`, `Inf
   header, footer, chat, archives and settings.
 - Font scale at 200%, a small screen (360 dp) and landscape: nothing clips or overlaps.
 - Icon-only buttons have a `contentDescription`.
-- `app/src/res/values-es/strings.xml` sits outside `main/` and is ignored by the build. Delete it, or merge it if
-  its wording is the better one.
 
 ### A8. Privacy, permissions, network security
 
@@ -194,9 +194,9 @@ Files: manifest (shared), `PRIVACY.md`, `SpazNetwork`/`NetworkMonitor` (shared),
 ### A9. Build and release
 
 Files: Gradle files and lockfiles (shared), `proguard-rules.pro`, `.github/workflows/*`, `fastlane/{Appfile,Fastfile}`,
-`Gemfile`, `fdroid.yml`, `metadata/*`, `key.properties.example`, `app/release/*`.
+`Gemfile`, `key.properties.example`, `app/release/*`.
 
-- `versionCode` is greater than the last released one, on GitHub, F-Droid and Play.
+- `versionCode` is greater than the last released one, on GitHub and Play.
 - `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` exists and is at most 500 characters.
 - The R8 release build runs (A0). The keep rules cover reflection, serialization and the JS bridge.
 - Lockfiles are updated with any dependency change, and there are no unreviewed version jumps.
@@ -204,12 +204,13 @@ Files: Gradle files and lockfiles (shared), `proguard-rules.pro`, `.github/workf
   `key.properties`).
 - The GitHub release asset is still named `app-release.apk`, because the sticker QR page at spaz.org/go/ depends on
   it.
-- The F-Droid metadata (`fdroid.yml`, `metadata/llm.slop.spazradio.yml`) builds the same version.
+- CI runs unit tests and lint before publishing (`testDebugUnitTest lintDebug` in `release.yml` and `nightly.yml`).
+- A release build without signing secrets fails unless `-PallowDebugSigning` is given on purpose.
 - No junk is tracked. Candidates seen so far are `exit`, `.kotlin/errors/*.log` and `app/release/output-metadata.json`.
 
 ### A10. Docs, store text, tracking
 
-Files: `README.md`, `CONTRIBUTING.md`, `LICENSE`, `fastlane/metadata/**` text, `fastlane/release_notes_*.md`,
+Files: `README.md`, `CONTRIBUTING.md`, `LICENSE`, `fastlane/metadata/**` text, `docs/release_notes_*.md`,
 `docs/*`.
 
 - Every user-visible commit since the baseline is in the next changelog.
