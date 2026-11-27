@@ -9,20 +9,23 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
 
 class NetworkMonitor(context: Context) {
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     val isOnline: Flow<Boolean> = callbackFlow {
+        // Wi-Fi and mobile can be up together: online means at least one network is, not "the last event said so".
+        val networks = mutableSetOf<Network>()
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                launch { send(true) }
+                synchronized(networks) { networks.add(network) }
+                trySend(true)
             }
 
             override fun onLost(network: Network) {
-                launch { send(false) }
+                val online = synchronized(networks) { networks.remove(network); networks.isNotEmpty() }
+                trySend(online)
             }
         }
 

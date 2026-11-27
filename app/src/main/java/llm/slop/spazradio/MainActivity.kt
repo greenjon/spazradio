@@ -13,6 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -43,7 +44,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -94,8 +97,13 @@ class MainActivity : AppCompatActivity() {
             val radioViewModel: RadioViewModel = viewModel()
             val appTheme by radioViewModel.appTheme.collectAsState()
             
-            val isDarkTheme = appTheme == AppTheme.DARK || appTheme == AppTheme.NEON
-            LaunchedEffect(appTheme) {
+            val systemDark = isSystemInDarkTheme()
+            val isDarkTheme = when (appTheme) {
+                AppTheme.DARK, AppTheme.NEON -> true
+                AppTheme.LIGHT -> false
+                AppTheme.AUTO -> systemDark
+            }
+            LaunchedEffect(isDarkTheme) {
                 if (isDarkTheme) {
                     enableEdgeToEdge(
                         statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -234,6 +242,9 @@ fun RadioApp(
         }
     }
 
+    // Back closes an open panel before it leaves the app.
+    BackHandler(enabled = activeUtility != ActiveUtility.NONE) { radioViewModel.closeInfoBox() }
+
     MainLayout(
         showOscilloscope = lissajousMode,
         showInfoBox = activeUtility != ActiveUtility.NONE,
@@ -277,19 +288,19 @@ fun RadioApp(
         },
         infoBox = { modifier ->
             if (activeUtility != ActiveUtility.NONE) {
-                val title by remember(pagerState, appMode) {
+                val titleRes by remember(pagerState, appMode) {
                     derivedStateOf {
                         when (pagerState.currentPage % 3) {
-                            0 -> if (appMode == AppMode.RADIO) "Schedule" else "Archives"
-                            1 -> "Chat"
-                            2 -> "Settings"
-                            else -> ""
+                            0 -> if (appMode == AppMode.RADIO) R.string.schedule_title else R.string.label_archives
+                            1 -> R.string.label_chat
+                            2 -> R.string.settings_title
+                            else -> R.string.app_name
                         }
                     }
                 }
 
                 InfoBox(
-                    title = title,
+                    title = stringResource(titleRes),
                     onClose = { radioViewModel.closeInfoBox() },
                     modifier = modifier
                 ) {

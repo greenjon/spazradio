@@ -1,20 +1,20 @@
 <resources>
+    <!-- audit 2026-11-26 -->
+    <string name="error_schedule">Programm nicht verfügbar</string>
+    <string name="schedule_empty">Keine kommenden Sendungen</string>
+    <string name="send_logs_chooser">Protokolle senden über&#8230;</string>
+    <string name="send_logs_subject">SPAZ Radio Debug-Protokolle</string>
     <string name="app_name">SPAZ Radio</string>
     <string name="listening_template">%d Zuhörer</string>
     <string name="schedule_title">Programm</string>
     <string name="settings_title">Einstellungen</string>
-    <string name="show_schedule">Programm anzeigen</string>
-    <string name="show_visuals">Visualisierungen anzeigen</string>
     
     <string name="status_connecting">Verbinden…</string>
     <string name="status_reconnecting">Wiederverbindung</string>
     <string name="status_buffering">Puffern</string>
-    <string name="label_archive">Archiv</string>
     <string name="label_archives">Archive</string>
     <string name="search_archives">Archive durchsuchen…</string>
     <string name="action_close">Schließen</string>
-    <string name="label_live">Live</string>
-    <string name="toast_download_started">Download gestartet: %s</string>
     <string name="loading_archives">Archive laden…</string>
     <string name="label_radio">Radio</string>
     <string name="label_play">Abspielen</string>
@@ -34,7 +34,6 @@
     <string name="chat_hint">Nachricht schreiben…</string>
     <string name="chat_join">Chat beitreten</string>
     <string name="chat_name_hint">Spitzname</string>
-    <string name="chat_online_count">%d online</string>
 
     <string name="chat_settings">Chat-Einstellungen</string>
     <string name="reset_username">Benutzername zurücksetzen</string>
@@ -42,7 +41,6 @@
     <string name="reset_dialog_text">Dadurch wirst du vom Chat getrennt. Beim nächsten Öffnen wirst du nach einem neuen Namen gefragt.</string>
     <string name="action_reset">Zurücksetzen</string>
     <string name="action_cancel">Abbrechen</string>
-    <string name="settings_placeholder">Weitere Einstellungen erscheinen hier.</string>
     <string name="label_visuals">Visuals</string>
     <string name="label_list">Liste</string>
     
@@ -54,7 +52,7 @@
 
     <string name="label_archives_count">%d Sendungen</string>
 
-    <string name="privacy_info_text">Wir sammeln keine Daten. Dieses Projekt ist Open Source. Das Projekt und unsere Datenschutzbestimmungen finden Sie %s</string>
+    <string name="privacy_info_text">Diese App hat keine Konten, keine Werbung und keine Analyse. Chat-Spitznamen und -Nachrichten sind öffentlich. Dieses Projekt ist Open Source. Unsere Datenschutzbestimmungen finden Sie %s</string>
     <string name="privacy_link_text">hier.</string>
 
     <string name="debug_settings">Debug &amp; Support</string>

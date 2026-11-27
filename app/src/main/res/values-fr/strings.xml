@@ -1,20 +1,20 @@
 <resources>
+    <!-- audit 2026-11-26 -->
+    <string name="error_schedule">Programme indisponible</string>
+    <string name="schedule_empty">Aucune émission à venir</string>
+    <string name="send_logs_chooser">Envoyer les journaux via&#8230;</string>
+    <string name="send_logs_subject">Journaux de débogage SPAZ Radio</string>
     <string name="app_name">SPAZ Radio</string>
     <string name="listening_template">%d auditeurs</string>
     <string name="schedule_title">Programme</string>
     <string name="settings_title">Paramètres</string>
-    <string name="show_schedule">Afficher le programme</string>
-    <string name="show_visuals">Afficher les visuels</string>
     
     <string name="status_connecting">Connexion…</string>
     <string name="status_reconnecting">Reconnexion</string>
     <string name="status_buffering">Mise en mémoire tampon</string>
-    <string name="label_archive">Archive</string>
     <string name="label_archives">Archives</string>
     <string name="search_archives">Rechercher dans les archives…</string>
     <string name="action_close">Fermer</string>
-    <string name="label_live">En direct</string>
-    <string name="toast_download_started">Téléchargement commencé : %s</string>
     <string name="loading_archives">Chargement des archives…</string>
     <string name="label_radio">Radio</string>
     <string name="label_play">Lire</string>
@@ -34,7 +34,6 @@
     <string name="chat_hint">Écrivez un message…</string>
     <string name="chat_join">Rejoindre le chat</string>
     <string name="chat_name_hint">Pseudo</string>
-    <string name="chat_online_count">%d en ligne</string>
 
     <string name="chat_settings">Paramètres du chat</string>
     <string name="reset_username">Réinitialiser le pseudo</string>
@@ -42,7 +41,6 @@
     <string name="reset_dialog_text">Cela vous déconnectera du chat. Un nouveau pseudo vous sera demandé lors de votre prochaine connexion.</string>
     <string name="action_reset">Réinitialiser</string>
     <string name="action_cancel">Annuler</string>
-    <string name="settings_placeholder">D\'autres paramètres apparaîtront ici.</string>
     <string name="label_visuals">Visuels</string>
     <string name="label_list">Liste</string>
     
@@ -54,7 +52,7 @@
 
     <string name="label_archives_count">%d émissions</string>
 
-    <string name="privacy_info_text">Nous ne collectons aucune donnée. Ce projet est open source. Le projet et notre politique de confidentialité sont %s</string>
+    <string name="privacy_info_text">Cette appli n\'a ni compte, ni publicité, ni statistiques. Les pseudos et messages du chat sont publics. Ce projet est open source. Notre politique de confidentialité est %s</string>
     <string name="privacy_link_text">ici.</string>
 
     <string name="debug_settings">Débogage et Support</string>

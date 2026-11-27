@@ -19,7 +19,9 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import llm.slop.spazradio.R
 import llm.slop.spazradio.ActiveUtility
 import llm.slop.spazradio.AppMode
 
@@ -42,7 +44,7 @@ fun FooterToolbar(
         tonalElevation = 0.dp,
         windowInsets = NavigationBarDefaults.windowInsets
     ) {
-        val infoLabel = if (appMode == AppMode.RADIO) "Schedule" else "List"
+        val infoLabel = stringResource(if (appMode == AppMode.RADIO) R.string.schedule_title else R.string.label_list)
         val infoIcon = if (appMode == AppMode.RADIO) Icons.AutoMirrored.Filled.EventNote else Icons.AutoMirrored.Filled.List
         
         NavigationBarItem(
@@ -56,24 +58,24 @@ fun FooterToolbar(
         NavigationBarItem(
             selected = activeUtility == ActiveUtility.CHAT,
             onClick = { onUtilityClick(ActiveUtility.CHAT) },
-            icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat") },
-            label = { Text("Chat") },
+            icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.label_chat)) },
+            label = { Text(stringResource(R.string.label_chat)) },
             colors = navigationBarItemColors()
         )
 
         NavigationBarItem(
             selected = activeUtility == ActiveUtility.SETTINGS,
             onClick = { onUtilityClick(ActiveUtility.SETTINGS) },
-            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-            label = { Text("Settings") },
+            icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title)) },
+            label = { Text(stringResource(R.string.settings_title)) },
             colors = navigationBarItemColors()
         )
 
         NavigationBarItem(
             selected = visualsEnabled,
             onClick = onToggleVisuals,
-            icon = { Icon(Icons.Default.Waves, contentDescription = "Visuals") },
-            label = { Text("Visuals") },
+            icon = { Icon(Icons.Default.Waves, contentDescription = stringResource(R.string.label_visuals)) },
+            label = { Text(stringResource(R.string.label_visuals)) },
             colors = navigationBarItemColors()
         )
     }

@@ -1,13 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
--->
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-Android 12 Auto Backup. Keeps the small prefs (theme, equalizer, autoplay, chat nickname);
+     leaves out the downloaded visuals content (tens of MB, rebuilt by the updater) and caches. -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="file" path="visuals-content/" />
+    <exclude domain="cache" path="." />
 </full-backup-content>

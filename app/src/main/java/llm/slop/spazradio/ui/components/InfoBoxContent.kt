@@ -36,13 +36,15 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.LinkAnnotation
@@ -74,6 +76,7 @@ fun SettingsContent(
     val currentTheme by radioViewModel.appTheme.collectAsState()
     val autoPlayEnabled by radioViewModel.autoPlayEnabled.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
     Column(
@@ -119,7 +122,7 @@ fun SettingsContent(
                     }
                 }
                 Text(
-                    text = if (showThemeMenu) "CLOSE" else "CHANGE",
+                    text = if (showThemeMenu) stringResource(R.string.action_close_caps) else stringResource(R.string.action_change),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -172,7 +175,7 @@ fun SettingsContent(
                         Text(
                             text = stringResource(R.string.autoplay_radio),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -191,7 +194,7 @@ fun SettingsContent(
                 Text(
                     text = stringResource(R.string.audio_quality),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 ChipRow(
                     options = listOf(
@@ -205,7 +208,7 @@ fun SettingsContent(
                 Text(
                     text = stringResource(R.string.audio_quality_help),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -220,7 +223,7 @@ fun SettingsContent(
                 Text(
                     text = stringResource(R.string.download_ask_metered),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
                 Switch(
@@ -243,7 +246,7 @@ fun SettingsContent(
 
             // Debug & Logs Section
             Text(
-                text = "Debug & Support",
+                text = stringResource(R.string.debug_settings),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 8.dp)
@@ -251,7 +254,7 @@ fun SettingsContent(
             Spacer(modifier = Modifier.height(12.dp))
             
             OutlinedButton(
-                onClick = { LogCollector.shareLogs(context) },
+                onClick = { scope.launch { LogCollector.shareLogs(context) } },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.primary,
@@ -260,7 +263,7 @@ fun SettingsContent(
             ) {
                 Icon(Icons.Default.BugReport, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Send Debug Logs")
+                Text(stringResource(R.string.send_debug_logs))
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
@@ -277,7 +280,7 @@ fun SettingsContent(
                 onClick = { showResetDialog = true },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = Color.White
+                    contentColor = MaterialTheme.colorScheme.onError
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -314,14 +317,16 @@ fun SettingsContent(
         Spacer(modifier = Modifier.height(32.dp))
 
         // Privacy & Info Section - Updated to avoid deprecated ClickableText
-        val privacyInfo = stringResource(R.string.privacy_info_text, "")
+        // The string holds one %s where the link goes; fill it with a marker and split on that.
+        val marker = "\u0000"
+        val privacyInfo = stringResource(R.string.privacy_info_text, marker)
         val linkText = stringResource(R.string.privacy_link_text)
         val annotatedString = buildAnnotatedString {
-            val parts = privacyInfo.split("%s")
+            val parts = privacyInfo.split(marker)
             append(parts[0])
             withLink(
                 LinkAnnotation.Url(
-                    url = "https://github.com/greenjon/spazradio",
+                    url = "https://github.com/greenjon/spazradio/blob/main/PRIVACY.md",
                     styles = TextLinkStyles(
                         style = SpanStyle(
                             color = MaterialTheme.colorScheme.primary,
@@ -340,8 +345,8 @@ fun SettingsContent(
         Text(
             text = annotatedString,
             style = MaterialTheme.typography.bodySmall.copy(
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                fontSize = 10.sp
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
             ),
             modifier = Modifier.padding(top = 16.dp, bottom = 16.dp)
         )
@@ -366,7 +371,7 @@ fun ThemeOption(
             onClick = onClick,
             colors = RadioButtonDefaults.colors(
                 selectedColor = MaterialTheme.colorScheme.primary,
-                unselectedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
         Spacer(modifier = Modifier.width(8.dp))
@@ -386,10 +391,19 @@ fun ScheduleContent(
     val loading by scheduleViewModel.loading.collectAsState()
     val error by scheduleViewModel.error.collectAsState()
 
+    // Poll and re-format only while the panel is on screen.
+    LaunchedEffect(Unit) { scheduleViewModel.keepFresh() }
+
     if (loading) {
         LoadingContent()
-    } else if (error != null) {
-        ErrorContent(message = stringResource(R.string.error_archives), onRetry = { scheduleViewModel.loadSchedule() })
+    } else if (error) {
+        ErrorContent(message = stringResource(R.string.error_schedule), onRetry = { scheduleViewModel.loadSchedule() })
+    } else if (schedule.isEmpty()) {
+        Text(
+            text = stringResource(R.string.schedule_empty),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize()
