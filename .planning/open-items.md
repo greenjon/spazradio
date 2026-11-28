@@ -14,7 +14,6 @@ Items left open by audits, plus owner decisions. Strike or delete them as they a
   - the pocket sensor
   - landscape (branch `landscape-layouts`): a phone on its side (cinema strip, panel on the right, chat with the
     keyboard up) and a tablet or foldable (two panels, Settings in Chat's slot, rotating both ways)
-- **Resync liquid-lsd-android** to liquid-lsd e6901b3 (merged to liquid-lsd main 2026-11-26).
 - **Play Console Data safety (A8-11).** Re-check it against the rewritten `PRIVACY.md`.
 
 - **Landscape and tablet screenshots** for the Play listing, once landscape is checked on real devices.
